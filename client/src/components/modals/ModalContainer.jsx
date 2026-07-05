@@ -836,9 +836,9 @@ export function ModalContainer({ mainPlayerId = 0 }) {
                    const c = me.hand[idx];
                    if (c.name !== 'Chém') {
                       const activeSkill = c.name === 'Né' && hasDoiNui ? 'Dời Núi' : 'Khai Thiên';
-                      handleResponseAction({ doReact: true, virtualCardName: 'Chém', activeSkill, cardIndexSelected: idx });
+                      handleResponseAction({ doReact: true, virtualCardName: 'Chém', activeSkill, cardIndexSelected: idx, cardId: c.id });
                    } else {
-                      handleResponseAction({ doReact: true, cardIndexSelected: idx });
+                      handleResponseAction({ doReact: true, cardIndexSelected: idx, cardId: c.id });
                    }
                 }}
                 onCancel={() => handleResponseAction({ doReact: false })}
@@ -933,7 +933,14 @@ export function ModalContainer({ mainPlayerId = 0 }) {
                 validCards={validCards}
                 confirmText="💖 Dùng cứu"
                 cancelText="⏭️ Bỏ qua"
-                onSelect={(idx) => handleResponseAction({ askerId: 0, doSave: true, cardIndexSelected: idx })}
+                onSelect={(idx) => {
+                   const c = validCards.find(card => card.idx === idx);
+                   if (c.originalName || (c.name !== 'Đào' && c.name !== 'Rượu')) {
+                      handleResponseAction({ askerId: 0, doSave: true, virtualCardName: c.name, activeSkill: c.virtualReason, cardIndexSelected: idx, cardId: c.id });
+                   } else {
+                      handleResponseAction({ askerId: 0, doSave: true, cardIndexSelected: idx, cardId: c.id });
+                   }
+                }}
                 onCancel={() => handleResponseAction({ askerId: 0, doSave: false })}
               />
             </div>
@@ -1037,9 +1044,9 @@ export function ModalContainer({ mainPlayerId = 0 }) {
                    const c = me.hand[idx];
                    if (c.name !== reqCardName) {
                       const activeSkill = c.name === (reqCardName === 'Chém' ? 'Né' : 'Chém') && hasDoiNui ? 'Dời Núi' : 'Khai Thiên';
-                      handleResponseAction({ doReact: true, virtualCardName: reqCardName, activeSkill, cardIndexSelected: idx });
+                      handleResponseAction({ doReact: true, virtualCardName: reqCardName, activeSkill, cardIndexSelected: idx, cardId: c.id });
                    } else {
-                      handleResponseAction({ doReact: true, cardIndexSelected: idx });
+                      handleResponseAction({ doReact: true, cardIndexSelected: idx, cardId: c.id });
                    }
                 }}
                 onCancel={() => handleResponseAction({ doReact: false })}
