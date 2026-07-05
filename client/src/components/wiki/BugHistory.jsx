@@ -49,11 +49,11 @@ const BUG_DATA = [
   },
   {
     id: 6,
-    title: "[Lỗi UI & Ghi Tên Log] Pop-up Hóa Giải, Invalid Date, và Thiếu giải thích Kỹ Năng",
-    labels: ["Lỗi UI", "UX", "Sai Tên Hiển Thị"],
-    symptom: "1. Pop-up hỏi Hóa Giải bị mất tên người dùng (hiện 'Ai đó'), và tự hiện dù không có bài Hóa Giải.\n2. Bảng Game Log hiển thị nhiều dòng trắng có chữ `[Invalid Date]`.\n3. Log Game chỉ ghi tên tướng chung chung khi gây sát thương (như Sét đánh của Phạt Tội), không giải thích rõ là do kỹ năng gì.",
-    cause: "1. Thiếu gán `req.lastNegaterId` và thiếu text giải thích kỹ năng ẩn trong Modal Hóa Giải.\n2. Lỗi log hiện đầy đủ tên tướng (lộ liễu, rối rắm).\n3. `Reducer.js` đẩy log dạng chuỗi String thuần túy thay vì Object có `timestamp`, khiến `GameView` văng lỗi `[Invalid Date]`.\n4. Lời thoại Log của các kỹ năng (như Phạt Tội) trước đây viết quá gọn, thiếu diễn giải nguyên nhân sát thương.",
-    fix: "- **Khắc phục Modal & Tên Log**: Thêm text giải thích kỹ năng ẩn vào Modal. Gán `req.lastNegaterId` vào Dispatcher. Định dạng lại log: Tự động thêm nhãn **(Đồng Minh)** / **(Kẻ Thù)** thay vì lộ tên Tướng.\n- **Khắc phục Log Date**: Đồng bộ `AddLogEffect` và `Reducer.js` để đẩy Object `{ text, type, timestamp }` vào `history`.\n- **Minh Bạch Kỹ Năng**: Viết lại Log rõ ràng nguyên nhân: `bị Sét Đánh mất 2 Sinh Lực vì kỹ năng [Phạt Tội] (do phán xét ra ♠)`.",
+    title: "[Lỗi UI & Ghi Tên Log] Pop-up Modal, Invalid Date, và Thiếu giải thích Kỹ Năng",
+    labels: ["Lỗi UI", "UX", "Sai Tên Hiển Thị", "Critical"],
+    symptom: "1. TẤT CẢ Pop-up (hỏi Né, Hóa Giải, Chọn Kỹ Năng...) hoàn toàn tàng hình và báo 'Lỗi hiển thị kỹ năng' nếu chơi chế độ Multiplayer (người chơi không phải Player 1).\n2. Lỗi mất tên Hóa Giải ('Ai đó').\n3. Bảng Game Log hiển thị dòng `[Invalid Date]` hoặc `[DRAW] 1 rút 2 lá bài`.\n4. Log Game sát thương không giải thích là do kỹ năng gì.",
+    cause: "1. Toàn bộ `ModalContainer.jsx` bị hardcode sai lầm kiểm tra `req.responderId === 0` thay vì ID thực tế của người chơi (`me.id`), và thiết lập sai điều kiện `!req.reason` khiến các lệnh Đòi Né từ Chém (`reason: 'chem'`) bị rớt đài chặn lại.\n2. Lỗi log hiện đầy đủ tên tướng (lộ liễu, rối rắm).\n3. `Reducer.js` đẩy chuỗi String thuần túy thay vì Object `{timestamp}` vào `history`, và nhét thẳng ID gốc (0, 1) vào text.\n4. Lời thoại Log thiếu diễn giải nguyên nhân sát thương.",
+    fix: "- **Khắc phục Khủng hoảng Modal**: Càn quét và thay thế hàng loạt lệnh `req.responderId === 0` thành `req.responderId === me.id` trong `ModalContainer.jsx`. Nới lỏng điều kiện `ask_dodge` để chấp nhận `req.reason === 'chem'`.\n- **Khắc phục Modal & Tên Log**: Thêm giải thích kỹ năng ẩn vào Modal Hóa Giải. Gán `req.lastNegaterId` vào Dispatcher. Tự động thêm nhãn **(Đồng Minh)** / **(Kẻ Thù)**.\n- **Khắc phục Log Date & ID**: Đồng bộ đẩy Object vào `history`. Dịch ID thành `Người chơi X` trực tiếp trong Reducer.\n- **Minh Bạch Kỹ Năng**: Viết lại Log rõ ràng nguyên nhân: `bị Sét Đánh mất 2 Sinh Lực vì kỹ năng [Phạt Tội]`.",
     status: "Fixed"
   },
   {

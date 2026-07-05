@@ -95,7 +95,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           minWidth: '280px',
         };
         // Ask Khai Quốc
-        if (req.type === 'ask_khai_quoc' && req.responderId === 0) {
+        if (req.type === 'ask_khai_quoc' && req.responderId === me.id) {
             return (
               <div style={modalStyle}>
                 <div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: 'var(--color-gold)' }}>
@@ -122,7 +122,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
               </div>
             );
         }
-        if (req.type === 'ask_snatch' && req.responderId === 0) {
+        if (req.type === 'ask_snatch' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <AskSnatchDismantleModal req={req} gameState={gameState} onConfirm={handleResponseAction} isSnatch={true} />
@@ -130,7 +130,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
         
-        if (req.type === 'ask_dismantle' && req.responderId === 0) {
+        if (req.type === 'ask_dismantle' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <AskSnatchDismantleModal req={req} gameState={gameState} onConfirm={handleResponseAction} isSnatch={false} />
@@ -139,7 +139,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         }
 
         // Quân Cơ Ask
-        if (req.type === 'ask_quan_co' && req.responderId === 0) {
+        if (req.type === 'ask_quan_co' && req.responderId === me.id) {
             const targetPlayer = gameState.players[req.targetId];
             const targetName = getFullPlayerName(targetPlayer, me.id);
             const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => c.name === req.reqCard);
@@ -164,7 +164,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         }
         
         // Quân Cơ Draw Ask (for the target)
-        if (req.type === 'ask_quan_co_draw' && req.responderId === 0) {
+        if (req.type === 'ask_quan_co_draw' && req.responderId === me.id) {
             const helperPlayer = gameState.players[req.targetId];
             const helperName = getFullPlayerName(helperPlayer, me.id);
             
@@ -188,7 +188,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
             );
         }
 
-        if (req.type === 'ask_banh_chung' && req.responderId === 0) {
+        if (req.type === 'ask_banh_chung' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <BanhChungModal req={req} onConfirm={handleResponseAction} />
@@ -199,7 +199,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         
         
         
-        if (req.type === 'ask_can_gian' && req.responderId === 0) {
+        if (req.type === 'ask_can_gian' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               
@@ -210,7 +210,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_thong_ngon' && req.responderId === 0) {
+        if (req.type === 'ask_thong_ngon' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               
@@ -221,7 +221,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_hau_vien' && req.responderId === 0) {
+        if (req.type === 'ask_hau_vien' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               
@@ -232,7 +232,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_tien_phat' && req.responderId === 0) {
+        if (req.type === 'ask_tien_phat' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <TienPhatModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -240,7 +240,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_doat_sao' && req.responderId === 0) {
+        if (req.type === 'ask_doat_sao' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <DoatSaoModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -248,7 +248,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_hien_hau' && req.responderId === 0) {
+        if (req.type === 'ask_hien_hau' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#ec4899', fontWeight: 'bold' }}>🌸 HIỀN HẬU</div>
@@ -262,7 +262,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_that_tram_so' && req.responderId === 0) {
+        if (req.type === 'ask_that_tram_so' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#ef4444', fontWeight: 'bold' }}>📜 THẤT TRẢM SỚ</div>
@@ -275,7 +275,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_that_tram_so_punish' && req.responderId === 0) {
+        if (req.type === 'ask_that_tram_so_punish' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#ef4444', fontWeight: 'bold' }}>⚖️ HÌNH PHẠT THẤT TRẢM SỚ</div>
@@ -288,7 +288,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_doi_su' && req.responderId === 0) {
+        if (req.type === 'ask_doi_su' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#3b82f6', fontWeight: 'bold' }}>🗣️ ĐỐI SỨ</div>
@@ -301,7 +301,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_hoa_nghi' && req.responderId === 0) {
+        if (req.type === 'ask_hoa_nghi' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#10b981', fontWeight: 'bold' }}>🕊️ HÒA NGHỊ</div>
@@ -314,7 +314,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_ho_chu' && req.responderId === 0) {
+        if (req.type === 'ask_ho_chu' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#f59e0b', fontWeight: 'bold' }}>🛡️ HỘ CHỦ</div>
@@ -327,7 +327,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_can_gian' && req.responderId === 0) {
+        if (req.type === 'ask_can_gian' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#f59e0b', fontWeight: 'bold' }}>✋ CAN GIÁN</div>
@@ -340,7 +340,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_xa_than' && req.responderId === 0) {
+        if (req.type === 'ask_xa_than' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#ec4899', fontWeight: 'bold' }}>🌸 XẢ THÂN</div>
@@ -353,7 +353,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_xuan_huong' && req.responderId === 0) {
+        if (req.type === 'ask_xuan_huong' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#ec4899', fontWeight: 'bold' }}>🌸 XUÂN HƯƠNG</div>
@@ -366,7 +366,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_bach_dang' && req.responderId === 0) {
+        if (req.type === 'ask_bach_dang' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <BachDangModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -374,7 +374,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
         
-        if (req.type === 'ask_lan_sau' && req.responderId === 0) {
+        if (req.type === 'ask_lan_sau' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#ef4444', fontWeight: 'bold' }}>🌊 LẶN SÂU</div>
@@ -387,7 +387,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_suit' && req.responderId === 0) {
+        if (req.type === 'ask_suit' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#3b82f6', fontWeight: 'bold' }}>🔮 Tâm Công</div>
@@ -402,7 +402,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_van_don' && (req.responderId === 0 || req.responderId === 0)) {
+        if (req.type === 'ask_van_don' && (req.responderId === me.id || req.responderId === me.id)) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#f59e0b', fontWeight: 'bold' }}>⚔️ ĐẤU ĐIỂM (Vân Đồn)</div>
@@ -414,7 +414,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_phat_tam' && req.responderId === 0) {
+        if (req.type === 'ask_phat_tam' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#f59e0b', fontWeight: 'bold' }}>🙏 PHÁT TÂM</div>
@@ -427,7 +427,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         }
 
 
-        if (req.type === 'ask_duyen_tho' && req.responderId === 0) {
+        if (req.type === 'ask_duyen_tho' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#ec4899', fontWeight: 'bold' }}>🌸 DUYÊN THƠ</div>
@@ -441,7 +441,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         }
 
 
-        if (req.type === 'ask_doat_sao_discard' && req.responderId === 0) {
+        if (req.type === 'ask_doat_sao_discard' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '15px', color: '#ef4444' }}>
@@ -461,7 +461,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
         
-        if (req.type === 'ask_chuong_duong_discard' && req.responderId === 0) {
+        if (req.type === 'ask_chuong_duong_discard' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: '15px', color: '#ef4444' }}>
@@ -481,7 +481,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_chuong_duong_move' && req.responderId === 0) {
+        if (req.type === 'ask_chuong_duong_move' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <ChuongDuongMoveModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -489,7 +489,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_da_trach' && req.responderId === 0) {
+        if (req.type === 'ask_da_trach' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <DaTrachModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -497,7 +497,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_khoi_nghia' && req.responderId === 0) {
+        if (req.type === 'ask_khoi_nghia' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <KhoiNghiaModal req={req} onConfirm={handleResponseAction} />
@@ -505,7 +505,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_khoan_dan' && req.responderId === 0) {
+        if (req.type === 'ask_khoan_dan' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <KhoanDanModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -513,7 +513,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_nam_quoc_son_ha' && req.responderId === 0) {
+        if (req.type === 'ask_nam_quoc_son_ha' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <NamQuocSonHaModal req={req} onConfirm={handleResponseAction} />
@@ -521,7 +521,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_tu_chu' && req.responderId === 0) {
+        if (req.type === 'ask_tu_chu' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <TuChuModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -529,7 +529,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_tu_chu_target' && req.responderId === 0) {
+        if (req.type === 'ask_tu_chu_target' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <TuChuTargetModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -537,7 +537,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
         
-        if (req.type === 'ask_duong_quan' && req.responderId === 0) {
+        if (req.type === 'ask_duong_quan' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <DuongQuanModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -545,7 +545,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
         
-        if (req.type === 'ask_tien_phong' && req.responderId === 0) {
+        if (req.type === 'ask_tien_phong' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <TienPhongModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -553,7 +553,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_uy_chan' && req.responderId === 0) {
+        if (req.type === 'ask_uy_chan' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: 'var(--color-gold)' }}>
@@ -574,7 +574,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_an_bang' && req.responderId === 0) {
+        if (req.type === 'ask_an_bang' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: 'var(--color-gold)' }}>
@@ -595,7 +595,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_phat_toi' && req.responderId === 0) {
+        if (req.type === 'ask_phat_toi' && req.responderId === me.id) {
           const validTargets = gameState.players.filter(p => p.id !== 0 && p.isAlive);
           return (
             <div style={modalStyle}>
@@ -618,7 +618,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
 
 
 
-        if (req.type === 'ask_pha_thanh' && req.responderId === 0) {
+        if (req.type === 'ask_pha_thanh' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: 'var(--color-gold)' }}>
@@ -639,7 +639,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_dieu_duoc' && req.responderId === 0) {
+        if (req.type === 'ask_dieu_duoc' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <DieuDuocModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -647,7 +647,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_hoa_than' && req.responderId === 0) {
+        if (req.type === 'ask_hoa_than' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <HoaThanModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -655,7 +655,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_binh_loan' && req.responderId === 0) {
+        if (req.type === 'ask_binh_loan' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <BinhLoanModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -663,7 +663,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_trung_dung' && req.responderId === 0) {
+        if (req.type === 'ask_trung_dung' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <TrungDungModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -671,7 +671,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_nghi_ngo' && req.responderId === 0) {
+        if (req.type === 'ask_nghi_ngo' && req.responderId === me.id) {
           const player = gameState.players[req.sourceId];
           return (
             <div style={modalStyle}>
@@ -693,7 +693,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_perfect_pair' && req.responderId === 0) {
+        if (req.type === 'ask_perfect_pair' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: 'var(--color-gold)' }}>
@@ -714,7 +714,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_reveal_for_skill' && req.responderId === 0) {
+        if (req.type === 'ask_reveal_for_skill' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: 'var(--color-gold)' }}>
@@ -735,7 +735,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_thuy_to' && req.responderId === 0) {
+        if (req.type === 'ask_thuy_to' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <ThuyToModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -743,7 +743,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_thuy_to_bonus' && req.responderId === 0) {
+        if (req.type === 'ask_thuy_to_bonus' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <ThuyToBonusModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -751,7 +751,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_boc_tram_trung_slash' && req.responderId === 0) {
+        if (req.type === 'ask_boc_tram_trung_slash' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <AskBocTramTrungSlashModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -759,7 +759,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_boc_tram_trung_dodge' && req.responderId === 0) {
+        if (req.type === 'ask_boc_tram_trung_dodge' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <AskBocTramTrungDodgeModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -767,7 +767,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_tre_nga_discard' && req.responderId === 0) {
+        if (req.type === 'ask_tre_nga_discard' && req.responderId === me.id) {
           const suitFilter = req.judgeSuit;
           const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => c.suit === suitFilter);
           
@@ -791,7 +791,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_dodge' && !req.reason && req.responderId === 0) {
+        if (req.type === 'ask_dodge' && (!req.reason || req.reason === 'chem') && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <DodgeModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -799,7 +799,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_slash' && req.reason === 'quyet-dau' && req.responderId === 0) {
+        if (req.type === 'ask_slash' && req.reason === 'quyet-dau' && req.responderId === me.id) {
           // Dời Núi (Né -> Chém)
           const hasDoiNui = me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'doi-nui'));
           
@@ -851,7 +851,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
             </div>
           );
         }
-        if (req.type === 'ask_slash' && req.reason === 'muon-dao' && req.responderId === 0) {
+        if (req.type === 'ask_slash' && req.reason === 'muon-dao' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <BorrowSwordModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -859,7 +859,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
         
-        if (req.type === 'ask_hoacong_reveal' && req.responderId === 0) {
+        if (req.type === 'ask_hoacong_reveal' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               
@@ -869,7 +869,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
             </div>
           );
         }
-        if (req.type === 'ask_hoacong_discard' && req.responderId === 0) {
+        if (req.type === 'ask_hoacong_discard' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               
@@ -880,7 +880,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
         
-        if (req.type === 'ask_hoa_tien' && req.responderId === 0) {
+        if (req.type === 'ask_hoa_tien' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: '#ef4444' }}>
@@ -901,7 +901,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
         
-        if (req.type === 'ask_peach' && req.responderId === 0) {
+        if (req.type === 'ask_peach' && req.responderId === me.id) {
           const isSelf = req.dyingId === 0;
           const dyingPlayer = gameState.players[req.dyingId];
           
@@ -992,8 +992,8 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if ((req.type === 'ask_dodge' && req.reason === 'van-tien' && req.responderId === 0) ||
-        (req.type === 'ask_slash' && req.reason === 'nam-man' && req.responderId === 0)) {
+        if ((req.type === 'ask_dodge' && req.reason === 'van-tien' && req.responderId === me.id) ||
+        (req.type === 'ask_slash' && req.reason === 'nam-man' && req.responderId === me.id)) {
           const reqCardName = req.trickType === 'barbarian' ? 'Chém' : 'Né';
           const sourceName = getFullPlayerName(gameState.players[req.sourceId], me.id);
           
@@ -1080,7 +1080,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         // Universal Fallback UI: Bắt lỗi nếu Player 0 cần respond nhưng không có UI Modal nào match req.type
         // Bỏ qua các type thuộc về Phase chính vì chúng được xử lý ở giao diện bên ngoài Modal (Nút Rút Bài, Bỏ Bài...)
         const ignoredPhases = ['draw_phase', 'play_phase', 'discard_phase', 'end_phase'];
-        if (req.responderId === 0 && !ignoredPhases.includes(req.type)) {
+        if (req.responderId === me.id && !ignoredPhases.includes(req.type)) {
             console.warn(`[UI FALLBACK] Unhandled request type: ${req.type} for human player!`);
             return (
               <div style={modalStyle}>

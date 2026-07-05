@@ -17,7 +17,7 @@ export function reduce(state, effect) {
       const target = nextState.players.find(p => p.id === effect.targetId);
       if (target) {
         target.hp = Math.max(0, target.hp - effect.amount);
-        nextState.history.push({ text: `[DAMAGE] ${effect.sourceId} gây ${effect.amount} sát thương cho ${effect.targetId}`, type: 'damage', timestamp: Date.now() });
+        nextState.history.push({ text: `[DAMAGE] Người chơi ${effect.sourceId + 1} gây ${effect.amount} sát thương cho Người chơi ${effect.targetId + 1}`, type: 'damage', timestamp: Date.now() });
       }
       break;
     }
@@ -26,7 +26,7 @@ export function reduce(state, effect) {
       const target = nextState.players.find(p => p.id === effect.targetId);
       if (target && target.hp < target.maxHp) {
         target.hp = Math.min(target.maxHp, target.hp + effect.amount);
-        nextState.history.push({ text: `[RECOVER] ${effect.targetId} hồi ${effect.amount} máu`, type: 'heal', timestamp: Date.now() });
+        nextState.history.push({ text: `[RECOVER] Người chơi ${effect.targetId + 1} hồi ${effect.amount} máu`, type: 'heal', timestamp: Date.now() });
       }
       break;
     }
@@ -35,7 +35,7 @@ export function reduce(state, effect) {
       const target = nextState.players.find(p => p.id === effect.targetId);
       if (target) {
         target.isTurnedOver = !target.isTurnedOver;
-        nextState.history.push({ text: `[TURN_OVER] ${effect.targetId} lật mặt tướng (${target.isTurnedOver})`, type: 'important', timestamp: Date.now() });
+        nextState.history.push({ text: `[TURN_OVER] Người chơi ${effect.targetId + 1} lật mặt tướng (${target.isTurnedOver})`, type: 'important', timestamp: Date.now() });
       }
       break;
     }
@@ -53,7 +53,7 @@ export function reduce(state, effect) {
         
         const drawnCards = nextState.deck.splice(0, effect.amount);
         target.hand.push(...drawnCards);
-        nextState.history.push({ text: `[DRAW] ${effect.targetId} rút ${drawnCards.length} lá bài`, type: 'normal', timestamp: Date.now() });
+        nextState.history.push({ text: `[DRAW] Người chơi ${effect.targetId + 1} rút ${drawnCards.length} lá bài`, type: 'normal', timestamp: Date.now() });
       }
       break;
     }
@@ -69,7 +69,7 @@ export function reduce(state, effect) {
         }
         const judgeCard = nextState.deck.pop();
         // TODO: Chờ reaction đổi phán xét (như Ứng Biến, Quân Cơ)
-        nextState.history.push({ text: `[JUDGE] ${target.id} phán xét ra ${judgeCard.suit} ${judgeCard.rank}`, type: 'important', timestamp: Date.now() });
+        nextState.history.push({ text: `[JUDGE] Người chơi ${target.id + 1} phán xét ra ${judgeCard.suit} ${judgeCard.rank}`, type: 'important', timestamp: Date.now() });
       }
       break;
     }
