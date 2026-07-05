@@ -49,11 +49,11 @@ const BUG_DATA = [
   },
   {
     id: 6,
-    title: "[Lỗi UI & Ghi Tên Log] Pop-up Modal, Invalid Date, và Thiếu giải thích Kỹ Năng",
-    labels: ["Lỗi UI", "UX", "Sai Tên Hiển Thị", "Critical"],
-    symptom: "1. TẤT CẢ Pop-up (hỏi Né, Hóa Giải, Chọn Kỹ Năng...) hoàn toàn tàng hình và báo 'Lỗi hiển thị kỹ năng' nếu chơi chế độ Multiplayer (người chơi không phải Player 1).\n2. Lỗi mất tên Hóa Giải ('Ai đó').\n3. Bảng Game Log hiển thị dòng `[Invalid Date]` hoặc `[DRAW] 1 rút 2 lá bài`.\n4. Log Game sát thương không giải thích là do kỹ năng gì.",
-    cause: "1. Toàn bộ `ModalContainer.jsx` bị hardcode sai lầm kiểm tra `req.responderId === 0` thay vì ID thực tế của người chơi (`me.id`), và thiết lập sai điều kiện `!req.reason` khiến các lệnh Đòi Né từ Chém (`reason: 'chem'`) bị rớt đài chặn lại.\n2. Lỗi log hiện đầy đủ tên tướng (lộ liễu, rối rắm).\n3. `Reducer.js` đẩy chuỗi String thuần túy thay vì Object `{timestamp}` vào `history`, và nhét thẳng ID gốc (0, 1) vào text.\n4. Lời thoại Log thiếu diễn giải nguyên nhân sát thương.",
-    fix: "- **Khắc phục Khủng hoảng Modal**: Càn quét và thay thế hàng loạt lệnh `req.responderId === 0` thành `req.responderId === me.id` trong `ModalContainer.jsx`. Nới lỏng điều kiện `ask_dodge` để chấp nhận `req.reason === 'chem'`.\n- **Khắc phục Modal & Tên Log**: Thêm giải thích kỹ năng ẩn vào Modal Hóa Giải. Gán `req.lastNegaterId` vào Dispatcher. Tự động thêm nhãn **(Đồng Minh)** / **(Kẻ Thù)**.\n- **Khắc phục Log Date & ID**: Đồng bộ đẩy Object vào `history`. Dịch ID thành `Người chơi X` trực tiếp trong Reducer.\n- **Minh Bạch Kỹ Năng**: Viết lại Log rõ ràng nguyên nhân: `bị Sét Đánh mất 2 Sinh Lực vì kỹ năng [Phạt Tội]`.",
+    title: "Lỗi Format Game Log, Invalid Date, Lộ Tên Tướng và Thiếu Giải Thích Kỹ Năng",
+    labels: ["Lỗi UI", "UX", "Sai Tên Hiển Thị"],
+    symptom: "1. Bảng Game Log hiển thị dòng `[Invalid Date]` hoặc các log rác như `[DRAW] 1 rút 2 lá bài`.\n2. Log Game sát thương không giải thích là do kỹ năng gì (vd: Sét đánh của Phạt Tội), làm người chơi hoang mang.\n3. Log Game hiện đầy đủ tên Tướng của đối thủ gây lộ liễu và rối rắm.",
+    cause: "1. `Reducer.js` đẩy chuỗi String thuần thay vì Object `{timestamp}` vào `history`, và nhét ID gốc (0, 1) vào text thay vì người chơi.\n2. Lời thoại Log thiếu diễn giải nguyên nhân sát thương.\n3. Dùng trực tiếp tên Tướng để render lên Log.",
+    fix: "- **Khắc phục Log Date & ID**: Đồng bộ đẩy Object vào `history`. Dịch ID thành `Người chơi X` trực tiếp trong Reducer.\n- **Minh Bạch Kỹ Năng**: Viết lại Log rõ ràng nguyên nhân: `bị Sét Đánh mất 2 Sinh Lực vì kỹ năng [Phạt Tội]`.\n- **Gọn gàng Tên Log**: Tự động tính toán góc nhìn của người chơi để thêm nhãn **(Đồng Minh)** / **(Kẻ Thù)** thay vì in tên Tướng.",
     status: "Fixed"
   },
   {
@@ -90,6 +90,15 @@ const BUG_DATA = [
     symptom: "Khi có người chơi chiến thắng (Game Over), Engine vẫn tiếp tục vòng lặp xử lý (Loop) khiến các tướng vẫn đánh nhau loạn xạ.",
     cause: "Vòng lặp `tick()` của Dispatcher không kiểm tra cờ `this.state.gameOver`, nên nó cứ tiếp tục lôi các Event còn sót trong hàng đợi ra xử lý.",
     fix: "**Ngắt Vòng Lặp**: Bổ sung cờ chặn `if (this.state.gameOver)` ngay đầu hàm `resolveEvent`, đồng thời quét sạch (clear) `reactionStack` và `actionQueue` để Engine chính thức 'nghỉ hưu' khi ván đấu kết thúc.",
+    status: "Fixed"
+  },
+  {
+    id: 11,
+    title: "Khủng Hoảng Tàng Hình Modal (Multiplayer) & Lỗi Pop-up Hóa Giải",
+    labels: ["Lỗi UI", "Critical", "UX"],
+    symptom: "1. TẤT CẢ Pop-up (hỏi Né, Hóa Giải, Chọn Kỹ Năng...) hoàn toàn tàng hình và báo 'Lỗi hiển thị kỹ năng' nếu chơi chế độ Multiplayer (người chơi không phải Player 1).\n2. Pop-up hỏi Hóa Giải bị mất tên người dùng (hiện 'Ai đó'), và tự động hiện dù không có bài Hóa Giải thật trên tay.",
+    cause: "1. Toàn bộ `ModalContainer.jsx` bị hardcode sai lầm kiểm tra `req.responderId === 0` thay vì ID thực tế của người chơi (`me.id`), và thiết lập sai điều kiện `!req.reason` khiến lệnh Đòi Né từ Chém bị chặn lại.\n2. Thiếu gán `req.lastNegaterId` vào Dispatcher. Modal Hóa Giải bị kích hoạt bởi kỹ năng ẩn nhưng không có text giải thích.",
+    fix: "- **Khắc phục Khủng hoảng Modal**: Càn quét thay thế hàng loạt lệnh `req.responderId === 0` thành `req.responderId === me.id` trong `ModalContainer.jsx`. Nới lỏng điều kiện `ask_dodge` để chấp nhận `req.reason === 'chem'`.\n- **Sửa Modal Hóa Giải**: Thêm dòng chữ giải thích kỹ năng ẩn (như Linh Giám) vào Modal. Gán `req.lastNegaterId` vào Dispatcher.",
     status: "Fixed"
   }
 ];
