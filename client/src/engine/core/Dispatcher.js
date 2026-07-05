@@ -83,14 +83,15 @@ export class Dispatcher {
 
       const p1 = this.state?.players?.[0];
       if (p1 && player.id !== 0 && player.isRevealed) {
-          const p1Faction = p1.isDaTam ? 'DaTam' : getPlayerFaction(p1);
+          const p1FactionRaw = p1.faction || (p1.heroes && p1.heroes[0] ? p1.heroes[0].faction : 'Lạc');
+          const p1Faction = p1.isDaTam ? 'DaTam' : p1FactionRaw;
           const pFaction = player.isDaTam ? 'DaTam' : getPlayerFaction(player);
           
           if (p1.isDaTam || player.isDaTam) {
               baseName += ' (Kẻ Thù)';
-          } else if (p1Faction === pFaction && p1Faction) {
+          } else if (p1Faction === pFaction && pFaction !== 'Ẩn') {
               baseName += ' (Đồng Minh)';
-          } else if (p1Faction && pFaction) {
+          } else if (pFaction !== 'Ẩn') {
               baseName += ' (Kẻ Thù)';
           }
       }
