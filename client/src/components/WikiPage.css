@@ -1,0 +1,175 @@
+.wiki-container {
+  color: var(--color-text);
+  height: 100%;
+}
+
+.wiki-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.wiki-header h2 {
+  color: var(--color-gold);
+  margin-bottom: 5px;
+}
+
+.wiki-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  background: var(--color-bg-light);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 10px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  background: var(--color-bg-lighter);
+}
+
+.tab-btn.active {
+  background: var(--color-gold);
+  color: #000;
+  border-color: var(--color-gold);
+}
+
+.wiki-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.wiki-grid-2col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.wiki-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-width: 100%;
+  margin: 0;
+}
+
+.wiki-card {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px;
+  backdrop-filter: blur(8px);
+}
+
+.hero-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 10px;
+}
+
+.hero-emoji {
+  font-size: 3rem;
+  background: var(--color-bg-dark);
+  border-radius: 50%;
+  width: 70px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-gold);
+}
+
+.hero-title h3 {
+  margin: 0 0 5px 0;
+  color: var(--color-gold-light);
+}
+
+.hero-tags {
+  display: flex;
+  gap: 8px;
+}
+
+.tag {
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: var(--color-bg-dark);
+  font-weight: 600;
+}
+
+.tag.faction-lạc { color: #10b981; background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; }
+.tag.faction-sơn { color: #b45309; background: rgba(180, 83, 9, 0.2); border: 1px solid #b45309; }
+.tag.faction-hà { color: #3b82f6; background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; }
+.tag.faction-việt { color: #ef4444; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; }
+
+.tag.hp { color: #fbbf24; }
+.tag.gender { color: #94a3b8; }
+.tag.type { color: #38bdf8; }
+.tag.range { color: #f472b6; }
+
+.hero-bio {
+  font-style: italic;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  margin-bottom: 15px;
+}
+
+.skill-item {
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.skill-item strong {
+  color: var(--color-gold);
+}
+
+.list-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  padding: 15px;
+}
+
+.list-icon {
+  font-size: 2rem;
+  background: var(--color-bg-dark);
+  width: 50px;
+  height: 50px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+}
+
+.list-content h4 {
+  margin: 0 0 5px 0;
+  color: var(--color-gold-light);
+}
+
+.list-content p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.equip-tags {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}

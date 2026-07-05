@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Việt Sát</string>
+    <string name="title_activity_main">Việt Sát</string>
+    <string name="package_name">com.vietsat.game</string>
+    <string name="custom_url_scheme">com.vietsat.game</string>
+</resources>

@@ -1,0 +1,150 @@
+Created At: 2026-07-05T01:51:09Z
+Completed At: 2026-07-05T01:51:09Z
+File Path: `file:///Users/huynhtronghieu/Documents/WORK%20Hi%E1%BA%BFu/game-vietnam-the-bai/client/src/components/game/GameView.jsx`
+Total Lines: 1667
+Total Bytes: 86419
+Showing lines 1100 to 1300
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1100:                 <span style={{ color: '#ef4444' }}>⚔️ Tầm đánh:</span> <strong style={{ color: 'white' }}>{getAttackRange(gameState, 0)}</strong>
+1101:               </div>
+1102:               <div title="Khoảng cách phòng vệ (người khác phải có Tầm đánh >= Khoảng cách này mới Chém được bạn)">
+1103:                 <span style={{ color: '#3b82f6' }}>🛡️ Khoảng cách của bạn:</span> <strong style={{ color: 'white' }}>+{me.equipment.find(c => getCardSubType(c) === CARD_SUBTYPES.EQUIP_MOUNT_DEF) ? 1 : 0}</strong>
+1104:               </div>
+1105:             </div>
+1106:           </div>
+1107:           <div className="equipment-area">
+1108:             {[
+1109:               { type: CARD_SUBTYPES.EQUIP_WEAPON, icon: '⚔️', title: 'Vũ khí' },
+1110:               { type: CARD_SUBTYPES.EQUIP_ARMOR, icon: '🛡️', title: 'Phòng cụ' },
+1111:               { type: CARD_SUBTYPES.EQUIP_MOUNT_ATK, icon: '🐎', title: 'Ngựa công (-1)' },
+1112:               { type: CARD_SUBTYPES.EQUIP_MOUNT_DEF, icon: '🐴', title: 'Ngựa thủ (+1)' }
+1113:             ].map((slot, i) => {
+1114:               const eqCard = me.equipment.find(c => getCardSubType(c) === slot.type);
+1115:               const bgImage = eqCard ? getCardBg(eqCard.name) : null;
+1116:               return (
+1117:                 <div key={i} className={`equip-slot ${eqCard ? 'equipped' : 'empty'}`} title={eqCard ? `${eqCard.name}: ${eqCard.desc}` : slot.title} style={{ ...(bgImage ? { backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid var(--color-gold)' } : {}), cursor: eqCard ? 'pointer' : 'default' }} onClick={() => { if (eqCard) setCardPopup(eqCard) }}>
+1118:                   {eqCard ? (
+1119:                     <>
+1120:                       <div style={{ fontSize: '0.5rem', color: eqCard.color === 'red' ? '#ef4444' : '#f1f5f9', textShadow: '0 0 4px rgba(0,0,0,1)', background: bgImage ? 'rgba(0,0,0,0.5)' : 'transparent', borderRadius: '2px', padding: '1px 3px', position: 'absolute', top: '2px', left: '2px', fontWeight: 'bold' }}>
+1121:                         {eqCard.suit}{eqCard.rank}
+1122:                       </div>
+1123:                       {!bgImage && (
+1124:                         <>
+1125:                           <div style={{ fontSize: '1.2rem', marginTop: '4px' }}>{eqCard.emoji}</div>
+1126:                           <div style={{ fontSize: '0.45rem', marginTop: '2px', textAlign: 'center', fontWeight: 'bold', lineHeight: '1.1' }}>{eqCard.name}</div>
+1127:                         </>
+1128:                       )}
+1129:                     </>
+1130:                   ) : (
+1131:                     slot.icon
+1132:                   )}
+1133:                 </div>
+1134:               );
+1135:             })}
+1136:           </div>
+1137:           <div className="action-buttons">
+1138:             {isMyTurn && gameState.phase === PHASES.DRAW && (
+1139:               <>
+1140:                 <button className="btn-action primary" onClick={() => handleDraw()}>
+1141:                   🃏 Rút Bài
+1142:                 </button>
+1143:                 {me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'nhiep-chinh')) && (
+1144:                   <button className="btn-action danger" style={{ marginLeft: '10px' }} onClick={() => handleDraw(true, false)}>
+1145:                     👑 Dùng Nhiếp Chính (Bỏ Rút Bài)
+1146:                   </button>
+1147:                 )}
+1148:                 {me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'binh-ngo')) && me.hp < me.maxHp && (
+1149:                   <button className="btn-action success" style={{ marginLeft: '10px' }} onClick={() => handleDraw(false, true, false)}>
+1150:                     🛡️ Dùng Bình Ngô (Rút 3 lá)
+1151:                   </button>
+1152:                 )}
+1153:                 {me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'khai-quoc')) && (
+1154:                   <button className="btn-action primary" style={{ marginLeft: '10px' }} onClick={() => handleDraw(false, false, true)}>
+1155:                     👑 Dùng Khai Quốc (Rút 4, Đưa 1)
+1156:                   </button>
+1157:                 )}
+1158:               </>
+1159:             )}
+1160:             {isMyTurn && gameState.phase === PHASES.ACTION && !targetSession && (
+1161:               <>
+1162:                 { (() => {
+1163:                     let skills = me.heroes ? me.heroes.flatMap((h, i) => {
+1164:                         return (h.skills || []).map(s => ({ ...s, heroIndex: i, isRevealed: me.revealedHeroes && me.revealedHeroes[i] }));
+1165:                     }).filter(s => s.type === 'ACTIVE' || s.type === 'ACTIVE_DEFENSIVE') : [];
+1166:                     
+1167:                     const myFaction = getPlayerFaction(me);
+1168:                     if (myFaction === 'sơn') {
+1169:                         const hasDinhQuocUser = gameState.players.some(p => p.id !== me.id && p.isAlive && p.heroes?.some((h, i) => p.revealedHeroes[i] && h.skills?.some(s => s.id === 'dinh-quoc')));
+1170:                         // Đảm bảo không bị trùng nếu chính mình là Đinh Điền
+1171:                         const iHaveDinhQuoc = skills.some(s => s.id === 'dinh-quoc' && s.isRevealed);
+1172:                         if (hasDinhQuocUser && !iHaveDinhQuoc) {
+1173:                             skills.push({ name: 'Định Quốc', desc: 'Đưa 1 lá bài cho tướng Định Quốc để họ hồi máu', isRevealed: true });
+1174:                         }
+1175:                     }
+1176:                     return skills.map(s => {
+1177:                       if (!s.isRevealed) {
+1178:                         return (
+1179:                           <button 
+1180:                             key={s.name + '_hidden'} 
+1181:                             className="btn-action warning" 
+1182:                             onClick={() => {
+1183:                                if (window.confirm(`Bạn phải lật tướng để sử dụng kỹ năng [${s.name}]. Lật ngay?`)) {
+1184:                                   handleRevealClick(s.heroIndex);
+1185:                                   setTimeout(() => alert(`Đã lật tướng. Vui lòng bấm lại kỹ năng [${s.name}]!`), 100);
+1186:                                }
+1187:                             }}
+1188:                             title="Tướng đang ẩn. Nhấn để lật tướng."
+1189:                             disabled={me.isSilenced}
+1190:                             style={{ opacity: me.isSilenced ? 0.5 : 0.8, filter: 'grayscale(0.5)' }}
+1191:                           >
+1192:                             👁️ {s.name} (Ẩn)
+1193:                           </button>
+1194:                         );
+1195:                       }
+1196:                       
+1197:                       const canUseObj = canUseSkill(gameState, me.id, s.id || s.name);
+1198:                       const isSkillDisabled = me.isSilenced || !canUseObj.valid;
+1199:                       const disableReason = me.isSilenced ? 'Kỹ năng bị khóa!' : canUseObj.reason;
+1200: 
+1201:                       return (
+1202:                         <button 
+1203:                           key={s.name} 
+1204:                           className={`btn-action ${activeSkill === s.name ? 'primary' : 'warning'}`} 
+1205:                           onClick={() => handleExecuteSkill(s.name)}
+1206:                           title={isSkillDisabled ? disableReason : s.desc}
+1207:                           disabled={isSkillDisabled}
+1208:                           style={{ opacity: isSkillDisabled ? 0.5 : 1, filter: isSkillDisabled ? 'grayscale(0.8)' : 'none' }}
+1209:                         >
+1210:                           ✨ {s.name} {activeSkill === s.name ? '(Đang chọn)' : ''}
+1211:                         </button>
+1212:                       );
+1213:                     });
+1214:                 })() }
+1215:                 <button className="btn-action danger" onClick={handleEndTurn}>
+1216:                   ⏭️ Kết Thúc
+1217:                 </button>
+1218:               </>
+1219:             )}
+1220:             {targetSession && (
+1221:               <>
+1222:                 {targetSession.targetingDef.type === 'multiple' && (
+1223:                   <button
+1224:                     className="btn-action primary"
+1225:                     onClick={() => {
+1226:                        if (isActionPending.current) return;
+1227:                        isActionPending.current = true;
+1228:                        if (activeSkill === 'Tiên Duyên') {
+1229:                            gameAPI.dispatcher.dispatchAction({
+1230:                                type: 'ACTION_USE_SKILL',
+1231:                                payload: { playerId: 0, skillId: 'tien-duyen-active', targets: targetSession.selectedTargets, options: { cardIds: [targetSession.card.id] } }
+1232:                            });
+1233:                        } else {
+1234:                            gameAPI.playCard(0, targetSession.card.id, targetSession.selectedTargets, { 
+1235:                                virtualCardName: targetSession.virtualCardName,
+1236:                                isReforge: targetSession.selectedTargets.length === 0
+1237:                            });
+1238:                        }
+1239:                        cancelTargeting();
+1240:                     }}
+1241:                   >
+1242:                     {targetSession.selectedTargets.length === 0 ? '⛓️ Rèn Lại (Bỏ 1 Rút 1)' : '🔗 Xác Nhận Xích'}

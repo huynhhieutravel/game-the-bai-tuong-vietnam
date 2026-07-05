@@ -1,0 +1,1094 @@
+/* ============================================
+   VIỆT SÁT — Game Thẻ Bài Việt Nam
+   Design System & Global Styles
+   ============================================ */
+
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap');
+
+/* ============================================
+   CSS Custom Properties (Design Tokens)
+   ============================================ */
+:root {
+  /* Colors — Vietnamese-inspired palette */
+  --color-bg-primary: #0a0e1a;
+  --color-bg-secondary: #111827;
+  --color-bg-card: #1a2236;
+  --color-bg-glass: rgba(26, 34, 54, 0.7);
+  
+  --color-gold: #d4a843;
+  --color-gold-light: #f0d68a;
+  --color-gold-dark: #a17c2e;
+  
+  --color-red: #c53030;
+  --color-red-light: #fc8181;
+  --color-red-glow: rgba(197, 48, 48, 0.4);
+  
+  --color-blue: #2b6cb0;
+  --color-blue-light: #63b3ed;
+  
+  --color-green: #2f855a;
+  --color-green-light: #68d391;
+  
+  --color-text-primary: #f7f7f7;
+  --color-text-secondary: #a0aec0;
+  --color-text-muted: #5a6a85;
+  
+  --color-border: rgba(212, 168, 67, 0.2);
+  --color-border-active: rgba(212, 168, 67, 0.6);
+  
+  /* Gradients */
+  --gradient-card-attack: linear-gradient(135deg, #c53030, #9b2c2c);
+  --gradient-card-defense: linear-gradient(135deg, #2b6cb0, #2c5282);
+  --gradient-card-heal: linear-gradient(135deg, #2f855a, #276749);
+  --gradient-card-special: linear-gradient(135deg, #805ad5, #6b46c1);
+  --gradient-card-equip: linear-gradient(135deg, #d69e2e, #b7791f);
+  --gradient-hero-bg: linear-gradient(180deg, rgba(10, 14, 26, 0) 0%, rgba(10, 14, 26, 0.95) 100%);
+  
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-card: 12px;
+  
+  /* Shadows */
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 20px rgba(212, 168, 67, 0.15);
+  --shadow-glow-gold: 0 0 20px rgba(212, 168, 67, 0.3);
+  --shadow-glow-red: 0 0 20px rgba(197, 48, 48, 0.4);
+  
+  /* Typography */
+  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Noto Serif', Georgia, serif;
+  
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  
+  /* Z-index layers */
+  --z-cards: 10;
+  --z-hand: 20;
+  --z-modal: 50;
+  --z-tooltip: 60;
+  --z-notification: 70;
+}
+
+/* ============================================
+   Reset & Base Styles
+   ============================================ */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-primary);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+.app-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevent body scroll, let children scroll */
+}
+
+/* ============================================
+   Game Board Layout
+   ============================================ */
+.game-board {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: 
+    radial-gradient(ellipse at 50% 30%, rgba(212, 168, 67, 0.05) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(197, 48, 48, 0.03) 0%, transparent 50%),
+    var(--color-bg-primary);
+}
+
+/* Decorative background pattern */
+.game-board::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: 
+    radial-gradient(circle at 20% 50%, rgba(212, 168, 67, 0.03) 0%, transparent 40%),
+    radial-gradient(circle at 80% 20%, rgba(43, 108, 176, 0.03) 0%, transparent 40%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ============================================
+   Top Bar (Game Info)
+   ============================================ */
+.game-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(17, 24, 39, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border);
+  z-index: var(--z-cards);
+  flex-shrink: 0;
+}
+
+.game-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-gold);
+  letter-spacing: 0.05em;
+}
+
+.game-status {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.game-status .turn-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 2px 10px;
+  background: rgba(212, 168, 67, 0.15);
+  border: 1px solid rgba(212, 168, 67, 0.3);
+  border-radius: 99px;
+  color: var(--color-gold-light);
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.deck-info {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.deck-info .deck-icon {
+  width: 18px;
+  height: 24px;
+  border: 1.5px solid var(--color-text-muted);
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+}
+
+/* ============================================
+   Opponents Area (Absolute Positioning for Table)
+   ============================================ */
+.opponents-area {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Let clicks pass through */
+  z-index: var(--z-cards);
+}
+
+.opponents-area > * {
+  pointer-events: auto; /* Re-enable clicks on players */
+}
+
+/* Positions for 3 opponents */
+.player-pos-0 {
+  position: absolute;
+  top: 50%;
+  left: 30px;
+  transform: translateY(-50%);
+}
+
+.player-pos-1 {
+  position: absolute;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.player-pos-2 {
+  position: absolute;
+  top: 50%;
+  right: 240px;
+  transform: translateY(-50%);
+}
+
+/* Hidden Hero Styling */
+.hero-card.hidden {
+  background: var(--color-bg-secondary);
+  border: 1px dashed var(--color-text-muted);
+}
+.hero-card.hidden .hero-portrait {
+  filter: grayscale(100%) opacity(0.5);
+}
+
+/* ============================================
+   Player Zone (Each player's area)
+   ============================================ */
+.player-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 120px;
+  max-width: 160px;
+  position: relative;
+}
+
+.player-zone.is-current-turn {
+  animation: currentTurnPulse 2s ease-in-out infinite;
+}
+
+@keyframes currentTurnPulse {
+  0%, 100% { filter: drop-shadow(0 0 0px transparent); }
+  50% { filter: drop-shadow(0 0 12px rgba(212, 168, 67, 0.4)); }
+}
+
+/* Hero Card (Character portrait) */
+.hero-card {
+  width: 140px;
+  height: auto;
+  min-height: 210px;
+  border-radius: var(--radius-card);
+  border: 2px solid var(--color-border);
+  background: var(--color-bg-card);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.hero-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--color-border);
+}
+
+.hero-card.dead {
+  filter: grayscale(1) brightness(0.4);
+  pointer-events: none;
+}
+
+.hero-card.flipped {
+  transform: rotate(180deg);
+  filter: brightness(0.6);
+}
+
+.hero-card.flipped:hover {
+  transform: rotate(180deg) scale(1.05);
+}
+
+.hero-portrait {
+  width: 100%;
+  height: 120px;
+  background: linear-gradient(135deg, #1a2a4a 0%, #0d1525 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+  position: relative;
+}
+
+.hero-portrait::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40%;
+  background: var(--gradient-hero-bg);
+}
+
+.hero-info {
+  padding: var(--space-sm);
+  text-align: center;
+  background: rgba(0, 0, 0, 0.6);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hero-name {
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: var(--space-xs);
+  color: var(--color-text-primary);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hero-hp {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+}
+
+.hp-pip {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-red);
+  background: var(--color-red);
+  transition: all var(--transition-fast);
+}
+
+.hp-pip.lost {
+  background: transparent;
+  border-color: rgba(197, 48, 48, 0.3);
+}
+
+/* Player hand count (number of cards opponents hold) */
+.hand-count {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.hand-count .card-mini-icon {
+  width: 12px;
+  height: 16px;
+  border: 1px solid var(--color-text-muted);
+  border-radius: 2px;
+}
+
+/* Player name label */
+.player-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.player-name.is-you {
+  color: var(--color-gold-light);
+}
+
+/* Equipment slots */
+.equipment-area {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  justify-content: flex-start;
+  overflow-x: auto;
+}
+
+.equip-slot {
+  width: 45px;
+  height: 64px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed rgba(212, 168, 67, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: var(--color-text-muted);
+  background: rgba(26, 34, 54, 0.5);
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.equip-slot.equipped {
+  border-style: solid;
+  border-color: var(--color-gold-dark);
+  background: rgba(212, 168, 67, 0.1);
+  color: var(--color-gold);
+  cursor: help;
+}
+
+.equip-slot.empty {
+  opacity: 0.3;
+}
+
+/* Judgement Area */
+.judgement-area {
+  position: absolute;
+  top: 0px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  z-index: 10;
+}
+
+.judgement-item {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9);
+  border: 1px solid white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+}
+
+/* ============================================
+   Center Area (Play area / Discard pile)
+   ============================================ */
+.center-area {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-md);
+  gap: var(--space-lg);
+  z-index: var(--z-cards);
+  flex: 1;
+}
+
+.play-area {
+  min-width: 200px;
+  min-height: 80px;
+  border: 2px dashed rgba(212, 168, 67, 0.15);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  position: relative;
+  transition: all var(--transition-base);
+}
+
+.play-area.active {
+  border-color: rgba(212, 168, 67, 0.4);
+  background: rgba(212, 168, 67, 0.03);
+}
+
+.play-area-label {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  background: var(--color-bg-primary);
+  padding: 0 var(--space-sm);
+  white-space: nowrap;
+}
+
+/* ============================================
+   Card Styles
+   ============================================ */
+.card {
+  width: 105px;
+  height: 150px;
+  border-radius: var(--radius-card);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  cursor: pointer;
+  transition: 
+    transform var(--transition-slow),
+    box-shadow var(--transition-base),
+    border-color var(--transition-fast);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%);
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.card:hover {
+  transform: translateY(-12px) scale(1.05);
+  box-shadow: var(--shadow-card-hover);
+  z-index: 30;
+}
+
+.card.selected {
+  transform: translateY(-20px) scale(1.08);
+  border-color: var(--color-gold);
+  box-shadow: var(--shadow-glow-gold);
+}
+
+/* Card types */
+.card.attack   { background: var(--gradient-card-attack); }
+.card.defense  { background: var(--gradient-card-defense); }
+.card.heal     { background: var(--gradient-card-heal); }
+.card.special  { background: var(--gradient-card-special); }
+.card.equip    { background: var(--gradient-card-equip); }
+
+/* Card face-down (opponent's hidden cards) */
+.card.face-down {
+  background: 
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 5px,
+      rgba(212, 168, 67, 0.05) 5px,
+      rgba(212, 168, 67, 0.05) 10px
+    ),
+    var(--color-bg-card);
+  border-color: var(--color-border);
+  cursor: default;
+}
+
+.card.face-down:hover {
+  transform: none;
+  box-shadow: var(--shadow-card);
+}
+
+/* Unplayable cards */
+.card.unplayable {
+  filter: grayscale(80%);
+  border-color: var(--color-text-muted);
+}
+.card.unplayable:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.card-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xs);
+  gap: 2px;
+}
+
+.card-icon {
+  font-size: 1.6rem;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.card-name {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: white;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  line-height: 1.2;
+}
+
+.card-type-badge {
+  font-size: 0.45rem;
+  padding: 1px 5px;
+  border-radius: 99px;
+  background: rgba(0,0,0,0.3);
+  color: rgba(255,255,255,0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Mini card (for play area, smaller version) */
+.card.mini {
+  width: 50px;
+  height: 70px;
+}
+
+.card.mini .card-icon {
+  font-size: 1.2rem;
+}
+
+.card.mini .card-name {
+  font-size: 0.5rem;
+}
+
+/* ============================================
+   Player Hand (Bottom of screen)
+   ============================================ */
+.player-hand-area {
+  flex-shrink: 0;
+  z-index: var(--z-hand);
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+  background: linear-gradient(to top, rgba(17, 24, 39, 0.95) 0%, rgba(17, 24, 39, 0.5) 80%, transparent 100%);
+  backdrop-filter: blur(8px);
+}
+
+/* Own hero info bar */
+.my-hero-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-md);
+  width: 100%;
+  padding-bottom: var(--space-sm);
+}
+
+.my-hero-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--color-gold-dark);
+  background: var(--color-bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.my-hero-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.my-hero-name {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-gold-light);
+}
+
+.my-hero-hp-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: 2px;
+}
+
+.my-hero-hp-bar .hp-pip {
+  width: 14px;
+  height: 14px;
+}
+
+/* Action buttons */
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  max-width: 350px;
+}
+
+.btn-action {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid;
+  font-family: var(--font-primary);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: transparent;
+  flex: 1 1 auto;
+  min-width: 100px;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+.btn-action.primary {
+  border-color: var(--color-gold);
+  color: var(--color-gold);
+  background-color: rgba(212, 168, 67, 0.2);
+  animation: pulse-primary 1s infinite alternate;
+}
+
+@keyframes pulse-primary {
+  0% {
+    box-shadow: 0 0 0 0 rgba(212, 168, 67, 0.7);
+    background-color: rgba(212, 168, 67, 0.2);
+    transform: scale(1);
+  }
+  100% {
+    box-shadow: 0 0 0 10px rgba(212, 168, 67, 0);
+    background-color: rgba(212, 168, 67, 0.5);
+    transform: scale(1.05);
+  }
+}
+
+.btn-action.primary:hover {
+  background: rgba(212, 168, 67, 0.15);
+  box-shadow: var(--shadow-glow-gold);
+  animation: none;
+}
+
+.btn-action.danger {
+  border-color: var(--color-red);
+  color: var(--color-red-light);
+}
+
+.btn-action.danger:hover {
+  background: rgba(197, 48, 48, 0.15);
+}
+
+.btn-action.secondary {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-action.secondary:hover {
+  border-color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.btn-action.warning {
+  border-color: var(--color-gold);
+  color: #fbbf24; /* bright yellow/orange text */
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.btn-action.warning:hover {
+  background: rgba(245, 158, 11, 0.2);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+.btn-action.success {
+  border-color: #10b981;
+  color: #34d399; /* bright green text */
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.btn-action.success:hover {
+  background: rgba(16, 185, 129, 0.2);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.btn-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  animation: none !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--color-text-muted) !important;
+  color: var(--color-text-muted) !important;
+  box-shadow: none !important;
+}
+
+.hand-cards {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 30px 0 12px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.hand-cards::-webkit-scrollbar {
+  display: none;
+}
+
+.hand-cards .card {
+  transition: 
+    transform var(--transition-slow),
+    box-shadow var(--transition-base),
+    margin var(--transition-base);
+}
+
+.hand-cards:hover .card {
+  margin-left: 0px;
+}
+
+.hand-cards .card:hover {
+  transform: translateY(-20px) scale(1.1);
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+/* ============================================
+   Game Log / Activity Feed
+   ============================================ */
+.game-log {
+  position: absolute;
+  top: 60px;
+  right: var(--space-md);
+  width: 350px;
+  bottom: 350px;
+  overflow-y: auto;
+  z-index: var(--z-cards);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+  background: rgba(17, 24, 39, 0.85);
+  border: 1px solid rgba(212, 168, 67, 0.3);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.log-entry {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  padding: 6px var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 24, 39, 0.6);
+  backdrop-filter: blur(4px);
+  animation: logSlideIn 0.3s ease;
+}
+
+.log-entry.important {
+  color: var(--color-gold-light);
+  background: rgba(212, 168, 67, 0.1);
+}
+
+.log-entry.damage {
+  color: var(--color-red-light);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.log-entry.success {
+  color: #34d399; /* Xanh Ngọc */
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.log-entry.heal {
+  color: #10b981; /* Xanh Lá Cây */
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.log-entry.info {
+  color: #60a5fa; /* Xanh Dương */
+  background: rgba(96, 165, 250, 0.1);
+}
+
+@keyframes logSlideIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes blinkText {
+  0% { opacity: 1; text-shadow: 0 0 10px rgba(239,68,68,0.8); }
+  50% { opacity: 0.5; text-shadow: 0 0 0px transparent; }
+  100% { opacity: 1; text-shadow: 0 0 10px rgba(239,68,68,0.8); }
+}
+
+/* ============================================
+   Notifications / Floating text
+   ============================================ */
+.floating-text {
+  position: absolute;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  pointer-events: none;
+  z-index: var(--z-notification);
+  animation: floatUp 1.5s ease-out forwards;
+}
+
+.floating-text.damage {
+  color: var(--color-red-light);
+  text-shadow: 0 0 10px var(--color-red-glow);
+}
+
+.floating-text.heal {
+  color: var(--color-green-light);
+  text-shadow: 0 0 10px rgba(47, 133, 90, 0.4);
+}
+
+.floating-text.miss {
+  color: var(--color-text-muted);
+}
+
+@keyframes floatUp {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  60% { opacity: 1; transform: translateY(-40px) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-70px) scale(0.8); }
+}
+
+/* ============================================
+   Phase Indicator Banner
+   ============================================ */
+.board-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xl);
+  z-index: 1;
+}
+
+.phase-banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: var(--z-modal);
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--color-gold);
+  text-shadow: 0 0 30px rgba(212, 168, 67, 0.5);
+  pointer-events: none;
+  animation: phaseBannerIn 2s ease forwards;
+}
+
+@keyframes phaseBannerIn {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  40% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+}
+
+/* ============================================
+   Responsive — Mobile (Portrait)
+   ============================================ */
+@media (max-width: 768px) {
+  .hero-card {
+    width: 85px;
+    height: 110px;
+  }
+  
+  .hero-portrait {
+    font-size: 1.8rem;
+  }
+  
+  .hero-name {
+    font-size: 0.6rem;
+  }
+  
+  .card {
+    width: 60px;
+    height: 85px;
+  }
+  
+  .card-icon {
+    font-size: 1.3rem;
+  }
+  
+  .card-name {
+    font-size: 0.5rem;
+  }
+  
+  .game-log {
+    width: 160px;
+  }
+  
+  .opponents-area {
+    gap: var(--space-sm);
+  }
+  
+  .player-zone {
+    min-width: 90px;
+  }
+}
+
+/* ============================================
+   Landscape mode optimization
+   ============================================ */
+@media (max-height: 500px) {
+  .game-top-bar {
+    padding: 4px var(--space-md);
+  }
+  
+  .hero-card {
+    width: 80px;
+    height: 100px;
+  }
+  
+  .card {
+    width: 55px;
+    height: 78px;
+  }
+  
+  .player-hand-area {
+    padding: var(--space-xs) var(--space-md);
+  }
+}
+
+.hero-tooltip-container {
+  position: relative;
+}
+.hero-tooltip-container .hero-tooltip-content {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.95);
+  color: #fff;
+  text-align: left;
+  border-radius: 8px;
+  padding: 12px;
+  width: 250px;
+  z-index: 100;
+  transition: opacity 0.2s, visibility 0.2s;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  border: 1px solid var(--color-gold);
+  pointer-events: none;
+}
+.hero-tooltip-container:hover {
+  z-index: 100 !important;
+}
+.hero-tooltip-container:hover .hero-tooltip-content {
+  visibility: visible;
+  opacity: 1;
+}
+
+.wiki-card:hover { z-index: 100 !important; }
+
+/* Damage Flash Overlay */
+.damage-flash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(220, 38, 38, 0.45);
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
+}
+.damage-flash-overlay.active {
+  opacity: 1;
+  transition: opacity 0.1s ease-in;
+}
+

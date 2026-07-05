@@ -1,0 +1,78 @@
+1025:         <div className="my-hero-bar" style={{ position: 'relative' }}>
+1026:           
+1027:           {/* Judgement Area for Me */}
+1028:           <div className="judgement-area" style={{ top: '-10px', left: '-10px' }}>
+1029:             {me.judgementArea && me.judgementArea.map((card, i) => (
+1030:               <div key={i} className="judgement-item" title={card.name} style={{ width: '24px', height: '24px', fontSize: '0.8rem' }}>
+1031:                 {card.emoji}
+1032:               </div>
+1033:             ))}
+1034:           </div>
+1035: 
+1036:           <div className="my-hero-avatars" onClick={() => setHeroPopup(me)} style={{ position: 'relative', display: 'flex', height: '100%', width: '80px', background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-md)', overflow: 'hidden', cursor: 'pointer' }}>
+1037:             {me.isSilenced && (
+1038:                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: '2.5rem', background: 'rgba(0,0,0,0.5)', padding: '10px', borderRadius: '50%', zIndex: 10, filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.8))', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Kỹ năng bị khóa!">
+1039:                  🔒
+1040:                </div>
+1041:             )}
+1042:             {me.isChained && (
+1043:                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 12, pointerEvents: 'none' }} title="Bị Xích!">
+1044:                   <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%) rotate(45deg)', fontSize: '3.5rem', filter: 'drop-shadow(0 0 5px rgba(0,0,0,1))', opacity: 0.9 }}>⛓️</div>
+1045:                   <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%) rotate(-45deg)', fontSize: '3.5rem', filter: 'drop-shadow(0 0 5px rgba(0,0,0,1))', opacity: 0.9 }}>⛓️</div>
+1046:                </div>
+1047:             )}
+1048:             <div className="hero-tooltip-container" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', fontSize: '1.5rem' }}>
+1049:               {(me.heroes?.[0]?.image || me.hero?.image) ? <img src={`/images/heroes/${me.heroes?.[0]?.image || me.hero?.image}`} style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center' }} /> : (me.heroes?.[0]?.emoji || me.hero?.emoji)}
+1050:               {(me.heroes?.[0] || me.hero) && (
+1051:                 <div className="hero-tooltip-content" style={{ bottom: '110%', left: '0', transform: 'none', width: '250px' }}>
+1052:                   <h4 style={{ margin: '0 0 5px 0', color: 'var(--color-gold)' }}>{(me.heroes?.[0] || me.hero).name}</h4>
+1053:                   {(me.heroes?.[0] || me.hero).skills?.map((skill, idx) => (
+1054:                     <div key={idx} style={{ marginBottom: '4px', fontSize: '0.75rem', lineHeight: '1.2', textAlign: 'left' }}>
+1055:                       <strong style={{ color: 'var(--color-gold-light)' }}>{skill.name}:</strong> {skill.desc}
+1056:                     </div>
+1057:                   ))}
+1058:                 </div>
+1059:               )}
+1060:             </div>
+1061:             <div className="hero-tooltip-container" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
+1062:               {me.heroes?.[1]?.image ? <img src={`/images/heroes/${me.heroes?.[1].image}`} style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center' }} /> : (me.heroes?.[1]?.emoji || '')}
+1063:               {me.heroes?.[1] && (
+1064:                 <div className="hero-tooltip-content" style={{ bottom: '110%', left: '0', transform: 'none', width: '250px' }}>
+1065:                   <h4 style={{ margin: '0 0 5px 0', color: 'var(--color-gold)' }}>{me.heroes?.[1]?.name}</h4>
+1066:                   {me.heroes?.[1]?.skills?.map((skill, idx) => (
+1067:                     <div key={idx} style={{ marginBottom: '4px', fontSize: '0.75rem', lineHeight: '1.2', textAlign: 'left' }}>
+1068:                       <strong style={{ color: 'var(--color-gold-light)' }}>{skill.name}:</strong> {skill.desc}
+1069:                     </div>
+1070:                   ))}
+1071:                 </div>
+1072:               )}
+1073:             </div>
+1074:           </div>
+1075:           <div className="my-hero-details">
+1076:             <div className="my-hero-name" style={{ fontSize: '0.9rem' }}>
+1077:               {me.heroes?.[0]?.name || me.hero?.name} & {me.heroes?.[1]?.name || '?'}
+1078:             </div>
+1079:             <div style={{ display: 'flex', gap: '6px', margin: '4px 0' }}>
+1080:               <div style={{ fontSize: '0.6rem', padding: '1px 6px', borderRadius: '4px', background: me.isDaTam ? '#9ca3af' : (getPlayerFaction(me) === 'Lạc' ? '#10b981' : getPlayerFaction(me) === 'Sơn' ? '#b45309' : getPlayerFaction(me) === 'Hà' ? '#3b82f6' : '#ef4444'), color: 'white', fontWeight: 'bold' }}>
+1081:                 {me.isDaTam ? '🐺 DÃ TÂM' : `PHE ${getPlayerFaction(me)?.toUpperCase()}`}
+1082:               </div>
+1083:               {!me.isRevealed && (
+1084:                 <div style={{ fontSize: '0.6rem', padding: '1px 6px', borderRadius: '4px', background: '#4b5563', color: 'white', fontWeight: 'bold' }}>
+1085:                   🕵️ CHƯA LỘ DIỆN
+1086:                 </div>
+1087:               )}
+1088:             </div>
+1089:             <div className="my-hero-hp-bar">
+1090:               {Array.from({ length: me.maxHp }).map((_, i) => (
+1091:                 <span key={i} className={`hp-pip ${i >= me.hp ? 'lost' : ''}`} />
+1092:               ))}
+1093:               <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', marginLeft: '4px' }}>
+1094:                 {me.hp}/{me.maxHp}
+1095:               </span>
+1096:               {me.drankWine && <span style={{ marginLeft: '8px', fontSize: '0.8rem', color: '#ef4444', fontWeight: 'bold', textShadow: '0 0 5px red' }}>🍷 Đang say</span>}
+1097:             </div>
+1098:             <div style={{ display: 'flex', gap: '15px', marginTop: '6px', fontSize: '0.75rem', color: 'var(--color-text-secondary)', background: 'rgba(0,0,0,0.3)', padding: '3px 8px', borderRadius: '6px' }}>
+1099:               <div title="Tầm đánh (quyết định khoảng cách tối đa có thể Chém)">
+1100:                 <span style={{ color: '#ef4444' }}>⚔️ Tầm đánh:</span> <strong style={{ color: 'white' }}>{getAttackRange(gameState, 0)}</strong>
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.
+

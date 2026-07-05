@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "target": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowJs": true,
+    "ignoreDeprecations": "6.0",
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "src/global.d.ts",
+    "src/engine/**/*",
+    "src/components/game/GameView.jsx",
+    "src/components/game/PlayerBoard.jsx",
+    "src/components/game/PlayerHand.jsx",
+    "src/components/game/ActionBar.jsx",
+    "src/components/game/DraftScreen.jsx",
+    "src/components/game/MyHeroBar.jsx",
+    "src/components/modals/*.jsx",
+    "src/components/game/hooks/useCardInteraction.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/engine/__tests__"
+  ]
+}
