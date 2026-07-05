@@ -92,6 +92,10 @@ export function useCardInteraction(props) {
            });
         } else {
            // Needs target selection
+           let defaultMsg = '🎯 HÃY CHỌN 1 MỤC TIÊU! 🎯';
+           if (targetingDef.type === 'multiple') {
+               defaultMsg = `🎯 CHỌN ${targetingDef.min} - ${targetingDef.max} MỤC TIÊU! 🎯`;
+           }
            setTargetSession({
                cardIndex,
                card,
@@ -100,6 +104,7 @@ export function useCardInteraction(props) {
                step: 0,
                selectedTargets: [],
                validTargets: getAvailableTargets(gameState, mainPlayerId, virtualName || card.name, card.id, []),
+               message: `[${virtualName || card.name}]: ` + defaultMsg
            });
         }
     }, [gameState, gameAPI, activeSkill, cancelTargeting, setTargetSession, mainPlayerId]);

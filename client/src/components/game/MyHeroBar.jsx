@@ -19,11 +19,33 @@ import { getCardBg } from '../../utils/cardStyles';
  * @property {any} statusMessage
  * @property {Function} setHeroPopup
  * @property {Function} setCardPopup
+ * @property {any} targetSession
+ * @property {Function} handleTargetClick
  * 
  * @param {MyHeroBarProps} props
  */
 export default function MyHeroBar(props) {
-    const { me, gameState, activePhase, handleRevealClick, actionBar, playerHand, statusMessage, setHeroPopup, setCardPopup } = props;
+    const { me, gameState, activePhase, handleRevealClick, actionBar, playerHand, statusMessage, setHeroPopup, setCardPopup, targetSession, handleTargetClick } = props;
+    
+    const isTargetable = targetSession?.validTargets.includes(me.id);
+    const isSelected = targetSession?.selectedTargets.includes(me.id);
+    
+    // Hàm phụ trợ để xử lý click lên avatar
+    const onAvatarClick = (e) => {
+        if (isTargetable && handleTargetClick) {
+            handleTargetClick(me.id);
+        } else {
+            setHeroPopup(me);
+        }
+    };
+
+    const bgAvatarStyle = {
+        position: 'relative', width: '140px', height: '200px', background: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-md)', 
+        border: '2px solid var(--color-gold-dark)', overflow: 'hidden', cursor: isTargetable ? 'crosshair' : 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+        outline: isSelected ? '3px solid var(--color-gold)' : (isTargetable ? '3px dashed #ef4444' : 'none'),
+        outlineOffset: '2px'
+    };
+
     return (
         <div className="my-hero-bar" style={{ display: 'flex', gap: '20px', alignItems: 'stretch', width: '100%' }}>
            
@@ -78,7 +100,7 @@ export default function MyHeroBar(props) {
                   <div className="my-hero-avatars" style={{ display: 'flex', gap: '15px', zIndex: 10, flexShrink: 0 }}>
                       
                       {/* Avatar 1 */}
-                      <div className="avatar-card" onClick={() => setHeroPopup(me)} style={{ position: 'relative', width: '140px', height: '200px', background: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-md)', border: '2px solid var(--color-gold-dark)', overflow: 'hidden', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }}>
+                      <div className="avatar-card" onClick={onAvatarClick} style={bgAvatarStyle}>
                           {/* Judgement Area for Me - Float on top of avatars */}
                           <div className="judgement-area" style={{ top: '-10px', left: '-10px', zIndex: 20 }}>
                             {me.judgementArea && me.judgementArea.map((card, i) => (
@@ -108,7 +130,7 @@ export default function MyHeroBar(props) {
                       </div>
 
                       {/* Avatar 2 */}
-                      <div className="avatar-card" onClick={() => setHeroPopup(me)} style={{ position: 'relative', width: '140px', height: '200px', background: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-md)', border: '2px solid var(--color-gold-dark)', overflow: 'hidden', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }}>
+                      <div className="avatar-card" onClick={onAvatarClick} style={bgAvatarStyle}>
                           {me.heroes?.[1]?.image ? <img src={`/images/heroes/${me.heroes?.[1].image}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} /> : <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: '2rem' }}>{(me.heroes?.[1]?.emoji || '')}</div>}
                           {me.revealedHeroes && !me.revealedHeroes[1] && (
                             <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>

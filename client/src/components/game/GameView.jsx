@@ -101,7 +101,7 @@ export default function GameView() {
       targetSession,
       setTargetSession,
       cancelTargeting,
-      mainPlayerId: gameState.players[0].id
+      mainPlayerId: gameState?.players?.[0]?.id ?? mainPlayerId
   });
 
   const handleResponseAction = useCallback((payload) => {
@@ -287,6 +287,8 @@ export default function GameView() {
             handleRevealClick={handleRevealClick}
             setHeroPopup={setHeroPopup}
             setCardPopup={setCardPopup}
+            targetSession={targetSession}
+            handleTargetClick={handleTargetClick}
             playerHand={
               <PlayerHand
                   me={me}

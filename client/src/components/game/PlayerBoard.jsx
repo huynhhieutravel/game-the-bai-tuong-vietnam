@@ -42,7 +42,7 @@ export function PlayerBoard({
             style={{
               ...style,
               cursor: isTargetable ? 'crosshair' : 'default',
-              outline: isSelected ? '3px solid var(--color-gold)' : (isTargetable ? '2px solid rgba(197, 48, 48, 0.5)' : 'none'),
+              outline: isSelected ? '3px solid var(--color-gold)' : (isTargetable ? '3px dashed #ef4444' : 'none'),
               outlineOffset: '4px',
               borderRadius: 'var(--radius-lg)'
             }}
