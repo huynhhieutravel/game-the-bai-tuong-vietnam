@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import '../WikiPage.css';
 
-const FIXED_CARDS_DATA = [];
+const FIXED_CARDS_DATA = [
+  {
+    name: 'Xiềng Xích',
+    type: 'Cẩm Nang',
+    issue: 'Người chơi không thể tự click chọn bản thân để tháo/xích. Thông báo hiển thị "Hãy chọn 1 mục tiêu" gây nhầm lẫn (do Xiềng xích cho chọn 0-2 người). Viền đỏ báo hiệu mục tiêu hợp lệ bị mờ nhạt.',
+    fix: 'Đã cập nhật lại MyHeroBar để khung Avatar nhận thao tác Target. Tối ưu câu thông báo linh hoạt dựa theo thông số của lá bài. Chỉnh viền đỏ thành nét đứt nổi bật (crosshair cursor).'
+  }
+];
 
 export default function FixedCards() {
   const [searchQuery, setSearchQuery] = useState('');
