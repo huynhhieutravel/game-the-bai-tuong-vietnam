@@ -52,8 +52,8 @@ const BUG_DATA = [
     title: "Lỗi UI Pop-up Hóa Giải hiển thị không rõ ràng",
     labels: ["Lỗi UI", "UX", "Sai Tên Hiển Thị"],
     symptom: "UI Pop-up hỏi có muốn Hóa Giải không nhưng hiển thị không rõ ràng, mất tên người dùng (hiện 'Ai đó'), và tự động hiện pop-up ngay cả khi người chơi không có lá Hóa Giải thật trên tay.",
-    cause: "Hệ thống tự động kích hoạt Modal Hóa Giải vì người chơi có kỹ năng ẩn (ví dụ: Linh Giám) cho phép dùng bài màu đen làm Hóa Giải. Tuy nhiên giao diện không giải thích điều này khiến người chơi bối rối. Ngoài ra quên gán `req.lastNegaterId` vào Dispatcher khi một người đánh Hóa Giải.",
-    fix: "Nhét `req.lastNegaterId = playerId` vào Dispatcher. Thêm dòng chữ giải thích rõ ràng vào Modal Hóa Giải: '(Bạn không có [Hóa Giải], nhưng có thể dùng kỹ năng ẩn của Tướng hoặc Trang bị để Hóa Giải!)'.",
+    cause: "Hệ thống tự động kích hoạt Modal Hóa Giải vì người chơi có kỹ năng ẩn (ví dụ: Linh Giám) cho phép dùng bài màu đen làm Hóa Giải. Tuy nhiên giao diện không giải thích điều này khiến người chơi bối rối. Ngoài ra quên gán `req.lastNegaterId` vào Dispatcher khi một người đánh Hóa Giải. Lỗi log hiện đầy đủ tên tướng gây rối rắm.",
+    fix: "- **Logic Engine**: Nhét `req.lastNegaterId = playerId` vào Dispatcher.\n- **UI Modal**: Thêm dòng chữ giải thích rõ ràng vào Modal Hóa Giải: '(Bạn không có [Hóa Giải], nhưng có thể dùng kỹ năng ẩn của Tướng hoặc Trang bị để Hóa Giải!)'.\n- **Log Game**: Định dạng lại tên hiển thị trên Log bằng cách bỏ tên Tướng, tự động tính toán góc nhìn của người chơi để thêm nhãn **(Đồng Minh)** hoặc **(Kẻ Thù)**.",
     status: "Fixed"
 
   },
@@ -170,17 +170,17 @@ export default function BugHistory() {
             
             <div style={{ borderLeft: '4px solid #f59e0b', paddingLeft: '15px', background: 'rgba(245, 158, 11, 0.05)', padding: '15px', borderRadius: '0 8px 8px 0' }}>
                 <strong style={{ color: '#f59e0b', display: 'block', marginBottom: '5px' }}>Triệu chứng (Symptom):</strong>
-                <span style={{ color: 'var(--color-text-primary)' }}>{bug.symptom}</span>
+                <span style={{ color: 'var(--color-text-primary)' }} dangerouslySetInnerHTML={{ __html: bug.symptom.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') }}></span>
             </div>
 
             <div style={{ borderLeft: '4px solid #ef4444', paddingLeft: '15px', background: 'rgba(239, 68, 68, 0.05)', padding: '15px', borderRadius: '0 8px 8px 0' }}>
                 <strong style={{ color: '#ef4444', display: 'block', marginBottom: '5px' }}>Nguyên nhân gốc rễ (Root Cause):</strong>
-                <span style={{ color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }}>{bug.cause}</span>
+                <span style={{ color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: bug.cause.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') }}></span>
             </div>
 
             <div style={{ borderLeft: '4px solid #10b981', paddingLeft: '15px', background: 'rgba(16, 185, 129, 0.05)', padding: '15px', borderRadius: '0 8px 8px 0' }}>
                 <strong style={{ color: '#10b981', display: 'block', marginBottom: '5px' }}>Cách Fix (Resolution):</strong>
-                <span style={{ color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }}>{bug.fix}</span>
+                <span style={{ color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: bug.fix.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') }}></span>
             </div>
           </div>
         ))}
