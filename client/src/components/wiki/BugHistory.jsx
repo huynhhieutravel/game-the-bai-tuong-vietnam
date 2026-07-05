@@ -49,13 +49,12 @@ const BUG_DATA = [
   },
   {
     id: 6,
-    title: "Lỗi UI Pop-up Hóa Giải hiển thị không rõ ràng",
+    title: "[Lỗi UI & Ghi Tên Log] Pop-up Hóa Giải, Invalid Date, và Thiếu giải thích Kỹ Năng",
     labels: ["Lỗi UI", "UX", "Sai Tên Hiển Thị"],
-    symptom: "UI Pop-up hỏi có muốn Hóa Giải không nhưng hiển thị không rõ ràng, mất tên người dùng (hiện 'Ai đó'), và tự động hiện pop-up ngay cả khi người chơi không có lá Hóa Giải thật trên tay.",
-    cause: "Hệ thống tự động kích hoạt Modal Hóa Giải vì người chơi có kỹ năng ẩn (ví dụ: Linh Giám) cho phép dùng bài màu đen làm Hóa Giải. Tuy nhiên giao diện không giải thích điều này khiến người chơi bối rối. Ngoài ra quên gán `req.lastNegaterId` vào Dispatcher khi một người đánh Hóa Giải. Lỗi log hiện đầy đủ tên tướng gây rối rắm.",
-    fix: "- **Logic Engine**: Nhét `req.lastNegaterId = playerId` vào Dispatcher.\n- **UI Modal**: Thêm dòng chữ giải thích rõ ràng vào Modal Hóa Giải: '(Bạn không có [Hóa Giải], nhưng có thể dùng kỹ năng ẩn của Tướng hoặc Trang bị để Hóa Giải!)'.\n- **Log Game**: Định dạng lại tên hiển thị trên Log bằng cách bỏ tên Tướng, tự động tính toán góc nhìn của người chơi để thêm nhãn **(Đồng Minh)** hoặc **(Kẻ Thù)**.",
+    symptom: "1. Pop-up hỏi Hóa Giải bị mất tên người dùng (hiện 'Ai đó'), và tự hiện dù không có bài Hóa Giải.\n2. Bảng Game Log hiển thị nhiều dòng trắng có chữ `[Invalid Date]`.\n3. Log Game chỉ ghi tên tướng chung chung khi gây sát thương (như Sét đánh của Phạt Tội), không giải thích rõ là do kỹ năng gì.",
+    cause: "1. Thiếu gán `req.lastNegaterId` và thiếu text giải thích kỹ năng ẩn trong Modal Hóa Giải.\n2. Lỗi log hiện đầy đủ tên tướng (lộ liễu, rối rắm).\n3. `Reducer.js` đẩy log dạng chuỗi String thuần túy thay vì Object có `timestamp`, khiến `GameView` văng lỗi `[Invalid Date]`.\n4. Lời thoại Log của các kỹ năng (như Phạt Tội) trước đây viết quá gọn, thiếu diễn giải nguyên nhân sát thương.",
+    fix: "- **Khắc phục Modal & Tên Log**: Thêm text giải thích kỹ năng ẩn vào Modal. Gán `req.lastNegaterId` vào Dispatcher. Định dạng lại log: Tự động thêm nhãn **(Đồng Minh)** / **(Kẻ Thù)** thay vì lộ tên Tướng.\n- **Khắc phục Log Date**: Đồng bộ `AddLogEffect` và `Reducer.js` để đẩy Object `{ text, type, timestamp }` vào `history`.\n- **Minh Bạch Kỹ Năng**: Viết lại Log rõ ràng nguyên nhân: `bị Sét Đánh mất 2 Sinh Lực vì kỹ năng [Phạt Tội] (do phán xét ra ♠)`.",
     status: "Fixed"
-
   },
   {
     id: 7,
@@ -86,11 +85,11 @@ const BUG_DATA = [
   },
   {
     id: 10,
-    title: "Log Game [Invalid Date], Thiếu giải thích Kỹ Năng & Lỗi Đánh Tiếp Dù Đã Thắng",
-    labels: ["Lỗi Engine", "Lỗi UI", "UX"],
-    symptom: "1. Bảng Game Log hiển thị nhiều dòng trắng có chữ `[Invalid Date]`.\n2. Người chơi bị mất máu do kỹ năng (như Sét đánh của Phạt Tội) nhưng Log chỉ ghi tên tướng chung chung, không giải thích là do kỹ năng gì, khiến người chơi hoang mang.\n3. Khi có người chơi chiến thắng (Game Over), Engine vẫn tiếp tục vòng lặp xử lý (Loop) khiến các tướng vẫn đánh nhau loạn xạ.",
-    cause: "1. `Reducer.js` (Engine mới) đẩy log dạng chuỗi String thuần túy vào `history`, trong khi `GameView.jsx` mong đợi Object có chứa `timestamp` để render giờ giấc.\n2. Lời thoại Log của kỹ năng Phạt Tội (và các kỹ năng sát thương khác) trước đây viết quá gọn, bỏ qua việc diễn giải rõ nguyên nhân sát thương.\n3. Vòng lặp `tick()` của Dispatcher không kiểm tra cờ `this.state.gameOver`, nên nó cứ tiếp tục lôi các Event còn sót trong hàng đợi ra xử lý.",
-    fix: "- **Khắc phục Log Date**: Đồng bộ toàn bộ hàm `AddLogEffect` và `Reducer.js` để luôn đẩy Object `{ text, type, timestamp }` vào `history`.\n- **Minh Bạch Kỹ Năng**: Viết lại Log của Phạt Tội rõ ràng: `bị Sét Đánh mất 2 Sinh Lực vì kỹ năng [Phạt Tội] (do phán xét ra ♠)`.\n- **Ngắt Vòng Lặp**: Bổ sung cờ chặn `if (this.state.gameOver)` ngay đầu hàm `resolveEvent`, đồng thời quét sạch (clear) `reactionStack` và `actionQueue` để Engine chính thức 'nghỉ hưu' khi ván đấu kết thúc.",
+    title: "Lỗi Đánh Tiếp Dù Có Người Đã Thắng (Game Over)",
+    labels: ["Lỗi Engine", "Lỗi Logic", "Critical"],
+    symptom: "Khi có người chơi chiến thắng (Game Over), Engine vẫn tiếp tục vòng lặp xử lý (Loop) khiến các tướng vẫn đánh nhau loạn xạ.",
+    cause: "Vòng lặp `tick()` của Dispatcher không kiểm tra cờ `this.state.gameOver`, nên nó cứ tiếp tục lôi các Event còn sót trong hàng đợi ra xử lý.",
+    fix: "**Ngắt Vòng Lặp**: Bổ sung cờ chặn `if (this.state.gameOver)` ngay đầu hàm `resolveEvent`, đồng thời quét sạch (clear) `reactionStack` và `actionQueue` để Engine chính thức 'nghỉ hưu' khi ván đấu kết thúc.",
     status: "Fixed"
   }
 ];
