@@ -82,8 +82,12 @@ export const systemSkills = {
     name: 'Bọc Trăm Trứng',
     type: SKILL_TYPES.ACTIVE,
     canUse: (state, player) => {
+       const req = state.waitingForResponse;
        const hasLacAllies = state.players.some(p => p.id !== player.id && p.isAlive && getPlayerFaction(p) === 'Lạc');
-       return hasLacAllies;
+       if (req && (req.type === 'ask_slash' || req.type === 'ask_dodge')) return hasLacAllies;
+       
+       const canSlash = player.equipment.some(e => e.name === 'Liên Nỗ' || e.name === 'Liên Nỏ') || (player.attackCountThisTurn || 0) === 0;
+       return hasLacAllies && canSlash;
     },
     getValidTargets: (state, player) => {
        return state.players.filter(p => p.id !== player.id && p.isAlive);

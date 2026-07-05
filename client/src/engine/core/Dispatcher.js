@@ -81,15 +81,20 @@ export class Dispatcher {
           baseName = playerIdStr.startsWith('bot') ? `Bot ${playerIdStr.replace('bot', '')}` : `Người chơi ${parseInt(playerIdStr) + 1}`;
       }
 
-      if (player.isRevealed && player.revealedHeroes) {
-          const h0 = player.revealedHeroes[0] ? HeroRegistry[player.mainHeroId]?.name : null;
-          const h1 = player.revealedHeroes[1] ? HeroRegistry[player.subHeroId]?.name : null;
+      const p1 = this.state?.players?.[0];
+      if (p1 && player.id !== 0 && player.isRevealed) {
+          const p1Faction = p1.isDaTam ? 'DaTam' : getPlayerFaction(p1);
+          const pFaction = player.isDaTam ? 'DaTam' : getPlayerFaction(player);
           
-          if (h0 && h1) return `${h0} & ${h1} (${baseName})`;
-          if (h0) return `${h0} (${baseName})`;
-          if (h1) return `${h1} (${baseName})`;
+          if (p1.isDaTam || player.isDaTam) {
+              baseName += ' (Kẻ Thù)';
+          } else if (p1Faction === pFaction && p1Faction) {
+              baseName += ' (Đồng Minh)';
+          } else if (p1Faction && pFaction) {
+              baseName += ' (Kẻ Thù)';
+          }
       }
-      
+
       return baseName;
   }
 
