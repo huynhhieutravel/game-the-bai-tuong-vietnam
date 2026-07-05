@@ -6,8 +6,8 @@ const FIXED_HEROES_DATA = [
     name: "Lạc Long Quân",
     faction: "Lạc",
     image: "/images/heroes/lac_lac-long-quan.png",
-    issue: "Lỗi dùng Bọc Trăm Trứng chủ động bị kẹt & Lỗi nhấn Thủy Tổ gây crash ứng dụng",
-    fix: "- **Bọc Trăm Trứng**: Mở khóa cửa kiểm duyệt ở `system.js` cho phép kỹ năng được dùng chủ động, gỡ bỏ hardcode `0` thay bằng `mainPlayerId`.\n- **Thủy Tổ**: Bổ sung `sourceId` vào payload của sự kiện Thủy Tổ trong Engine để UI tìm đúng người chơi hiển thị."
+    issue: "Đại tu toàn diện Logic Kỹ Năng & AI Bot & Khắc phục Màn hình Đỏ",
+    fix: "- **1. Logic Engine**: Sửa lỗi Bọc Trăm Trứng bị kẹt hàng đợi khi có người từ chối.\n- **2. Mismatch Dữ liệu**: Đồng bộ payload UI gửi lên (`cardId` thay vì `cardIndexSelected`) để Engine nhận diện.\n- **3. UI / Màn hình Đỏ**: Bổ sung Modal `AskBocTramTrungDodgeModal` còn thiếu. Dùng Optional Chaining `gameState?.players?.[0]` để triệt tiêu lỗi trắng màn hình lúc khởi tạo.\n- **4. AI (Bot)**: Bot đã biết vứt bài dùng Thủy Tổ, dùng Đào/Chém khi được thưởng, và biết quăng Né/Chém để đỡ đạn cứu Lạc Long Quân."
   }
 ];
 
