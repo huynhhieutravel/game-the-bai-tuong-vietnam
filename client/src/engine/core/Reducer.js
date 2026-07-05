@@ -17,7 +17,7 @@ export function reduce(state, effect) {
       const target = nextState.players.find(p => p.id === effect.targetId);
       if (target) {
         target.hp = Math.max(0, target.hp - effect.amount);
-        nextState.history.push(`[DAMAGE] ${effect.sourceId} gây ${effect.amount} sát thương cho ${effect.targetId}`);
+        nextState.history.push({ text: `[DAMAGE] ${effect.sourceId} gây ${effect.amount} sát thương cho ${effect.targetId}`, type: 'damage', timestamp: Date.now() });
       }
       break;
     }
@@ -26,7 +26,7 @@ export function reduce(state, effect) {
       const target = nextState.players.find(p => p.id === effect.targetId);
       if (target && target.hp < target.maxHp) {
         target.hp = Math.min(target.maxHp, target.hp + effect.amount);
-        nextState.history.push(`[RECOVER] ${effect.targetId} hồi ${effect.amount} máu`);
+        nextState.history.push({ text: `[RECOVER] ${effect.targetId} hồi ${effect.amount} máu`, type: 'heal', timestamp: Date.now() });
       }
       break;
     }
@@ -35,7 +35,7 @@ export function reduce(state, effect) {
       const target = nextState.players.find(p => p.id === effect.targetId);
       if (target) {
         target.isTurnedOver = !target.isTurnedOver;
-        nextState.history.push(`[TURN_OVER] ${effect.targetId} lật mặt tướng (${target.isTurnedOver})`);
+        nextState.history.push({ text: `[TURN_OVER] ${effect.targetId} lật mặt tướng (${target.isTurnedOver})`, type: 'important', timestamp: Date.now() });
       }
       break;
     }
@@ -53,7 +53,7 @@ export function reduce(state, effect) {
         
         const drawnCards = nextState.deck.splice(0, effect.amount);
         target.hand.push(...drawnCards);
-        nextState.history.push(`[DRAW] ${effect.targetId} rút ${drawnCards.length} lá bài`);
+        nextState.history.push({ text: `[DRAW] ${effect.targetId} rút ${drawnCards.length} lá bài`, type: 'normal', timestamp: Date.now() });
       }
       break;
     }
@@ -69,7 +69,7 @@ export function reduce(state, effect) {
         }
         const judgeCard = nextState.deck.pop();
         // TODO: Chờ reaction đổi phán xét (như Ứng Biến, Quân Cơ)
-        nextState.history.push(`[JUDGE] ${target.id} phán xét ra ${judgeCard.suit} ${judgeCard.rank}`);
+        nextState.history.push({ text: `[JUDGE] ${target.id} phán xét ra ${judgeCard.suit} ${judgeCard.rank}`, type: 'important', timestamp: Date.now() });
       }
       break;
     }
@@ -199,7 +199,7 @@ export function reduce(state, effect) {
     case 'ADD_LOG': {
       // Thay cho: dispatcher.addLog('...')
       // Usage: AddLogEffect('message', 'type')
-      nextState.history.push(effect.message);
+      nextState.history.push({ text: effect.message, type: effect.logType || 'normal', timestamp: Date.now() });
       break;
     }
 

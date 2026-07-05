@@ -72,10 +72,11 @@ export function SetWaitingEffect(value) {
   };
 }
 
-export function AddLogEffect(message) {
+export function AddLogEffect(message, type = 'normal') {
   return {
     type: 'ADD_LOG',
-    message
+    message,
+    logType: type
   };
 }
 

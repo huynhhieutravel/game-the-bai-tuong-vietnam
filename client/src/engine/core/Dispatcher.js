@@ -232,6 +232,13 @@ export class Dispatcher {
          return;
       }
 
+      if (this.state.gameOver) {
+         this.state.reactionStack = [];
+         this.state.actionQueue = [];
+         this.state.waitingForResponse = null;
+         return;
+      }
+
       // 3. Xử lý Event chính — Ưu tiên delegate cho các Handler module
       if (handlePhaseEvent(this, event)) return;
       if (handleCombatEvent(this, event)) return;
@@ -882,7 +889,7 @@ export class Dispatcher {
                 if (data && data.targetId !== undefined && data.targetId !== null) {
                     const target = this.state.players.find(p => p.id === data.targetId);
                     const player = this.state.players.find(p => p.id === req.sourceId);
-                    this.addLog(`✨ ${this.getHeroName(player)} phát động [Phạt Tội] lên ${this.getHeroName(target)}!`, 'important');
+                    this.addLog(`✨ ${this.getHeroName(player)} phát động kỹ năng [Phạt Tội] lên ${this.getHeroName(target)}!`, 'important');
                     
                     if (this.state.deck.length === 0) {
                         this.state.deck = [...this.state.discardPile].reverse();
@@ -893,14 +900,14 @@ export class Dispatcher {
                     this.addLog(`⚖️ [Phạt Tội] phán xét: ${judgeCard.suit} ${judgeCard.rank} (${judgeCard.color})!`, 'important');
                     
                     if (judgeCard.suit === '♠') {
-                        this.addLog(`⚡ ${this.getHeroName(target)} nhận 2 sát thương Lôi vì [Phạt Tội]!`, 'damage');
+                        this.addLog(`⚡ ${this.getHeroName(target)} bị Sét Đánh mất 2 Sinh Lực vì kỹ năng [Phạt Tội] (do phán xét ra ♠)!`, 'damage');
                         this.state.reactionStack.push({
                             type: 'EVENT_DAMAGE',
                             payload: { sourceId: player.id, targetId: target.id, amount: 2, damageType: 'lightning' }
                         });
                     } else if (judgeCard.suit === '♣') {
                         this.applyEffect(Effects.RecoverEffect(player.id, 1));
-                        this.addLog(`💖 ${this.getHeroName(player)} hồi 1 HP và gây 1 sát thương Lôi cho ${this.getHeroName(target)}!`, 'heal');
+                        this.addLog(`💖 ${this.getHeroName(player)} hồi 1 HP và giáng Sét Đánh làm ${this.getHeroName(target)} mất 1 Sinh Lực vì [Phạt Tội] (do phán xét ra ♣)!`, 'heal');
                         this.state.reactionStack.push({
                             type: 'EVENT_DAMAGE',
                             payload: { sourceId: player.id, targetId: target.id, amount: 1, damageType: 'lightning' }

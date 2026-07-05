@@ -83,6 +83,15 @@ const BUG_DATA = [
     cause: "Hàm `getPlayerGender()` cố gắng trỏ tới `player.heroes[0].gender`. Tuy nhiên, vì lý do tối ưu hóa mạng và bảo mật, danh sách `player.heroes` trên Server chỉ được cấp mảng rỗng `[{}, {}]` chứ không nạp toàn bộ cấu hình tướng. Do đó `gender` trên Server liên tục văng ra `undefined`.",
     fix: "1. Tại `EVENT_ACTION_REVEAL_HERO` trong `Dispatcher.js`, đóng cứng thuộc tính `player.gender = hero.gender` khi Tướng được lật.\n2. Nâng cấp `getPlayerGender()` để ưu tiên trả về `player.gender` (trên Server), nếu không có mới fallback về `heroes[0].gender` (trên Client).",
     status: "Fixed"
+  },
+  {
+    id: 10,
+    title: "Log Game [Invalid Date], Thiếu giải thích Kỹ Năng & Lỗi Đánh Tiếp Dù Đã Thắng",
+    labels: ["Lỗi Engine", "Lỗi UI", "UX"],
+    symptom: "1. Bảng Game Log hiển thị nhiều dòng trắng có chữ `[Invalid Date]`.\n2. Người chơi bị mất máu do kỹ năng (như Sét đánh của Phạt Tội) nhưng Log chỉ ghi tên tướng chung chung, không giải thích là do kỹ năng gì, khiến người chơi hoang mang.\n3. Khi có người chơi chiến thắng (Game Over), Engine vẫn tiếp tục vòng lặp xử lý (Loop) khiến các tướng vẫn đánh nhau loạn xạ.",
+    cause: "1. `Reducer.js` (Engine mới) đẩy log dạng chuỗi String thuần túy vào `history`, trong khi `GameView.jsx` mong đợi Object có chứa `timestamp` để render giờ giấc.\n2. Lời thoại Log của kỹ năng Phạt Tội (và các kỹ năng sát thương khác) trước đây viết quá gọn, bỏ qua việc diễn giải rõ nguyên nhân sát thương.\n3. Vòng lặp `tick()` của Dispatcher không kiểm tra cờ `this.state.gameOver`, nên nó cứ tiếp tục lôi các Event còn sót trong hàng đợi ra xử lý.",
+    fix: "- **Khắc phục Log Date**: Đồng bộ toàn bộ hàm `AddLogEffect` và `Reducer.js` để luôn đẩy Object `{ text, type, timestamp }` vào `history`.\n- **Minh Bạch Kỹ Năng**: Viết lại Log của Phạt Tội rõ ràng: `bị Sét Đánh mất 2 Sinh Lực vì kỹ năng [Phạt Tội] (do phán xét ra ♠)`.\n- **Ngắt Vòng Lặp**: Bổ sung cờ chặn `if (this.state.gameOver)` ngay đầu hàm `resolveEvent`, đồng thời quét sạch (clear) `reactionStack` và `actionQueue` để Engine chính thức 'nghỉ hưu' khi ván đấu kết thúc.",
+    status: "Fixed"
   }
 ];
 
