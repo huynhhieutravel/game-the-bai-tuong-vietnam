@@ -134,133 +134,168 @@ export function DraftScreen(props) {
                 
                 return (
                 <div 
-                key={hero.id} 
-                className={`wiki-card draft-hero-card ${isSelected ? 'selected' : ''}`}
-                onClick={() => !isUnselectable && handleDraftSelect(hero.id)}
-                style={{ 
-                    cursor: isUnselectable ? 'not-allowed' : 'pointer', 
-                    display: 'flex',
-                    flexDirection: 'column',
-                    border: isSelected ? '4px solid var(--color-gold)' : `3px solid ${factionColor}`,
-                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                    boxShadow: isSelected ? '0 0 20px rgba(212, 168, 67, 0.7)' : 'var(--shadow-card)',
-                    transform: isSelected ? 'translateY(-6px) scale(1.03)' : 'none',
-                    transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                    position: 'relative',
-                    borderRadius: '12px',
-                    opacity: isUnselectable ? 0.3 : 1,
-                    filter: isUnselectable ? 'grayscale(1)' : 'none',
-                    overflow: 'hidden'
-                }}
-                >
-                {/* Huy hiệu phe */}
-                <div style={{ position: 'absolute', top: '8px', left: '8px', zIndex: 4, background: factionColor, color: 'white', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-                    {hero.faction}
-                </div>
-
-                {/* Nút soi cố định ở góc trên bên phải - Kích thước luôn chuẩn xác đồng nhất */}
-                <button 
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        setInspectedHero(hero);
-                    }}
+                    key={hero.id} 
+                    className={`draft-hero-card ${isSelected ? 'selected' : ''}`}
+                    onClick={() => !isUnselectable && handleDraftSelect(hero.id)}
                     style={{ 
-                        position: 'absolute',
-                        top: '8px',
-                        right: '8px',
-                        zIndex: 5,
-                        background: 'rgba(15, 23, 42, 0.88)', 
-                        border: '1px solid var(--color-gold)', 
-                        color: 'var(--color-gold)', 
-                        borderRadius: '12px', 
-                        padding: '3px 8px', 
-                        fontSize: '0.72rem', 
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
+                        cursor: isUnselectable ? 'not-allowed' : 'pointer', 
                         display: 'flex',
+                        flexDirection: 'column',
                         alignItems: 'center',
-                        gap: '2px',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
-                        backdropFilter: 'blur(4px)'
+                        gap: '4px',
+                        opacity: isUnselectable ? 0.35 : 1,
+                        filter: isUnselectable ? 'grayscale(1)' : 'none',
+                        transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        transform: isSelected ? 'translateY(-6px) scale(1.03)' : 'none',
+                        position: 'relative'
                     }}
-                    title="Xem chi tiết kỹ năng"
                 >
-                    🔍 Soi
-                </button>
-
-                {/* Biểu tượng đã chọn */}
-                {isSelected && (
-                    <div style={{ 
-                        position: 'absolute', 
-                        top: '8px', 
-                        right: '62px', 
-                        fontSize: '1rem', 
-                        zIndex: 6, 
-                        background: 'rgba(16, 185, 129, 0.95)', 
-                        color: 'white',
-                        borderRadius: '50%', 
-                        width: '22px',
-                        height: '22px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 'bold',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.6)'
-                    }}>
-                        ✓
-                    </div>
-                )}
-
-                {hero.image ? (
-                    <img 
-                        src={`/images/heroes/${hero.image}`} 
-                        alt={hero.name} 
+                    {/* 1. HÀNG TRÊN NGOÀI KHUNG: Huy hiệu Phe & Nút Soi */}
+                    <div 
+                        className="draft-hero-card-header"
                         style={{ 
-                            width: '100%', 
-                            height: '100%', 
-                            objectFit: 'contain',
-                            display: 'block' 
-                        }} 
-                    />
-                ) : (
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-card)', padding: '10px' }}>
-                        <div style={{ fontSize: '3rem' }}>{hero.emoji || '❓'}</div>
-                        <h3>{hero.name}</h3>
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between', 
+                            width: '100%',
+                            padding: '0 2px'
+                        }}
+                    >
+                        {/* Huy hiệu phe ngoài khung */}
+                        <span 
+                            style={{ 
+                                background: factionColor, 
+                                color: '#ffffff', 
+                                padding: '2px 8px', 
+                                borderRadius: '5px', 
+                                fontSize: '0.74rem', 
+                                fontWeight: 800,
+                                letterSpacing: '0.5px',
+                                boxShadow: `0 2px 6px ${factionColor}66`,
+                                textShadow: '0 1px 2px rgba(0,0,0,0.6)'
+                            }}
+                        >
+                            {hero.faction}
+                        </span>
+
+                        {/* Nút soi ngoài khung */}
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setInspectedHero(hero);
+                            }}
+                            style={{ 
+                                background: 'rgba(15, 23, 42, 0.9)', 
+                                border: '1.5px solid var(--color-gold)', 
+                                color: 'var(--color-gold-light)', 
+                                borderRadius: '10px', 
+                                padding: '2px 8px', 
+                                fontSize: '0.70rem', 
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
+                                backdropFilter: 'blur(4px)'
+                            }}
+                            title="Xem chi tiết kỹ năng"
+                        >
+                            🔍 Soi
+                        </button>
                     </div>
-                )}
-                
-                {/* Tên tướng dạng chip nổi nhẹ ở chân thẻ, không che khuất trích dẫn & HP */}
-                <div style={{ 
-                    position: 'absolute', 
-                    bottom: '4px', 
-                    left: '50%', 
-                    transform: 'translateX(-50%)',
-                    background: 'rgba(15, 23, 42, 0.85)',
-                    border: '1px solid rgba(212, 168, 67, 0.4)',
-                    borderRadius: '10px',
-                    padding: '1px 8px',
-                    textAlign: 'center',
-                    zIndex: 3,
-                    maxWidth: '85%',
-                    pointerEvents: 'none',
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.7)',
-                    backdropFilter: 'blur(3px)'
-                }}>
-                    <span style={{ 
-                        color: '#f8fafc', 
-                        fontSize: (hero.name || '').length > 10 ? '0.70rem' : '0.78rem', 
-                        fontWeight: 'bold', 
-                        display: 'block',
-                        whiteSpace: 'nowrap', 
-                        overflow: 'hidden', 
-                        textOverflow: 'ellipsis',
-                        textShadow: '0 1px 2px rgba(0,0,0,0.9)'
-                    }}>
-                        {hero.name || `Tướng ${hero.id}`}
-                    </span>
+
+                    {/* 2. KHUNG MÀU CHỨA FULL ẢNH TƯỚNG (Không che lấp, hiển thị trọn vẹn toàn bộ thẻ) */}
+                    <div 
+                        className={`draft-hero-card-frame ${isSelected ? 'selected' : ''}`}
+                        style={{
+                            border: isSelected ? '3.5px solid var(--color-gold)' : `2.5px solid ${factionColor}`,
+                            borderRadius: '10px',
+                            overflow: 'hidden',
+                            backgroundColor: '#0a0f1d',
+                            boxShadow: isSelected ? '0 0 22px rgba(212, 168, 67, 0.85)' : '0 6px 18px rgba(0,0,0,0.6)',
+                            position: 'relative',
+                            width: '100%',
+                            aspectRatio: '1086 / 1448',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                    >
+                        {/* Biểu tượng đã chọn ở góc */}
+                        {isSelected && (
+                            <div style={{ 
+                                position: 'absolute', 
+                                top: '6px', 
+                                right: '6px', 
+                                fontSize: '0.85rem', 
+                                zIndex: 10, 
+                                background: '#10b981', 
+                                color: 'white',
+                                borderRadius: '50%', 
+                                width: '22px',
+                                height: '22px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: '900',
+                                boxShadow: '0 0 10px rgba(16, 185, 129, 0.9)',
+                                border: '1.5px solid #ffffff'
+                            }}>
+                                ✓
+                            </div>
+                        )}
+
+                        {hero.image ? (
+                            <img 
+                                src={`/images/heroes/${hero.image}`} 
+                                alt={hero.name} 
+                                style={{ 
+                                    width: '100%', 
+                                    height: '100%', 
+                                    objectFit: 'cover',
+                                    display: 'block' 
+                                }} 
+                            />
+                        ) : (
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-card)', padding: '10px' }}>
+                                <div style={{ fontSize: '3rem' }}>{hero.emoji || '❓'}</div>
+                                <h3>{hero.name}</h3>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 3. TÊN TƯỚNG NGOÀI KHUNG (Nằm trực tiếp phía dưới khung thẻ) */}
+                    <div 
+                        className="draft-hero-name-badge"
+                        style={{ 
+                            background: 'rgba(15, 23, 42, 0.92)',
+                            border: `1.5px solid ${isSelected ? 'var(--color-gold)' : 'rgba(212, 168, 67, 0.45)'}`,
+                            borderRadius: '12px',
+                            padding: '3px 10px',
+                            textAlign: 'center',
+                            maxWidth: '100%',
+                            boxShadow: '0 3px 8px rgba(0,0,0,0.7)',
+                            backdropFilter: 'blur(4px)',
+                            width: 'max-content'
+                        }}
+                    >
+                        <span style={{ 
+                            color: isSelected ? 'var(--color-gold-light)' : '#f8fafc', 
+                            fontSize: (hero.name || '').length > 12 ? '0.72rem' : '0.80rem', 
+                            fontWeight: 'bold', 
+                            display: 'block',
+                            whiteSpace: 'nowrap', 
+                            overflow: 'hidden', 
+                            textOverflow: 'ellipsis',
+                            textShadow: '0 1px 3px rgba(0,0,0,0.9)'
+                        }}>
+                            {hero.name || `Tướng ${hero.id}`}
+                        </span>
+                    </div>
                 </div>
-                </div>
-            )}) : (
+                );
+            }) : (
                 <div style={{ gridColumn: '1 / -1', padding: '50px', color: 'var(--color-text-muted)' }}>
                 Đang chờ các người chơi khác chọn tướng...
                 </div>
@@ -271,33 +306,120 @@ export function DraftScreen(props) {
                 if (me.draftHeroes.some(h => h.id === id)) return null;
                 const vipHero = HEROES.find(h => h.id === id);
                 if (!vipHero) return null;
+                const factionColor = vipHero.faction === 'Lạc' ? '#10b981' : vipHero.faction === 'Sơn' ? '#b45309' : vipHero.faction === 'Hà' ? '#3b82f6' : '#ef4444';
                 return (
                     <div 
                         key={id}
-                        className="wiki-card draft-hero-card selected"
+                        className="draft-hero-card selected"
                         style={{ 
-                        cursor: 'pointer', 
-                        display: 'flex',
-                        flexDirection: 'column',
-                        border: '4px solid var(--color-gold)',
-                        backgroundColor: 'transparent',
-                        boxShadow: '0 0 20px rgba(212, 168, 67, 0.6)',
-                        transform: 'translateY(-6px) scale(1.03)',
-                        transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                        position: 'relative',
-                        borderRadius: '12px'
+                            cursor: 'pointer', 
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                            transform: 'translateY(-6px) scale(1.03)',
+                            position: 'relative'
                         }}
                         onClick={() => handleDraftSelect(id)}
                     >
-                        <div style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '2rem', zIndex: 2, background: 'rgba(0,0,0,0.5)', borderRadius: '50%' }}>✅</div>
-                        {vipHero.image ? (
-                        <img src={`/images/heroes/${vipHero.image}`} alt={vipHero.name} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
-                        ) : (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-card)', padding: '20px' }}>
-                            <div style={{ fontSize: '5rem' }}>{vipHero.emoji || '❓'}</div>
-                            <h3>{vipHero.name}</h3>
+                        {/* Hàng trên ngoài khung */}
+                        <div 
+                            className="draft-hero-card-header"
+                            style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between', 
+                                width: '100%',
+                                padding: '0 2px'
+                            }}
+                        >
+                            <span 
+                                style={{ 
+                                    background: factionColor, 
+                                    color: '#ffffff', 
+                                    padding: '2px 8px', 
+                                    borderRadius: '5px', 
+                                    fontSize: '0.74rem', 
+                                    fontWeight: 800,
+                                    letterSpacing: '0.5px'
+                                }}
+                            >
+                                {vipHero.faction}
+                            </span>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--color-gold)', fontWeight: 'bold' }}>VIP ⭐</span>
                         </div>
-                        )}
+
+                        {/* Khung màu full ảnh */}
+                        <div 
+                            className="draft-hero-card-frame selected"
+                            style={{
+                                border: '3.5px solid var(--color-gold)',
+                                borderRadius: '10px',
+                                overflow: 'hidden',
+                                backgroundColor: '#0a0f1d',
+                                boxShadow: '0 0 22px rgba(212, 168, 67, 0.85)',
+                                position: 'relative',
+                                width: '100%',
+                                aspectRatio: '1086 / 1448',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            <div style={{ 
+                                position: 'absolute', 
+                                top: '6px', 
+                                right: '6px', 
+                                fontSize: '0.85rem', 
+                                zIndex: 10, 
+                                background: '#10b981', 
+                                color: 'white',
+                                borderRadius: '50%', 
+                                width: '22px',
+                                height: '22px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: '900',
+                                border: '1.5px solid #ffffff'
+                            }}>
+                                ✓
+                            </div>
+                            {vipHero.image ? (
+                                <img src={`/images/heroes/${vipHero.image}`} alt={vipHero.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            ) : (
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-card)', padding: '20px' }}>
+                                    <div style={{ fontSize: '5rem' }}>{vipHero.emoji || '❓'}</div>
+                                    <h3>{vipHero.name}</h3>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Tên tướng ngoài khung */}
+                        <div 
+                            className="draft-hero-name-badge"
+                            style={{ 
+                                background: 'rgba(15, 23, 42, 0.92)',
+                                border: '1.5px solid var(--color-gold)',
+                                borderRadius: '12px',
+                                padding: '3px 10px',
+                                textAlign: 'center',
+                                maxWidth: '100%',
+                                boxShadow: '0 3px 8px rgba(0,0,0,0.7)',
+                                width: 'max-content'
+                            }}
+                        >
+                            <span style={{ 
+                                color: 'var(--color-gold-light)', 
+                                fontSize: '0.80rem', 
+                                fontWeight: 'bold', 
+                                display: 'block',
+                                whiteSpace: 'nowrap'
+                            }}>
+                                {vipHero.name}
+                            </span>
+                        </div>
                     </div>
                 );
             })}

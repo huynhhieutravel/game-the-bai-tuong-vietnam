@@ -1244,8 +1244,13 @@ body {
 }
 
 .draft-hero-card {
-  width: 260px;
-  height: 364px;
+  width: 220px;
+  height: auto;
+}
+
+.draft-hero-card-frame {
+  width: 100%;
+  aspect-ratio: 1086 / 1448;
 }
 
 .draft-confirm-btn {
@@ -1430,19 +1435,25 @@ body {
     flex-wrap: nowrap !important;
     justify-content: center !important;
     align-items: center !important;
-    gap: 8px !important;
+    gap: clamp(6px, 1.2vw, 12px) !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 2px auto !important;
   }
 
   .draft-hero-card {
-    height: clamp(185px, 58vh, 248px) !important;
-    aspect-ratio: 1086 / 1448 !important;
-    width: auto !important;
-    max-width: 185px !important;
+    height: auto !important;
+    aspect-ratio: unset !important;
+    width: clamp(120px, 15.2vw, 155px) !important;
+    max-width: 160px !important;
     flex: 0 1 auto !important;
     border-radius: 10px !important;
+  }
+
+  .draft-hero-card-frame {
+    width: 100% !important;
+    aspect-ratio: 1086 / 1448 !important;
+    height: auto !important;
   }
 
   .draft-confirm-btn {
