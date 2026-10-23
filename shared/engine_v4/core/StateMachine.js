@@ -163,8 +163,22 @@ export class StateMachine {
     const player = this.state.getCurrentPlayer();
 
     const baseMaxHand = Math.max(0, player.hp);
-    const bonusMaxHand = player.bonusMaxHand || 0;
-    const effectiveMaxHand = baseMaxHand + bonusMaxHand;
+    let bonusMaxHand = player.bonusMaxHand || 0;
+
+    // Nguyễn Bặc - Khai Quốc (Chủ Công Kỹ): Giới hạn bài tay +2 × (số tướng hệ Sơn)
+    const hasKhaiQuoc = globalHeroRegistry.hasSkill(player, 'khai_quoc', true) || globalHeroRegistry.hasSkill(player, 'khai_quoc_nguyen_bac', true);
+    if (hasKhaiQuoc) {
+      const allySonCount = this.state.players.filter(p => p.id !== player.id && p.isAlive && p.faction === 'son').length;
+      bonusMaxHand += allySonCount * 2;
+    }
+
+    let effectiveMaxHand = baseMaxHand + bonusMaxHand;
+
+    // Nguyễn Địa Lô - Hộ Chủ: Nếu có các lá bài Trung, Max hand được tính bằng số lá bài Trung
+    if (globalHeroRegistry.hasSkill(player, 'ho_chu', true) && Array.isArray(player.trungCards) && player.trungCards.length > 0) {
+      effectiveMaxHand = Math.max(effectiveMaxHand, player.trungCards.length);
+    }
+
     const excess = player.hand.length - effectiveMaxHand;
 
     // Nhiếp chính Tô Hiến Thành: Chỉ được miễn bỏ bài nếu lượt này KHÔNG sử dụng lá Chém nào
@@ -217,7 +231,7 @@ export class StateMachine {
     this.state.priorityStack.pop();
 
     // Assert Invariant bỏ bài
-    GameInvariants.assertDiscardLimit(player);
+    GameInvariants.assertDiscardLimit(player, this.state);
 
     // Chuyển sang Pha Kết thúc
     this._runPhaseEnd();

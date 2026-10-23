@@ -144,6 +144,18 @@ export const DinhDien = {
           attacker.hp -= 1;
         }
       }
+    }),
+    new SkillContract({
+      id: 'quan_co',
+      name: 'Quân Cơ',
+      type: 'reactive',
+      description: 'Đánh bài Đen để thay thế bài phán xét trước khi có hiệu lực.'
+    }),
+    new SkillContract({
+      id: 'dinh_quoc',
+      name: 'Định Quốc',
+      type: 'active',
+      description: 'Chủ Công Kỹ: Tướng Sơn có thể đưa lá [Né] hoặc [Sấm Sét] cho Đinh Điền.'
     })
   ]
 };

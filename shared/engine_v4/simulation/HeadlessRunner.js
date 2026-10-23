@@ -150,8 +150,22 @@ export class HeadlessRunner {
           TrickRules.respondDuel(state, actorId, reaction.slashCard);
         } else if (frame.type === 'ASK_NEGATE') {
           TrickRules.respondNegate(state, actorId, reaction.negateCard);
+        } else if (frame.type === 'ASK_CHANGE_JUDGE') {
+          TrickRules.respondChangeJudge(state, actorId, null);
+        } else if (frame.type === 'ASK_BOC_TRAM_TRUNG_DODGE') {
+          CombatRules.respondBocTramTrungDodge(state, actorId, reaction.dodgeCard || null);
+        } else if (frame.type === 'ASK_BOC_TRAM_TRUNG_SLASH') {
+          CombatRules.respondBocTramTrungSlash(state, actorId, reaction.slashCard || null);
+        } else if (frame.type === 'ASK_TIEN_PHAT') {
+          CombatRules.respondTienPhat(state, actorId, reaction.dodgeCard || null);
+        } else if (frame.type === 'ASK_HAU_VIEN') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          p.hp = Math.min(p.maxHp, p.hp + 1);
         } else {
           // Bỏ qua các frame khác bằng cách pop
+          if (frame.context?.judgeCard) state.discardPile.push(frame.context.judgeCard);
+          if (frame.context?.delayedCard) state.discardPile.push(frame.context.delayedCard);
           state.priorityStack.pop();
         }
 

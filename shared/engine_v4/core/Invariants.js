@@ -24,15 +24,27 @@ export class GameInvariants {
    * Bất biến 2: Bỏ bài cuối lượt (Discard Phase)
    * Số bài trên tay không được vượt quá HP hiện tại (trừ kỹ năng đặc thù)
    */
-  static assertDiscardLimit(player) {
-    if (player.temporaryFlags?.skipDiscardPhase || player.skills?.includes('nhiep_chinh_to_hien_thanh')) {
+  static assertDiscardLimit(player, state = null) {
+    const hasToHienThanh = (player.skills?.includes('nhiep_chinh_to_hien_thanh') || player.temporaryFlags?.skipDiscardPhase) && (player.turnStats?.slashCount || 0) === 0;
+    if (player.temporaryFlags?.skipDiscardPhase || hasToHienThanh) {
       return;
     }
 
-    // Tính Max Hand: Mặc định bằng HP hiện tại + bonus kỹ năng (như Khai Quốc của Nguyễn Bặc)
+    // Tính Max Hand: Mặc định bằng HP hiện tại + bonus kỹ năng (như Khai Quốc của Nguyễn Bặc, Hộ Chủ của Nguyễn Địa Lô)
     const baseMaxHand = Math.max(0, player.hp);
-    const bonusMaxHand = player.bonusMaxHand || 0;
-    const effectiveMaxHand = baseMaxHand + bonusMaxHand;
+    let bonusMaxHand = player.bonusMaxHand || 0;
+
+    const hasKhaiQuoc = player.skills?.includes('khai_quoc') || (player.heroes && Object.values(player.heroes).some(h => h?.skills?.includes('khai_quoc')));
+    if (hasKhaiQuoc && state?.players) {
+      const allySonCount = state.players.filter(p => p.id !== player.id && p.isAlive && p.faction === 'son').length;
+      bonusMaxHand += allySonCount * 2;
+    }
+
+    let effectiveMaxHand = baseMaxHand + bonusMaxHand;
+    const hasHoChu = player.skills?.includes('ho_chu') || (player.heroes && Object.values(player.heroes).some(h => h?.skills?.includes('ho_chu')));
+    if (hasHoChu && Array.isArray(player.trungCards) && player.trungCards.length > 0) {
+      effectiveMaxHand = Math.max(effectiveMaxHand, player.trungCards.length);
+    }
 
     const handCount = player.hand?.length || 0;
     if (handCount > effectiveMaxHand) {

@@ -162,6 +162,27 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
   - **Hòa Thân (Huyền Trân Công Chúa):** Bỏ 1 lá bài trên tay để bắt buộc 2 tướng Nam bất kỳ bước vào trận Quyết Đấu sinh tử với nhau.
   - **Bình Loạn (Nguyễn Bặc):** Bỏ 2 lá bài cùng chất để kích hoạt hiệu ứng cẩm nang [Loạn Tiễn].
   - **Trung Dũng (Lê Ngân):** Úp 1 lá bài trên tay tuyên bố chức năng ảo như [Chém], [Đào], [Tước Bài], v.v. Kẻ thù có thể lựa chọn tin tưởng hoặc nghi ngờ.
-  - **Thủy Tổ (Lạc Long Quân):** Giao bài cho đồng minh; nếu giao từ 2 lá trở lên thì nhận thêm khung thưởng `ASK_THUY_TO_BONUS` cho phép đánh ngay 1 Bài Cơ Bản miễn phí.
-  - **Tự Chủ (Khúc Thừa Dụ):** Đấu điểm lật bài ngẫu nhiên với một tướng có lượng HP cao hơn mình. Thắng ép đối thủ Chém người khác; thua bị đối thủ Chém trả đũa.
 
+---
+
+## 14. Kỹ Năng Chúa Công Quốc Chiến, Cửa Sổ Can Thiệp Phán Xét & Thưởng Phạt Đồng Minh (National War Lord Skills & Judgement Intercept)
+
+- **🎁 Thưởng Hạ Địch & Phạt Ngộ Sát Quốc Chiến (Faction Kill Rewards & Friendly Fire Penalty):**
+  - **Thưởng diệt địch:** Khi tiêu diệt một người chơi khác phe đã lộ diện, kẻ kết liễu được rút số lá bài bằng **số đồng minh đã lộ diện của nạn nhân + 1** (tối thiểu là 2 lá bài). Nếu tiêu diệt một kẻ mang dã tâm (Careerist), kẻ kết liễu chỉ nhận 1 lá bài thưởng.
+  - **Phạt ngộ sát (Friendly Fire):** Khi tiêu diệt một đồng minh cùng phe đã lộ diện, kẻ kết liễu lập tức bị xử phạt **vứt bỏ toàn bộ số bài trên tay và toàn bộ trang bị đang mặc**.
+- **🐉 Bọc Trăm Trứng (Lạc Long Quân - Phe Lạc):**
+  - Khi cần ra lá [Né] (bị Chém, Loạn Tiễn) hoặc lá [Chém] (trong Quyết Đấu, Dã Man), Chúa công Lạc Long Quân có thể phát động `Bọc Trăm Trứng` để mở khung yêu cầu đồng minh `ASK_BOC_TRAM_TRUNG_DODGE` hoặc `ASK_BOC_TRAM_TRUNG_SLASH`.
+  - Toàn bộ người chơi cùng phe Lạc còn sống sẽ được hỏi tuần tự theo hàng đợi xem có ai tình nguyện ra bài thay cho Chúa công hay không.
+- **👑 Tiên Phát (Lý Thường Kiệt - Phe Việt):**
+  - Khi Lý Thường Kiệt bị tấn công và cần dùng lá [Né], có thể phát động `Tiên Phát` tạo khung `ASK_TIEN_PHAT` để hỏi tuần tự các đồng minh phe Việt ra [Né] đỡ đòn giùm mình.
+- **🤝 Hậu Viện (Ngô Quyền - Phe Hà):**
+  - Khi một người chơi phe Hà sử dụng lá [Đào] chủ động trong lượt, nếu Ngô Quyền đang bị thương (`hp < maxHp`), hệ thống sẽ mở khung `ASK_HAU_VIEN` hỏi người chơi đó có muốn nhường quả Đào này cho Ngô Quyền hay không. Nếu đồng ý, Ngô Quyền hồi 1 HP và người nhường Đào được rút thưởng 1 lá bài từ bộ bài.
+- **☯️ Cửa Sổ Can Thiệp Phán Xét (Pre-Judgement Intercept Window):**
+  - Khi một cẩm nang trì hoãn (Sấm Sét, Hỗn Loạn) đến giai đoạn phán xét, lá bài phán xét được rút tạm từ đỉnh bộ bài rút nhưng **chưa được áp dụng ngay**.
+  - Hệ thống quét tất cả người chơi còn sống xem có ai sở hữu kỹ năng can thiệp phán xét như **Mạc Đĩnh Chi** (`Ứng Biến` - dùng bài bất kỳ trên tay) hoặc **Đinh Điền** (`Quân Cơ` - dùng bài đen trên tay) hay không.
+  - Người chơi hợp lệ sẽ nhận được khung `ASK_CHANGE_JUDGE`. Nếu chấp thuận, lá bài phán xét cũ bị thay thế bởi lá bài được chọn từ tay người can thiệp, qua đó có thể trực tiếp cứu đồng minh thoát khỏi Sấm Sét nổ hoặc ép kẻ thù nổ lôi hỏa.
+- **📊 Giới Hạn Bài Trên Tay Động (Dynamic Max Hand Limit Invariant):**
+  - Mặc định, giới hạn bài trên tay tối đa trong Pha Bỏ bài bằng lượng HP hiện tại.
+  - Tuy nhiên, kỹ năng **Khai Quốc** của Nguyễn Bặc cộng thêm **+2 Max Hand cho mỗi đồng minh Sơn còn sống**.
+  - Kỹ năng **Hộ Chủ** của Nguyễn Địa Lô cho phép tính Max Hand bằng số lá bài Trung đã tích lũy.
+  - Cả `StateMachine.js` và `GameInvariants.assertDiscardLimit` đều đồng bộ tính toán `effectiveMaxHand` chính xác, đảm bảo không có cảnh báo vi phạm giả (false positive).

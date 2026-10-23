@@ -129,6 +129,58 @@ export function toViewModel(state, mainPlayerId = 0) {
           askQueue: [...(frame.priorityQueue || [])],
           ...frame.context
         };
+      } else if (frame.type === 'ASK_CHANGE_JUDGE') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_change_judge',
+          responderId: frame.currentActorId,
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          reason: frame.context?.reason,
+          judgeCard: frame.context?.judgeCard,
+          skills: frame.context?.skills,
+          askQueue: [...(frame.priorityQueue || [])],
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_HAU_VIEN') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_hau_vien',
+          sourceId: frame.sourceId,
+          responderId: frame.currentActorId || frame.sourceId,
+          targets: frame.context?.targets || [],
+          askQueue: [...(frame.priorityQueue || [])],
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_BOC_TRAM_TRUNG_DODGE') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_boc_tram_trung_dodge',
+          sourceId: frame.sourceId,
+          responderId: frame.currentActorId,
+          askQueue: [...(frame.priorityQueue || [])],
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_BOC_TRAM_TRUNG_SLASH') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_boc_tram_trung_slash',
+          sourceId: frame.sourceId,
+          responderId: frame.currentActorId,
+          isDefensive: frame.context?.isDefensive,
+          askQueue: [...(frame.priorityQueue || [])],
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_TIEN_PHAT') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_tien_phat',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          askQueue: [...(frame.priorityQueue || [])],
+          ...frame.context
+        };
       } else {
         const isDiscard = frame.type === 'ASK_DISCARD';
         const frameType = isDiscard ? 'discard_phase' : frame.type.toLowerCase();

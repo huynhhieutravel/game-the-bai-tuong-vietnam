@@ -4,6 +4,8 @@ import { getFullPlayerName, getPlayerFaction } from "shared/utils/playerHelpers"
 import { CardSelector } from './CardSelector';
 
 import { AskBocTramTrungSlashModal } from './AskBocTramTrungSlashModal';
+import { AskChangeJudgeModal } from './AskChangeJudgeModal';
+import { HauVienModal } from './HauVienModal';
 import { AskSnatchDismantleModal } from './AskSnatchDismantleModal';
 import { AskWeaponSkillModal } from './AskWeaponSkillModal';
 import { BachDangModal } from './BachDangModal';
@@ -227,10 +229,15 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         if (req.type === 'ask_hau_vien' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
-              
-<div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: '#ef4444' }}>🌟 Hậu Viện (Chưa code Modal)</div>
-<button className="btn-action secondary" onClick={() => handleResponseAction({ doReact: false })}>Bỏ qua</button>
+              <HauVienModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
+            </div>
+          );
+        }
 
+        if (req.type === 'ask_change_judge' && req.responderId === me.id) {
+          return (
+            <div style={modalStyle}>
+              <AskChangeJudgeModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
             </div>
           );
         }

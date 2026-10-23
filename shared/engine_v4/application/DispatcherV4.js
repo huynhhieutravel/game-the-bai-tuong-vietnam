@@ -142,7 +142,31 @@ export class DispatcherV4 {
       if (player.hp >= player.maxHp) {
         throw new Error('Máu đã đầy, không thể sử dụng Đào!');
       }
+
       this.state.discardFromHand(sourceId, [card.id]);
+
+      // Kiểm tra Kỹ Năng Hậu Viện (Ngô Quyền - Phe Hà)
+      const isHaFaction = (player.faction || '').toLowerCase() === 'ha';
+      const hauVienTargets = isHaFaction
+        ? this.state.getAlivePlayers().filter(p => p.id !== player.id && (p.faction || '').toLowerCase() === 'ha' && p.hp < p.maxHp && (globalHeroRegistry.hasSkill(p, 'hau_vien', true) || globalHeroRegistry.hasSkill(p, 'hau-vien', true)))
+        : [];
+
+      if (hauVienTargets.length > 0) {
+        this.state.priorityStack.push({
+          type: 'ASK_HAU_VIEN',
+          sourceId: player.id,
+          targetId: player.id,
+          currentActorId: player.id,
+          priorityQueue: [player.id],
+          context: {
+            reason: 'hau_vien',
+            targets: hauVienTargets.map(p => p.id)
+          }
+        });
+        this.state.addLog(`✨ [Hậu Viện] ${player.name} có thể nhường lá [Đào] này cho Chúa công Ngô Quyền!`);
+        return;
+      }
+
       player.hp = Math.min(player.maxHp, player.hp + 1);
       this.state.addLog(`${player.name} sử dụng [Đào], hồi phục 1 Máu (${player.hp}/${player.maxHp}).`);
       return;
@@ -343,7 +367,7 @@ export class DispatcherV4 {
         if (!isCancelOrSkip) {
           slashCard = this._resolveCard(player, data) || player.hand.find(c => c.type === 'slash' || c.name === 'Chém');
         }
-        TrickRules.respondDuel(this.state, playerId, slashCard);
+        TrickRules.respondDuel(this.state, playerId, slashCard, data);
         break;
       }
 
@@ -352,7 +376,59 @@ export class DispatcherV4 {
         if (!isCancelOrSkip) {
           slashCard = this._resolveCard(player, data) || player.hand.find(c => c.type === 'slash' || c.name === 'Chém');
         }
-        TrickRules.respondBarbarian(this.state, playerId, slashCard);
+        TrickRules.respondBarbarian(this.state, playerId, slashCard, data);
+        break;
+      }
+
+      case 'ASK_CHANGE_JUDGE': {
+        let replaceCard = null;
+        if (!isCancelOrSkip && data.doReact) {
+          replaceCard = this._resolveCard(player, data);
+        }
+        TrickRules.respondChangeJudge(this.state, playerId, replaceCard, data);
+        break;
+      }
+
+      case 'ASK_HAU_VIEN': {
+        this.state.priorityStack.pop();
+        if (!isCancelOrSkip && data.doReact && data.targetId !== undefined) {
+          const target = this.state.getPlayer(data.targetId);
+          if (target && target.isAlive) {
+            target.hp = Math.min(target.maxHp, target.hp + 1);
+            this.state.addLog(`✨ [Hậu Viện] ${player.name} nhường [Đào] cho ${target.name} (${target.hp}/${target.maxHp}) và rút 1 lá bài!`);
+            this.state.drawCards(playerId, 1);
+          }
+        } else {
+          player.hp = Math.min(player.maxHp, player.hp + 1);
+          this.state.addLog(`${player.name} sử dụng [Đào], hồi phục 1 Máu (${player.hp}/${player.maxHp}).`);
+        }
+        break;
+      }
+
+      case 'ASK_BOC_TRAM_TRUNG_DODGE': {
+        let dodgeCard = null;
+        if (!isCancelOrSkip && (data.doProvide || data.doReact)) {
+          dodgeCard = this._resolveCard(player, data) || player.hand.find(c => c.type === 'dodge' || c.name === 'Né');
+        }
+        CombatRules.respondBocTramTrungDodge(this.state, playerId, dodgeCard);
+        break;
+      }
+
+      case 'ASK_BOC_TRAM_TRUNG_SLASH': {
+        let slashCard = null;
+        if (!isCancelOrSkip && (data.doProvide || data.doReact)) {
+          slashCard = this._resolveCard(player, data) || player.hand.find(c => c.type === 'slash' || c.name === 'Chém');
+        }
+        CombatRules.respondBocTramTrungSlash(this.state, playerId, slashCard);
+        break;
+      }
+
+      case 'ASK_TIEN_PHAT': {
+        let dodgeCard = null;
+        if (!isCancelOrSkip && (data.doProvide || data.doReact)) {
+          dodgeCard = this._resolveCard(player, data) || player.hand.find(c => c.type === 'dodge' || c.name === 'Né');
+        }
+        CombatRules.respondTienPhat(this.state, playerId, dodgeCard);
         break;
       }
 

@@ -520,7 +520,7 @@ export class TrickRules {
   /**
    * Phản hồi trong trận Quyết Đấu (Duel)
    */
-  static respondDuel(state, actorId, slashCard = null) {
+  static respondDuel(state, actorId, slashCard = null, data = {}) {
     const frame = state.priorityStack.peek();
     if (!frame || frame.type !== 'ASK_SLASH_DUEL') {
       throw new Error(`[TrickRules] Không có trận Quyết Đấu nào đang chờ!`);
@@ -532,6 +532,28 @@ export class TrickRules {
     }
 
     const responder = state.getPlayer(actorId);
+
+    // Lạc Long Quân: Bọc Trăm Trứng (Hỏi đồng minh Lạc Chém thay)
+    if (data.callBocTramTrung) {
+      const isLLQ = globalHeroRegistry.hasSkill(responder, 'boc_tram_trung', true);
+      const lacAllies = state.getAlivePlayers().filter(p => p.id !== responder.id && p.faction === 'lac');
+      if (isLLQ && lacAllies.length > 0) {
+        state.addLog(`🐉 [Bọc Trăm Trứng] ${responder.name} kêu gọi đồng minh hệ Lạc ra [Chém] giùm trong Quyết Đấu!`);
+        state.priorityStack.push({
+          type: 'ASK_BOC_TRAM_TRUNG_SLASH',
+          sourceId: responder.id,
+          targetId: responder.id,
+          currentActorId: lacAllies[0].id,
+          priorityQueue: [lacAllies[0].id],
+          context: {
+            reason: 'boc_tram_trung_slash',
+            allies: lacAllies.map(p => p.id),
+            allyIndex: 0
+          }
+        });
+        return { calledAllies: true };
+      }
+    }
 
     if (slashCard) {
       // Đánh ra Chém hợp lệ -> Đổi lượt sang người kia
@@ -556,13 +578,37 @@ export class TrickRules {
   /**
    * Phản hồi trong đợt công kích Dã Man Xâm Nhập (Nam Man)
    */
-  static respondBarbarian(state, targetId, slashCard = null) {
+  static respondBarbarian(state, targetId, slashCard = null, data = {}) {
     const frame = state.priorityStack.peek();
     if (!frame || frame.type !== 'ASK_SLASH_RESPONSE') {
       throw new Error(`[TrickRules] Không có yêu cầu đỡ Dã Man nào đang chờ!`);
     }
 
     const target = state.getPlayer(targetId);
+
+    // Lạc Long Quân: Bọc Trăm Trứng (Hỏi đồng minh Lạc Chém thay cản Dã Man)
+    if (data.callBocTramTrung) {
+      const isLLQ = globalHeroRegistry.hasSkill(target, 'boc_tram_trung', true);
+      const lacAllies = state.getAlivePlayers().filter(p => p.id !== target.id && p.faction === 'lac');
+      if (isLLQ && lacAllies.length > 0) {
+        state.addLog(`🐉 [Bọc Trăm Trứng] ${target.name} kêu gọi đồng minh hệ Lạc ra [Chém] giùm cản Dã Man!`);
+        state.priorityStack.push({
+          type: 'ASK_BOC_TRAM_TRUNG_SLASH',
+          sourceId: target.id,
+          targetId: target.id,
+          currentActorId: lacAllies[0].id,
+          priorityQueue: [lacAllies[0].id],
+          context: {
+            reason: 'boc_tram_trung_slash',
+            allies: lacAllies.map(p => p.id),
+            allyIndex: 0,
+            isDefensive: true
+          }
+        });
+        return { calledAllies: true };
+      }
+    }
+
     state.priorityStack.pop();
 
     if (slashCard) {
@@ -654,45 +700,119 @@ export class TrickRules {
         state.discardPile.push(delayedCard);
         continue;
       }
-      state.discardPile.push(judgeCard);
 
-      // Kích hoạt phản ứng phán xét (Ngọc Hân Công Chúa - Thông Ngôn...)
-      globalHeroRegistry.dispatchTrigger('ON_JUDGED', { targetId: player.id, judgeCard }, state);
+      // Kiểm tra xem có người chơi nào có kỹ năng đổi phán xét (Mạc Đĩnh Chi - Ứng Biến, Đinh Điền - Quân Cơ)
+      const candidateIds = state.players
+        .filter(p => p.isAlive && p.hand && p.hand.length > 0 && (
+          globalHeroRegistry.hasSkill(p, 'ung_bien', true) ||
+          globalHeroRegistry.hasSkill(p, 'quan_co', true)
+        ))
+        .map(p => p.id);
 
-      if (cardKey === 'sam_set') {
-        // Sấm Sét: Bích (♠) 2 - 9 -> NỔ 3 HP
-        const isSpade = judgeCard.suit === 'spade' || judgeCard.suit === '♠';
-        const rank = typeof judgeCard.rank === 'number' ? judgeCard.rank : parseInt(judgeCard.rank, 10);
-        const isExploded = isSpade && rank >= 2 && rank <= 9;
-
-        if (isExploded) {
-          state.addLog(`🌩️⚡ [Sấm Sét] NỔ TRÚNG ${player.name} (${judgeCard.name} chất Bích ${rank})! Nhận 3 sát thương lôi hỏa!`);
-          state.discardPile.push(delayedCard);
-          CombatRules.applyDamage(state, null, player.id, 3, 'lightning');
-        } else {
-          state.addLog(`⚡ [Sấm Sét] Không nổ (${judgeCard.name} ${judgeCard.suit} ${judgeCard.rank || ''})! Chuyển cẩm nang sang người chơi còn sống kế tiếp.`);
-          // Chuyển sang người sống sót kế tiếp theo chiều kim đồng hồ
-          const alive = state.getAlivePlayers();
-          const currIdx = alive.findIndex(p => p.id === player.id);
-          const nextPlayer = alive[(currIdx + 1) % alive.length];
-          nextPlayer.judgementArea = nextPlayer.judgementArea || [];
-          nextPlayer.judgementArea.push(delayedCard);
-        }
-      } else if (cardKey === 'hon_loan') {
-        // Hỗn Loạn: Phán xét KHÔNG PHẢI CƠ (♥) -> Mất Pha Hành Động
-        const isHeart = judgeCard.suit === 'heart' || judgeCard.suit === '♥' || (judgeCard.color === 'red' && judgeCard.suit !== 'diamond' && judgeCard.suit !== '♦');
-        state.discardPile.push(delayedCard);
-
-        if (!isHeart) {
-          state.addLog(`🌀 [Hỗn Loạn] Phán xét KHÔNG PHẢI CƠ (${judgeCard.name} chất ${judgeCard.suit || judgeCard.color})! ${player.name} bị mất Giai đoạn Ra bài!`);
-          player.temporaryFlags = player.temporaryFlags || {};
-          player.temporaryFlags.skipActionPhase = true;
-        } else {
-          state.addLog(`✨ [Hỗn Loạn] Phán xét ra CƠ (${judgeCard.name})! ${player.name} thoát khỏi Hỗn Loạn thành công.`);
-        }
-      } else {
-        state.discardPile.push(delayedCard);
+      if (candidateIds.length > 0) {
+        state.priorityStack.push({
+          type: 'ASK_CHANGE_JUDGE',
+          sourceId: player.id,
+          targetId: player.id,
+          priorityQueue: candidateIds,
+          currentActorId: candidateIds[0],
+          context: {
+            delayedCard,
+            judgeCard,
+            reason: cardKey,
+            candidateIds,
+            candidateIndex: 0
+          }
+        });
+        return; // Dừng lại chờ phản hồi từ người đổi phán xét
       }
+
+      // Không có ai đổi bài -> Xử lý kết quả phán xét trực tiếp
+      this._finalizeDelayedJudgement(state, player, delayedCard, judgeCard);
+    }
+  }
+
+  /**
+   * Phản hồi đổi bài phán xét (Mạc Đĩnh Chi - Ứng Biến, Đinh Điền - Quân Cơ)
+   */
+  static respondChangeJudge(state, responderId, replaceCard = null) {
+    const frame = state.priorityStack.peek();
+    if (!frame || frame.type !== 'ASK_CHANGE_JUDGE') {
+      throw new Error(`[TrickRules] Không có yêu cầu đổi phán xét nào đang chờ!`);
+    }
+
+    const responder = state.getPlayer(responderId);
+    const { delayedCard, candidateIds, candidateIndex = 0 } = frame.context;
+    let finalJudgeCard = frame.context.judgeCard;
+    const player = state.getPlayer(frame.targetId);
+
+    if (replaceCard) {
+      state.priorityStack.pop();
+      state.discardFromHand(responderId, [replaceCard.id]);
+      state.discardPile.push(finalJudgeCard);
+      finalJudgeCard = replaceCard;
+      const skillName = globalHeroRegistry.hasSkill(responder, 'ung_bien', true) ? 'Ứng Biến' : 'Quân Cơ';
+      state.addLog(`☯️ [${skillName}] ${responder.name} đánh ra lá [${replaceCard.name} ${replaceCard.suit || ''}] thay thế lá phán xét!`);
+      this._finalizeDelayedJudgement(state, player, delayedCard, finalJudgeCard);
+      return { changed: true, newCard: replaceCard };
+    } else {
+      // Bỏ qua / Từ chối đổi -> Chuyển sang candidate tiếp theo nếu có
+      const nextIdx = candidateIndex + 1;
+      if (nextIdx < candidateIds.length) {
+        frame.context.candidateIndex = nextIdx;
+        const nextId = candidateIds[nextIdx];
+        frame.currentActorId = nextId;
+        frame.priorityQueue = [nextId];
+        return { continued: true, nextPlayerId: nextId };
+      } else {
+        // Hết người muốn đổi -> Chốt phán xét với lá ban đầu
+        state.priorityStack.pop();
+        this._finalizeDelayedJudgement(state, player, delayedCard, finalJudgeCard);
+        return { changed: false, finalCard: finalJudgeCard };
+      }
+    }
+  }
+
+  /**
+   * Thực thi kết quả phán xét cuối cùng cho Cẩm nang Trì hoãn
+   */
+  static _finalizeDelayedJudgement(state, player, delayedCard, judgeCard) {
+    const cardKey = delayedCard.idKey || (delayedCard.name === 'Sấm Sét' ? 'sam_set' : (delayedCard.name === 'Hỗn Loạn' ? 'hon_loan' : delayedCard.id));
+    state.discardPile.push(judgeCard);
+
+    // Kích hoạt phản ứng phán xét (Ngọc Hân Công Chúa - Thông Ngôn...)
+    globalHeroRegistry.dispatchTrigger('ON_JUDGED', { targetId: player.id, judgeCard }, state);
+
+    if (cardKey === 'sam_set') {
+      const isSpade = judgeCard.suit === 'spade' || judgeCard.suit === '♠';
+      const rank = typeof judgeCard.rank === 'number' ? judgeCard.rank : parseInt(judgeCard.rank, 10);
+      const isExploded = isSpade && rank >= 2 && rank <= 9;
+
+      if (isExploded) {
+        state.addLog(`🌩️⚡ [Sấm Sét] NỔ TRÚNG ${player.name} (${judgeCard.name} chất Bích ${rank})! Nhận 3 sát thương lôi hỏa!`);
+        state.discardPile.push(delayedCard);
+        CombatRules.applyDamage(state, null, player.id, 3, 'lightning');
+      } else {
+        state.addLog(`⚡ [Sấm Sét] Không nổ (${judgeCard.name} ${judgeCard.suit} ${judgeCard.rank || ''})! Chuyển cẩm nang sang người chơi còn sống kế tiếp.`);
+        const alive = state.getAlivePlayers();
+        const currIdx = alive.findIndex(p => p.id === player.id);
+        const nextPlayer = alive[(currIdx + 1) % alive.length];
+        nextPlayer.judgementArea = nextPlayer.judgementArea || [];
+        nextPlayer.judgementArea.push(delayedCard);
+      }
+    } else if (cardKey === 'hon_loan') {
+      const isHeart = judgeCard.suit === 'heart' || judgeCard.suit === '♥' || (judgeCard.color === 'red' && judgeCard.suit !== 'diamond' && judgeCard.suit !== '♦');
+      state.discardPile.push(delayedCard);
+
+      if (!isHeart) {
+        state.addLog(`🌀 [Hỗn Loạn] Phán xét KHÔNG PHẢI CƠ (${judgeCard.name} chất ${judgeCard.suit || judgeCard.color})! ${player.name} bị mất Giai đoạn Ra bài!`);
+        player.temporaryFlags = player.temporaryFlags || {};
+        player.temporaryFlags.skipActionPhase = true;
+      } else {
+        state.addLog(`✨ [Hỗn Loạn] Phán xét ra CƠ (${judgeCard.name})! ${player.name} thoát khỏi Hỗn Loạn thành công.`);
+      }
+    } else {
+      state.discardPile.push(delayedCard);
     }
   }
 

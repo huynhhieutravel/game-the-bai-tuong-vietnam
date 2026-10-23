@@ -156,6 +156,49 @@ export class CombatRules {
 
     const target = state.getPlayer(targetId);
 
+    // 0. Gọi đồng minh trợ chiến (Bọc Trăm Trứng / Tiên Phát)
+    if (options.callBocTramTrung) {
+      const allies = state.players.filter(p => p.id !== targetId && p.isAlive && p.faction === 'lac');
+      if (allies.length > 0) {
+        state.addLog(`🐉 ${target.name} phát động [Bọc Trăm Trứng], kêu gọi đồng minh hệ Lạc ra [Né] giùm!`);
+        state.priorityStack.push({
+          type: 'ASK_BOC_TRAM_TRUNG_DODGE',
+          sourceId: targetId,
+          targetId: targetId,
+          priorityQueue: allies.map(a => a.id),
+          currentActorId: allies[0].id,
+          context: {
+            allies: allies.map(a => a.id),
+            allyIndex: 0
+          }
+        });
+        return { calledAllies: true };
+      } else {
+        state.addLog(`🐉 Không có đồng minh hệ Lạc nào có thể ra [Né] giùm cho ${target.name}!`);
+      }
+    }
+
+    if (options.doTienPhat) {
+      const allies = state.players.filter(p => p.id !== targetId && p.isAlive && p.faction === 'viet');
+      if (allies.length > 0) {
+        state.addLog(`👑 ${target.name} phát động [Tiên Phát], kêu gọi đồng minh hệ Việt ra [Né] giùm!`);
+        state.priorityStack.push({
+          type: 'ASK_TIEN_PHAT',
+          sourceId: targetId,
+          targetId: targetId,
+          priorityQueue: allies.map(a => a.id),
+          currentActorId: allies[0].id,
+          context: {
+            allies: allies.map(a => a.id),
+            allyIndex: 0
+          }
+        });
+        return { calledAllies: true };
+      } else {
+        state.addLog(`👑 Không có đồng minh hệ Việt nào có thể ra [Né] giùm cho ${target.name}!`);
+      }
+    }
+
     // 1. Phán xét Bát Quái / Thần Giáp (Rùa Vàng)
     if (options.useBagua || options.doBagua) {
       const hasBaguaArmor = target.equipment?.armor && (
@@ -225,6 +268,139 @@ export class CombatRules {
       state.priorityStack.pop(); // Giải phóng frame ASK_DODGE
       this.applyDamage(state, sourceId, targetId, damageAmount, damageType);
       return { dodged: false };
+    }
+  }
+
+  /**
+   * Phản hồi Bọc Trăm Trứng (Né giùm cho Lạc Long Quân)
+   */
+  static respondBocTramTrungDodge(state, allyId, dodgeCard = null) {
+    const frame = state.priorityStack.peek();
+    if (!frame || frame.type !== 'ASK_BOC_TRAM_TRUNG_DODGE') {
+      throw new Error(`[CombatRules] Không có yêu cầu Bọc Trăm Trứng Né nào đang chờ!`);
+    }
+
+    const ally = state.getPlayer(allyId);
+    const llq = state.getPlayer(frame.sourceId);
+
+    if (dodgeCard) {
+      state.priorityStack.pop(); // Giải phóng frame hỏi đồng minh
+      state.discardFromHand(allyId, [dodgeCard.id]);
+      state.addLog(`🐉 [Bọc Trăm Trứng] ${ally.name} đánh ra lá [Né] đỡ đòn thay cho ${llq.name}!`);
+
+      // Cập nhật frame ASK_DODGE bên dưới
+      const dodgeFrame = state.priorityStack.peek();
+      if (dodgeFrame && dodgeFrame.type === 'ASK_DODGE') {
+        dodgeFrame.context.dodgesProvided += 1;
+        if (dodgeFrame.context.dodgesProvided >= dodgeFrame.context.requiredDodges) {
+          state.priorityStack.pop();
+          state.addLog(`${llq.name} đã né thành công cú Chém nhờ đồng minh!`);
+          globalHeroRegistry.dispatchTrigger('ON_DODGE_SUCCESS', { sourceId: dodgeFrame.sourceId, targetId: llq.id, card: dodgeCard }, state);
+          return this._handlePostDodgeWeapons(state, dodgeFrame, llq);
+        }
+      }
+      return { defended: true };
+    } else {
+      // Đồng minh từ chối né giùm -> Chuyển sang đồng minh tiếp theo trong hàng đợi
+      frame.context.allyIndex = (frame.context.allyIndex || 0) + 1;
+      if (frame.context.allyIndex < frame.context.allies.length) {
+        const nextAllyId = frame.context.allies[frame.context.allyIndex];
+        frame.currentActorId = nextAllyId;
+        frame.priorityQueue = [nextAllyId];
+        return { continued: true, nextAllyId };
+      } else {
+        // Hết đồng minh trợ giúp -> Trả lại quyền quyết định cho Lạc Long Quân
+        state.priorityStack.pop();
+        state.addLog(`🐉 Đồng minh hệ Lạc không có ai ra [Né] thay cho ${llq.name}!`);
+        return { defended: false };
+      }
+    }
+  }
+
+  /**
+   * Phản hồi Tiên Phát (Né giùm cho Lý Thường Kiệt)
+   */
+  static respondTienPhat(state, allyId, dodgeCard = null) {
+    const frame = state.priorityStack.peek();
+    if (!frame || frame.type !== 'ASK_TIEN_PHAT') {
+      throw new Error(`[CombatRules] Không có yêu cầu Tiên Phát nào đang chờ!`);
+    }
+
+    const ally = state.getPlayer(allyId);
+    const ltk = state.getPlayer(frame.sourceId);
+
+    if (dodgeCard) {
+      state.priorityStack.pop(); // Giải phóng frame hỏi đồng minh
+      state.discardFromHand(allyId, [dodgeCard.id]);
+      state.addLog(`👑 [Tiên Phát] ${ally.name} đánh ra lá [Né] đỡ đòn thay cho ${ltk.name}!`);
+
+      const dodgeFrame = state.priorityStack.peek();
+      if (dodgeFrame && dodgeFrame.type === 'ASK_DODGE') {
+        dodgeFrame.context.dodgesProvided += 1;
+        if (dodgeFrame.context.dodgesProvided >= dodgeFrame.context.requiredDodges) {
+          state.priorityStack.pop();
+          state.addLog(`${ltk.name} đã né thành công cú Chém nhờ đồng minh [Tiên Phát]!`);
+          globalHeroRegistry.dispatchTrigger('ON_DODGE_SUCCESS', { sourceId: dodgeFrame.sourceId, targetId: ltk.id, card: dodgeCard }, state);
+          return this._handlePostDodgeWeapons(state, dodgeFrame, ltk);
+        }
+      }
+      return { defended: true };
+    } else {
+      frame.context.allyIndex = (frame.context.allyIndex || 0) + 1;
+      if (frame.context.allyIndex < frame.context.allies.length) {
+        const nextAllyId = frame.context.allies[frame.context.allyIndex];
+        frame.currentActorId = nextAllyId;
+        frame.priorityQueue = [nextAllyId];
+        return { continued: true, nextAllyId };
+      } else {
+        state.priorityStack.pop();
+        state.addLog(`👑 Đồng minh hệ Việt không có ai ra [Né] thay cho ${ltk.name}!`);
+        return { defended: false };
+      }
+    }
+  }
+
+  /**
+   * Phản hồi Bọc Trăm Trứng (Chém giùm cho Lạc Long Quân)
+   */
+  static respondBocTramTrungSlash(state, allyId, slashCard = null) {
+    const frame = state.priorityStack.peek();
+    if (!frame || frame.type !== 'ASK_BOC_TRAM_TRUNG_SLASH') {
+      throw new Error(`[CombatRules] Không có yêu cầu Bọc Trăm Trứng Chém nào đang chờ!`);
+    }
+
+    const ally = state.getPlayer(allyId);
+    const llq = state.getPlayer(frame.sourceId);
+
+    if (slashCard) {
+      state.priorityStack.pop(); // Giải phóng frame hỏi đồng minh
+      state.discardFromHand(allyId, [slashCard.id]);
+      state.addLog(`🐉 [Bọc Trăm Trứng] ${ally.name} đánh ra lá [Chém] giùm cho ${llq.name}!`);
+
+      // Nếu trong Quyết Đấu
+      const underlyingFrame = state.priorityStack.peek();
+      if (underlyingFrame && underlyingFrame.type === 'ASK_SLASH_DUEL') {
+        const nextId = underlyingFrame.currentActorId === underlyingFrame.context.attackerId 
+          ? underlyingFrame.targetId 
+          : underlyingFrame.context.attackerId;
+        underlyingFrame.context.currentResponderId = nextId;
+        underlyingFrame.currentActorId = nextId;
+        underlyingFrame.priorityQueue = [nextId];
+        return { continued: true, nextPlayerId: nextId };
+      }
+      return { slashed: true };
+    } else {
+      frame.context.allyIndex = (frame.context.allyIndex || 0) + 1;
+      if (frame.context.allyIndex < frame.context.allies.length) {
+        const nextAllyId = frame.context.allies[frame.context.allyIndex];
+        frame.currentActorId = nextAllyId;
+        frame.priorityQueue = [nextAllyId];
+        return { continued: true, nextAllyId };
+      } else {
+        state.priorityStack.pop();
+        state.addLog(`🐉 Đồng minh hệ Lạc không có ai ra [Chém] giùm cho ${llq.name}!`);
+        return { slashed: false };
+      }
     }
   }
 
@@ -434,7 +610,8 @@ export class CombatRules {
   static handleDeath(state, deadPlayerId, killerId = null) {
     const deadPlayer = state.getPlayer(deadPlayerId);
     deadPlayer.isAlive = false;
-    state.addLog(`💀 ${deadPlayer.name} ĐÃ TỬ TRẬN! Danh tính: [${deadPlayer.identity.toUpperCase()}].`);
+    const deadFaction = deadPlayer.faction || deadPlayer.identity;
+    state.addLog(`💀 ${deadPlayer.name} ĐÃ TỬ TRẬN! Phe phái: [${(deadFaction || 'Vô danh').toUpperCase()}].`);
 
     // 1. Thu hồi toàn bộ bài trên tay + trang bị + bài phán xét vào discardPile
     if (deadPlayer.hand.length > 0) {
@@ -452,24 +629,53 @@ export class CombatRules {
       deadPlayer.judgementArea = [];
     }
 
-    // 2. Thưởng / Phạt Phe Phái
-    if (killerId !== null) {
+    // 2. Thưởng / Phạt Phe Phái (Quốc Chiến & Nội Chiến)
+    if (killerId !== null && killerId !== deadPlayerId) {
       const killer = state.getPlayer(killerId);
       if (killer && killer.isAlive) {
-        // Giết Phản Tặc -> Rút 3 lá bài thưởng
-        if (deadPlayer.identity === 'rebel') {
-          state.addLog(`🎁 ${killer.name} tiêu diệt Phản Tặc, được thưởng rút 3 lá bài!`);
-          state.drawCards(killerId, 3);
-        }
-        // Chủ Công giết Trung Thần -> Bỏ hết bài trên tay và trang bị
-        else if (killer.isLord && deadPlayer.identity === 'loyalist') {
-          state.addLog(`⚠️ Chủ Công ${killer.name} ngộ sát Trung Thần! Bị trừng phạt bỏ hết toàn bộ bài trên tay và trang bị!`);
-          state.discardPile.push(...killer.hand);
-          killer.hand = [];
-          for (const slot in killer.equipment) {
-            if (killer.equipment[slot]) {
-              state.discardPile.push(killer.equipment[slot]);
-              killer.equipment[slot] = null;
+        const isNationalWar = Boolean(
+          deadPlayer.faction && killer.faction &&
+          deadPlayer.faction !== 'none' && killer.faction !== 'none'
+        );
+
+        if (isNationalWar) {
+          const isSameFaction = !killer.isDaTam && !deadPlayer.isDaTam && (killer.faction === deadPlayer.faction);
+          if (isSameFaction) {
+            // Ngộ sát đồng minh cùng phe -> Phạt vứt toàn bộ bài trên tay và trang bị
+            state.addLog(`⚠️ ÁC MỘNG! ${killer.name} đã ngộ sát đồng minh cùng phe ${deadPlayer.faction.toUpperCase()}! Bị trừng phạt vứt toàn bộ bài!`);
+            if (killer.hand.length > 0) {
+              state.discardPile.push(...killer.hand);
+              killer.hand = [];
+            }
+            for (const slot in killer.equipment) {
+              if (killer.equipment[slot]) {
+                state.discardPile.push(killer.equipment[slot]);
+                killer.equipment[slot] = null;
+              }
+            }
+          } else {
+            // Tiêu diệt kẻ địch khác phe -> Thưởng rút bài
+            const deadAllies = state.players.filter(p => p.id !== deadPlayer.id && p.faction === deadPlayer.faction && (p.revealedHeroes?.[0] || p.revealedHeroes?.[1])).length;
+            const rewardCards = deadPlayer.isDaTam ? 1 : Math.max(2, deadAllies + 1);
+            state.addLog(`🎁 LẬP CÔNG! ${killer.name} tiêu diệt kẻ địch [${deadPlayer.name}], được thưởng rút ${rewardCards} lá bài!`);
+            state.drawCards(killerId, rewardCards);
+          }
+        } else {
+          // Fallback Chế độ Nội Chiến (Standard Identity Mode)
+          if (deadPlayer.identity === 'rebel') {
+            state.addLog(`🎁 ${killer.name} tiêu diệt Phản Tặc, được thưởng rút 3 lá bài!`);
+            state.drawCards(killerId, 3);
+          } else if (killer.isLord && deadPlayer.identity === 'loyalist') {
+            state.addLog(`⚠️ Chủ Công ${killer.name} ngộ sát Trung Thần! Bị trừng phạt bỏ hết toàn bộ bài trên tay và trang bị!`);
+            if (killer.hand.length > 0) {
+              state.discardPile.push(...killer.hand);
+              killer.hand = [];
+            }
+            for (const slot in killer.equipment) {
+              if (killer.equipment[slot]) {
+                state.discardPile.push(killer.equipment[slot]);
+                killer.equipment[slot] = null;
+              }
             }
           }
         }
