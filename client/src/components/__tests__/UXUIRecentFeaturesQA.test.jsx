@@ -622,5 +622,44 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
       fireEvent.click(discardBtn);
       expect(confirmDiscard).toHaveBeenCalled();
     });
+
+    it('ActionBar hiển thị Kết Thúc và Kỹ Năng thuần text, không chứa icon emoji', async () => {
+      const { ActionBar } = await import('../game/ActionBar');
+      const handleEndTurn = vi.fn();
+      const handleExecuteSkill = vi.fn();
+      const me = {
+        id: 0,
+        isSilenced: false,
+        heroes: [
+          {
+            name: 'Hồ Xuân Hương',
+            skills: [
+              { name: 'Duyên Thơ', type: 'ACTIVE', desc: 'Mô tả Duyên Thơ', isUsable: true }
+            ]
+          }
+        ],
+        revealedHeroes: [true]
+      };
+
+      const { getByRole } = render(
+        <ActionBar
+          me={me}
+          isMyTurn={true}
+          gameState={{ phase: 'action', players: [me] }}
+          gameAPI={{}}
+          needsDiscard={false}
+          handleEndTurn={handleEndTurn}
+          handleExecuteSkill={handleExecuteSkill}
+        />
+      );
+
+      const endTurnBtn = getByRole('button', { name: /^Kết Thúc$/i });
+      expect(endTurnBtn).not.toBeNull();
+      expect(endTurnBtn.textContent.trim()).toBe('Kết Thúc');
+
+      const skillBtn = getByRole('button', { name: /^Duyên Thơ$/i });
+      expect(skillBtn).not.toBeNull();
+      expect(skillBtn.textContent.trim()).toBe('Duyên Thơ');
+    });
   });
 });

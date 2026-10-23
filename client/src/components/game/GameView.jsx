@@ -230,9 +230,9 @@ export default function GameView() {
     // Tọa độ và bán kính elip co giãn theo Desktop / Mobile Portrait / Mobile Landscape
     let rx, ry, baseY, scale;
     if (isLandscapeMobile) {
-      rx = totalOpponents > 4 ? 38 : 32; // vw
-      ry = 4; // % arc phẳng hơn, giữ đối thủ trong dải top 19-24%
-      baseY = 23.5; // Trọng tâm Y ở 23.5% (91px), hoàn toàn cách top-bar và trên center deck (41%)
+      rx = totalOpponents > 4 ? 38 : 34; // vw
+      ry = 14; // % độ võng hình vòng cung tự nhiên, hạ người chơi 2 & 4 xuống ngang sườn bàn
+      baseY = 36; // Trọng tâm Y ở 36%: người chơi 3 ở top 22% (36 - 14), người chơi 2 & 4 ở top 36%
       scale = totalOpponents >= 6 ? 0.48 : (totalOpponents >= 4 ? 0.54 : 0.60);
     } else if (isMobile) {
       rx = totalOpponents > 4 ? 37 : 35; // vw

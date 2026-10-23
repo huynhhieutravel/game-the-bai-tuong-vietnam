@@ -24,13 +24,13 @@ function renderCardNameBadge(card) {
   const name = card.name || '';
   const len = name.length;
   // Dynamic font size ensuring 2-word & long names (e.g. "Quyết Đấu", "Vạn Tiễn Quy Tâm") fit cleanly on 1 line
-  let fontSize = '0.74rem';
+  let fontSize = '0.78rem';
   if (len > 12) {
-    fontSize = '0.50rem';
+    fontSize = '0.54rem';
   } else if (len > 8) {
-    fontSize = '0.58rem';
+    fontSize = '0.62rem';
   } else if (len > 5) {
-    fontSize = '0.64rem';
+    fontSize = '0.68rem';
   }
 
   return (
@@ -58,7 +58,7 @@ function renderCardNameBadge(card) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        height: '18px',
+        height: '20px',
         boxSizing: 'border-box'
       }}
       title={name}

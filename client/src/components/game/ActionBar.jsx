@@ -49,7 +49,7 @@ export function ActionBar(props) {
         <div className="action-buttons" onClick={(e) => e.stopPropagation()}>
             {needsDiscard && (
               <button 
-                className="btn-action danger" 
+                className="btn-action danger btn-discard" 
                 disabled={selectedDiscards.length !== discardAmount}
                 onClick={confirmDiscard}
                 style={{
@@ -57,13 +57,13 @@ export function ActionBar(props) {
                   filter: selectedDiscards.length === discardAmount ? 'none' : 'grayscale(0.6)'
                 }}
               >
-                🗑️ Bỏ Bài ({selectedDiscards.length}/{discardAmount})
+                Bỏ Bài ({selectedDiscards.length}/{discardAmount})
               </button>
             )}
             {isMyTurn && gameState.phase === PHASES.DRAW && !needsDiscard && (
               <>
                 <button className="btn-action primary" onClick={() => handleDraw()}>
-                  🃏 Rút Bài
+                  Rút Bài
                 </button>
 
                 {/* Bình Ngô is now automatically applied by the engine if the hero is revealed. */}
@@ -72,7 +72,7 @@ export function ActionBar(props) {
             {isMyTurn && gameState.phase === PHASES.ACTION && !targetSession && !needsDiscard && (
               <>
                 <button className="btn-action danger btn-end-turn" onClick={handleEndTurn}>
-                  ⏭️ Kết Thúc
+                  Kết Thúc
                 </button>
                 { (() => {
                     let skills = me.heroes ? me.heroes.filter(Boolean).flatMap((h, i) => {
@@ -102,7 +102,7 @@ export function ActionBar(props) {
                             disabled={me.isSilenced}
                             style={{ opacity: me.isSilenced ? 0.5 : 0.8, filter: 'grayscale(0.5)' }}
                           >
-                            👁️ {s.name} (Ẩn)
+                            {s.name} (Ẩn)
                           </button>
                         );
                       }
@@ -119,7 +119,7 @@ export function ActionBar(props) {
                           disabled={isSkillDisabled}
                           style={{ opacity: isSkillDisabled ? 0.5 : 1, filter: isSkillDisabled ? 'grayscale(0.8)' : 'none' }}
                         >
-                          ✨ {s.name} {activeSkill === s.name ? '✓' : ''}
+                          {s.name}
                         </button>
                       );
                     });
@@ -132,7 +132,7 @@ export function ActionBar(props) {
                   className="btn-action secondary btn-cancel"
                   onClick={cancelTargeting}
                 >
-                  ✕ Hủy
+                  Hủy
                 </button>
                 {targetSession.targetingDef?.type === 'multiple' && (() => {
                   const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
@@ -141,9 +141,9 @@ export function ActionBar(props) {
                   const isReforge = isXiengXich && targetSession.selectedTargets.length === 0;
                   const canSubmit = isReforge || hasEnoughTargets;
                   
-                  let label = `✅ Dùng ${targetSession.virtualCardName || targetSession.card?.name || activeSkill}`;
+                  let label = `Dùng ${targetSession.virtualCardName || targetSession.card?.name || activeSkill}`;
                   if (isXiengXich) {
-                     label = isReforge ? '⛓️ Rèn Lại (Bỏ 1)' : '🔗 Xác Nhận Xích';
+                     label = isReforge ? 'Rèn Lại (Bỏ 1)' : 'Xác Nhận Xích';
                   }
 
                   return (
@@ -182,7 +182,7 @@ export function ActionBar(props) {
                         cancelTargeting();
                     }}
                   >
-                    ✅ Dùng {targetSession.virtualCardName || targetSession.card.name}
+                    Dùng {targetSession.virtualCardName || targetSession.card.name}
                   </button>
                 )}
               </>

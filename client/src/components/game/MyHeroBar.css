@@ -6,8 +6,8 @@
 .my-hero-bar {
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 8px;
   width: 100%;
 }
 
@@ -136,22 +136,24 @@
   line-height: 1.1;
 }
 
-/* ZONE 2: HAND FAN (Center) */
+/* ZONE 2: HAND FAN (Center / Left-aligned near dock) */
 .my-hero-hand-zone {
   flex: 1;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: flex-end;
   min-width: 0;
+  margin-left: 4px;
   overflow: visible;
   z-index: 15;
 }
 
 .my-hero-hand-wrapper {
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
 }
 
 /* ZONE 3: ACTION HUB (Right) */
@@ -160,17 +162,18 @@
   flex-direction: column;
   justify-content: flex-end;
   align-items: stretch;
-  gap: 4px;
+  gap: 3px;
   background: var(--color-bg-glass);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 5px 6px;
+  padding: 4px 6px;
   backdrop-filter: blur(12px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
   flex-shrink: 0;
   z-index: 20;
   min-width: 82px;
-  max-width: 96px;
+  max-width: 110px;
+  margin-left: auto;
 }
 
 .my-hero-action-buttons {
@@ -483,14 +486,18 @@
   .my-hero-hand-zone {
     flex: 1;
     min-width: 0;
+    justify-content: flex-start !important;
+    margin-left: 2px !important;
   }
 
   .my-hero-action-hub {
-    padding: 3px 5px;
+    padding: 3px 5px !important;
     gap: 3px;
     border-radius: 8px;
-    min-width: 76px;
-    max-width: 90px;
+    min-width: 78px !important;
+    max-width: 106px !important;
+    width: auto !important;
+    margin-left: auto !important;
     justify-content: flex-end;
   }
 
@@ -503,16 +510,20 @@
   }
 
   .my-hero-action-buttons .btn-action {
-    padding: 3px 5px !important;
-    font-size: 0.7rem !important;
+    padding: 2.5px 5px !important;
+    font-size: 0.68rem !important;
     min-width: unset !important;
     border-radius: 4px;
-    white-space: nowrap;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+    letter-spacing: -0.15px;
+    font-weight: 700;
+    line-height: 1.15;
   }
 
   .my-hero-action-buttons .btn-skill {
-    font-size: 0.66rem !important;
-    padding: 2.5px 4px !important;
+    font-size: 0.65rem !important;
+    padding: 2.5px 5px !important;
   }
 }
 
@@ -537,18 +548,22 @@
   }
 
   .my-hero-action-hub {
-    min-width: 72px !important;
-    max-width: 86px !important;
+    min-width: 76px !important;
+    max-width: 102px !important;
+    width: auto !important;
+    margin-left: auto !important;
     padding: 2px 4px !important;
   }
 
   .my-hero-action-buttons .btn-action {
-    padding: 2.5px 4px !important;
-    font-size: 0.68rem !important;
+    padding: 2px 4px !important;
+    font-size: 0.66rem !important;
+    white-space: nowrap !important;
+    letter-spacing: -0.2px;
   }
 
   .my-hero-action-buttons .btn-skill {
-    font-size: 0.64rem !important;
-    padding: 2px 3px !important;
+    font-size: 0.63rem !important;
+    padding: 2px 4px !important;
   }
 }
