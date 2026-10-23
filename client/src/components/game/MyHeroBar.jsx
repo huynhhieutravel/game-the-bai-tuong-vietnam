@@ -44,10 +44,9 @@ export default function MyHeroBar(props) {
     return (
         <div className={`my-hero-bar cockpit-layout ${animationClass || ''}`}>
            
-           {/* ZONE 1: HERO DOCK (Góc dưới trái) */}
-           <div className="my-hero-dock">
-               
-               {/* 1. Header: Phe badge, Ẩn badge, HP Hearts 4/4 */}
+           {/* ZONE 1: HERO DOCK CONTAINER (Góc dưới trái) */}
+           <div className="my-hero-dock-container">
+               {/* 1. Header trên cùng: Phe badge, Ẩn badge, HP Hearts 4/4 */}
                <div className="my-hero-dock-header">
                    <div className="my-hero-dock-badges">
                        <div className={`my-hero-faction-tag ${me.isDaTam ? 'datam' : (getPlayerFaction(me) === 'Lạc' ? 'lac' : getPlayerFaction(me) === 'Sơn' ? 'son' : getPlayerFaction(me) === 'Hà' ? 'ha' : 'default')}`}>
@@ -73,68 +72,77 @@ export default function MyHeroBar(props) {
                    </div>
                </div>
 
-               {/* 2. Body: 2 Main Hero Avatars + 2x2 Equipment Grid */}
-               <div className="my-hero-dock-body">
-                   {/* Avatars */}
-                   <div className="my-hero-avatars">
-                       {/* Avatar 1 */}
-                       <div className={`my-hero-avatar-card ${isTargetable ? 'targetable' : ''} ${isSelected ? 'selected' : ''}`} onClick={onAvatarClick}>
-                           <div className="judgement-area my-hero-judgement-area" style={{ display: 'flex', gap: '4px', position: 'absolute', top: '4px', left: '4px', zIndex: 15 }}>
-                             {me.judgementArea && me.judgementArea.map((card, i) => {
-                               const icon = card.emoji || (card.name === 'Sấm Sét' ? '⚡' : card.name === 'Hỗn Loạn' ? '🌀' : '📜');
-                               return (
-                                 <div 
-                                   key={i} 
-                                   className="judgement-item my-hero-judgement-item" 
-                                   title={`${card.name}: Cẩm nang trì hoãn đang chờ phán xét`}
-                                   style={{
-                                     background: 'rgba(0, 0, 0, 0.8)',
-                                     border: '1px solid #f59e0b',
-                                     borderRadius: '4px',
-                                     padding: '1px 3px',
-                                     fontSize: '0.75rem',
-                                     boxShadow: '0 0 6px rgba(245, 158, 11, 0.7)',
-                                     cursor: 'help'
-                                   }}
-                                 >
-                                   {icon}
+               {/* 2. Khung thẻ Tướng bự hơn */}
+               <div className="my-hero-dock">
+                   <div className="my-hero-dock-body">
+                       {/* Avatars */}
+                       <div className="my-hero-avatars">
+                           {/* Avatar 1 */}
+                           <div className={`my-hero-avatar-card ${isTargetable ? 'targetable' : ''} ${isSelected ? 'selected' : ''}`} onClick={onAvatarClick}>
+                               <div className="judgement-area my-hero-judgement-area" style={{ display: 'flex', gap: '4px', position: 'absolute', top: '4px', left: '4px', zIndex: 15 }}>
+                                 {me.judgementArea && me.judgementArea.map((card, i) => {
+                                   const icon = card.emoji || (card.name === 'Sấm Sét' ? '⚡' : card.name === 'Hỗn Loạn' ? '🌀' : '📜');
+                                   return (
+                                     <div 
+                                       key={i} 
+                                       className="judgement-item my-hero-judgement-item" 
+                                       title={`${card.name}: Cẩm nang trì hoãn đang chờ phán xét`}
+                                       style={{
+                                         background: 'rgba(0, 0, 0, 0.8)',
+                                         border: '1px solid #f59e0b',
+                                         borderRadius: '4px',
+                                         padding: '1px 3px',
+                                         fontSize: '0.75rem',
+                                         boxShadow: '0 0 6px rgba(245, 158, 11, 0.7)',
+                                         cursor: 'help'
+                                       }}
+                                     >
+                                       {icon}
+                                     </div>
+                                   );
+                                 })}
+                               </div>
+                               {me.isSilenced && (
+                                  <div className="my-hero-silence-overlay" title="Kỹ năng bị khóa!">
+                                    🔒
+                                  </div>
+                               )}
+                               {me.isChained && (
+                                  <div className="my-hero-chain-overlay" title="Bị Xích!">
+                                     <div className="my-hero-chain-icon c1">⛓️</div>
+                                     <div className="my-hero-chain-icon c2">⛓️</div>
+                                  </div>
+                               )}
+                               
+                               {(me.heroes?.[0]?.image) ? <img src={`/images/heroes/${me.heroes?.[0]?.image}`} className="my-hero-avatar-img" /> : <div className="my-hero-avatar-emoji">{(me.heroes?.[0]?.emoji)}</div>}
+                               {me.revealedHeroes && !me.revealedHeroes[0] && (
+                                 <div className="my-hero-reveal-overlay" onClick={(e) => { e.stopPropagation(); setHeroPopup(me); }}>
+                                   <button className="btn-action warning my-hero-reveal-btn" onClick={(e) => { e.stopPropagation(); handleRevealClick(0); }}>Lật</button>
+                                   <button className="btn-action secondary my-hero-view-btn" onClick={(e) => { e.stopPropagation(); setHeroPopup(me); }}>Xem</button>
                                  </div>
-                               );
-                             })}
+                               )}
                            </div>
-                           {me.isSilenced && (
-                              <div className="my-hero-silence-overlay" title="Kỹ năng bị khóa!">
-                                🔒
-                              </div>
-                           )}
-                           {me.isChained && (
-                              <div className="my-hero-chain-overlay" title="Bị Xích!">
-                                 <div className="my-hero-chain-icon c1">⛓️</div>
-                                 <div className="my-hero-chain-icon c2">⛓️</div>
-                              </div>
-                           )}
-                           
-                           {(me.heroes?.[0]?.image) ? <img src={`/images/heroes/${me.heroes?.[0]?.image}`} className="my-hero-avatar-img" /> : <div className="my-hero-avatar-emoji">{(me.heroes?.[0]?.emoji)}</div>}
-                           {me.revealedHeroes && !me.revealedHeroes[0] && (
-                             <div className="my-hero-reveal-overlay">
-                               <button className="btn-action warning my-hero-reveal-btn" onClick={(e) => { e.stopPropagation(); handleRevealClick(0); }}>Lật</button>
-                             </div>
-                           )}
-                       </div>
 
-                       {/* Avatar 2 */}
-                       <div className={`my-hero-avatar-card ${isTargetable ? 'targetable' : ''} ${isSelected ? 'selected' : ''}`} onClick={onAvatarClick}>
-                           {me.heroes?.[1]?.image ? <img src={`/images/heroes/${me.heroes?.[1].image}`} className="my-hero-avatar-img" /> : <div className="my-hero-avatar-emoji">{(me.heroes?.[1]?.emoji || '')}</div>}
-                           {me.revealedHeroes && !me.revealedHeroes[1] && (
-                             <div className="my-hero-reveal-overlay">
-                               <button className="btn-action warning my-hero-reveal-btn" onClick={(e) => { e.stopPropagation(); handleRevealClick(1); }}>Lật</button>
-                             </div>
-                           )}
+                           {/* Avatar 2 */}
+                           <div className={`my-hero-avatar-card ${isTargetable ? 'targetable' : ''} ${isSelected ? 'selected' : ''}`} onClick={onAvatarClick}>
+                               {me.heroes?.[1]?.image ? <img src={`/images/heroes/${me.heroes?.[1].image}`} className="my-hero-avatar-img" /> : <div className="my-hero-avatar-emoji">{(me.heroes?.[1]?.emoji || '')}</div>}
+                               {me.revealedHeroes && !me.revealedHeroes[1] && (
+                                 <div className="my-hero-reveal-overlay" onClick={(e) => { e.stopPropagation(); setHeroPopup(me); }}>
+                                   <button className="btn-action warning my-hero-reveal-btn" onClick={(e) => { e.stopPropagation(); handleRevealClick(1); }}>Lật</button>
+                                   <button className="btn-action secondary my-hero-view-btn" onClick={(e) => { e.stopPropagation(); setHeroPopup(me); }}>Xem</button>
+                                 </div>
+                               )}
+                           </div>
                        </div>
                    </div>
+               </div>
+           </div>
 
-                   {/* 4 Equipment Slots in 2x2 Grid */}
-                   <div className="my-hero-equipment-area">
+           {/* ZONE 2: HAND FAN + EQUIPMENT (Chính giữa đáy) */}
+           <div className="my-hero-hand-zone">
+               <div className="my-hero-hand-wrapper">
+                   {/* 4 ô trang bị dàn ngang 1 hàng bên trên thẻ bài */}
+                   <div className="my-hero-equipment-area my-hero-equipment-row">
                      {[
                        { type: CARD_SUBTYPES.EQUIP_WEAPON, icon: <WeaponIcon size={20} />, title: 'Vũ khí' },
                        { type: CARD_SUBTYPES.EQUIP_ARMOR, icon: <ArmorIcon size={20} />, title: 'Phòng cụ' },
@@ -144,7 +152,13 @@ export default function MyHeroBar(props) {
                        const eqCard = me.equipment?.find(c => getCardSubType(c) === slot.type);
                        const bgImage = eqCard ? getCardBg(eqCard.name) : null;
                        return (
-                         <div key={i} className={`my-hero-equip-slot ${eqCard ? 'equipped' : 'empty'}`} title={eqCard ? `${eqCard.name}: ${eqCard.desc}` : slot.title} style={{ ...(bgImage ? { backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid var(--color-gold)' } : {}) }} onClick={(e) => { e.stopPropagation(); if (eqCard) setCardPopup(eqCard) }}>
+                         <div 
+                           key={i} 
+                           className={`my-hero-equip-slot ${eqCard ? 'equipped' : 'empty'}`} 
+                           title={eqCard ? `${eqCard.name}: ${eqCard.desc} (Nhấn để phóng to)` : slot.title} 
+                           style={{ ...(bgImage ? { backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1.5px solid var(--color-gold)' } : {}) }} 
+                           onClick={(e) => { e.stopPropagation(); if (eqCard) setCardPopup(eqCard); }}
+                         >
                            {eqCard ? (
                              <>
                                <div className={`my-hero-equip-badge ${eqCard.color === 'red' ? 'red' : ''} ${bgImage ? 'has-bg' : ''}`}>
@@ -164,13 +178,7 @@ export default function MyHeroBar(props) {
                        );
                      })}
                    </div>
-               </div>
 
-           </div>
-
-           {/* ZONE 2: HAND FAN (Chính giữa đáy) */}
-           <div className="my-hero-hand-zone">
-               <div className="my-hero-hand-wrapper">
                    {playerHand}
                </div>
            </div>

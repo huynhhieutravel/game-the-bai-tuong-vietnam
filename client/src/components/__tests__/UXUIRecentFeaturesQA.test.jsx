@@ -574,23 +574,87 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
         />
       );
 
-      // Dock header
-      const dockHeader = container.querySelector('.my-hero-dock-header');
+      // Dock container & Dock header (Header nằm trên khung dock)
+      const dockContainer = container.querySelector('.my-hero-dock-container');
+      expect(dockContainer).not.toBeNull();
+      const dockHeader = dockContainer.querySelector('.my-hero-dock-header');
       expect(dockHeader).not.toBeNull();
       expect(dockHeader.querySelector('.my-hero-hp-bar')).not.toBeNull();
       expect(dockHeader.querySelector('.my-hero-faction-tag')).not.toBeNull();
       expect(dockHeader.textContent).toContain('4/4');
 
-      // Dock body
-      const dockBody = container.querySelector('.my-hero-dock-body');
+      // Dock frame chứa 2 thẻ tướng
+      const dock = dockContainer.querySelector('.my-hero-dock');
+      expect(dock).not.toBeNull();
+      const dockBody = dock.querySelector('.my-hero-dock-body');
       expect(dockBody).not.toBeNull();
       expect(dockBody.querySelector('.my-hero-avatars')).not.toBeNull();
-      expect(dockBody.querySelector('.my-hero-equipment-area')).not.toBeNull();
+
+      // 4 ô trang bị dàn ngang 1 hàng bên trên thẻ bài (trong my-hero-hand-wrapper)
+      const handWrapper = container.querySelector('.my-hero-hand-wrapper');
+      expect(handWrapper).not.toBeNull();
+      const equipArea = handWrapper.querySelector('.my-hero-equipment-row');
+      expect(equipArea).not.toBeNull();
+      expect(equipArea.querySelectorAll('.my-hero-equip-slot').length).toBe(4);
 
       // Stats box should NOT be inside action-hub
       const actionHub = container.querySelector('.my-hero-action-hub');
       expect(actionHub).not.toBeNull();
       expect(actionHub.querySelector('.my-hero-stats-box')).toBeNull();
+    });
+
+    it('Hero reveal overlay hiển thị nút Lật và nút Xem bên dưới để xem tướng an toàn không nhấn nhầm', async () => {
+      const { default: MyHeroBar } = await import('../game/MyHeroBar');
+      const setHeroPopup = vi.fn();
+      const handleRevealClick = vi.fn();
+      const me = {
+        id: 0,
+        hp: 3,
+        maxHp: 3,
+        faction: 'son',
+        isRevealed: false,
+        revealedHeroes: [false, false],
+        heroes: [
+          { id: 'h1', name: 'Lăng Liệu', emoji: '⚔️' },
+          { id: 'h2', name: 'Chỉ Đồng Tử', emoji: '🛡️' }
+        ],
+        equipment: []
+      };
+
+      const { container } = render(
+        <MyHeroBar
+          me={me}
+          gameState={{ phase: 'action' }}
+          activePhase="action"
+          handleRevealClick={handleRevealClick}
+          actionBar={<div>ACTION_BUTTONS</div>}
+          playerHand={<div>PLAYER_HAND</div>}
+          setHeroPopup={setHeroPopup}
+          setCardPopup={vi.fn()}
+          targetSession={null}
+          handleTargetClick={vi.fn()}
+        />
+      );
+
+      const overlays = container.querySelectorAll('.my-hero-reveal-overlay');
+      expect(overlays.length).toBe(2);
+
+      const firstOverlay = overlays[0];
+      const revealBtn = firstOverlay.querySelector('.my-hero-reveal-btn');
+      const viewBtn = firstOverlay.querySelector('.my-hero-view-btn');
+      expect(revealBtn).not.toBeNull();
+      expect(revealBtn.textContent).toBe('Lật');
+      expect(viewBtn).not.toBeNull();
+      expect(viewBtn.textContent).toBe('Xem');
+
+      // Test click Xem button
+      fireEvent.click(viewBtn);
+      expect(setHeroPopup).toHaveBeenCalledWith(me);
+      expect(handleRevealClick).not.toHaveBeenCalled();
+
+      // Test click Lật button
+      fireEvent.click(revealBtn);
+      expect(handleRevealClick).toHaveBeenCalledWith(0);
     });
 
     it('ActionBar hiển thị nút Bỏ Bài khi needsDiscard là true', async () => {
