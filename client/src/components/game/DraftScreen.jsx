@@ -120,11 +120,11 @@ export function DraftScreen(props) {
     };
 
     return (
-        <div className="draft-board" style={{ position: 'relative', padding: '20px 40px', maxWidth: '100%', margin: '0 auto', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', overflowY: 'auto' }}>
-            <h2 style={{ color: 'var(--color-gold)', fontSize: '2rem', marginBottom: '10px', textShadow: '0 0 10px rgba(212, 168, 67, 0.5)' }}>⏳ Chọn 2 Tướng Cùng Phe ({draftTimer}s)</h2>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '1.2rem', marginBottom: '40px' }}>Chế độ Quốc Chiến: Chọn 2 tướng cùng màu để xác định phe của bạn.</p>
+        <div className="draft-board">
+            <h2 className="draft-title">⏳ Chọn 2 Tướng Cùng Phe ({draftTimer}s)</h2>
+            <p className="draft-subtitle">Chế độ Quốc Chiến: Chọn 2 tướng cùng màu để xác định phe của bạn.</p>
             
-            <div className="draft-heroes-container" style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '25px' }}>
+            <div className="draft-heroes-container">
             {!me.hasDrafted ? me.draftHeroes.map(hero => {
                 const isSelected = draftSelection.includes(hero.id);
                 const firstSelectedHero = draftSelection.length > 0 ? (me.draftHeroes.find(h => h.id === draftSelection[0]) || HEROES[draftSelection[0]]) : null;
@@ -133,18 +133,16 @@ export function DraftScreen(props) {
                 return (
                 <div 
                 key={hero.id} 
-                className={`wiki-card ${isSelected ? 'selected' : ''}`}
+                className={`wiki-card draft-hero-card ${isSelected ? 'selected' : ''}`}
                 onClick={() => !isUnselectable && handleDraftSelect(hero.id)}
                 style={{ 
                     cursor: isUnselectable ? 'not-allowed' : 'pointer', 
-                    width: '260px',
-                    height: '364px',
                     display: 'flex',
                     flexDirection: 'column',
                     border: isSelected ? '4px solid var(--color-gold)' : `3px solid ${hero.faction === 'Lạc' ? '#10b981' : hero.faction === 'Sơn' ? '#b45309' : hero.faction === 'Hà' ? '#3b82f6' : '#ef4444'}`,
                     backgroundColor: 'transparent',
                     boxShadow: isSelected ? '0 0 20px rgba(212, 168, 67, 0.6)' : 'var(--shadow-card)',
-                    transform: isSelected ? 'translateY(-10px) scale(1.05)' : 'none',
+                    transform: isSelected ? 'translateY(-6px) scale(1.03)' : 'none',
                     transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     position: 'relative',
                     borderRadius: '12px',
@@ -192,17 +190,15 @@ export function DraftScreen(props) {
                 return (
                     <div 
                         key={id}
-                        className="wiki-card selected"
+                        className="wiki-card draft-hero-card selected"
                         style={{ 
                         cursor: 'pointer', 
-                        width: '260px',
-                        height: '364px',
                         display: 'flex',
                         flexDirection: 'column',
                         border: '4px solid var(--color-gold)',
                         backgroundColor: 'transparent',
                         boxShadow: '0 0 20px rgba(212, 168, 67, 0.6)',
-                        transform: 'translateY(-10px) scale(1.05)',
+                        transform: 'translateY(-6px) scale(1.03)',
                         transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                         position: 'relative',
                         borderRadius: '12px'
@@ -238,10 +234,9 @@ export function DraftScreen(props) {
 
             {!me.hasDrafted && (
             <button 
-                className="btn-action primary" 
+                className="btn-action primary draft-confirm-btn" 
                 onClick={handleDraftConfirm}
                 disabled={draftSelection.length !== 2}
-                style={{ marginTop: '30px', padding: '10px 30px', fontSize: '1.2rem', flex: 'none' }}
             >
                 Chốt Danh Sách
             </button>

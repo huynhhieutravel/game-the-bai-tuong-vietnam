@@ -4,7 +4,24 @@
  * Tuân thủ tuyệt đối quy tắc hình học vòng tròn chuẩn Tam Quốc Sát.
  */
 
-import { globalHeroRegistry } from '../heroes/HeroRegistry.js';
+import { globalHeroRegistry, getPlayerGender } from '../heroes/HeroRegistry.js';
+
+export const WEAPON_RANGE_MAP = {
+  // Liên Nỏ (1)
+  'lien_no': 1, 'lien-no': 1, 'Liên Nỏ': 1,
+  // Song Kiếm (2)
+  'song_kiem': 2, 'song-kiem': 2, 'Song Kiếm': 2,
+  // Quạt Sắt / Cổ Đĩnh Đao (2)
+  'quat_sat': 2, 'quat-sat': 2, 'Quạt Sắt': 2, 'co_dinh_dao': 2, 'Cổ Đĩnh Đao': 2,
+  // Thanh Long Đao (3)
+  'thanh_long_dao': 3, 'thanh-long-dao': 3, 'Thanh Long Đao': 3,
+  // Rìu Đá / Quán Thạch Phủ (3)
+  'riu_da': 3, 'riu-da': 3, 'Rìu Đá': 3, 'quan_thach_phu': 3, 'Quán Thạch Phủ': 3,
+  // Phương Thiên Kích (4)
+  'phuong_thien_kich': 4, 'phuong-thien-kich': 4, 'Phương Thiên Kích': 4,
+  // Kỳ Lân Cung (5)
+  'ky_lan_cung': 5, 'ky-lan-cung': 5, 'Kỳ Lân Cung': 5
+};
 
 export class RangeSystem {
   /**
@@ -54,8 +71,12 @@ export class RangeSystem {
     }
 
     // - Tiên Dung: Tiên Duyên cự ly (khoảng cách từ người khác giới tính đến Tiên Dung luôn +1)
-    if (globalHeroRegistry.hasSkill(target, 'tien_duyen_khoang_cach', true) && source.gender && target.gender && source.gender !== target.gender) {
-      defenseModifier += 1;
+    if (globalHeroRegistry.hasSkill(target, 'tien_duyen_khoang_cach', true)) {
+      const sGender = getPlayerGender(source);
+      const tGender = getPlayerGender(target);
+      if (sGender !== 'none' && tGender !== 'none' && sGender !== tGender) {
+        defenseModifier += 1;
+      }
     }
 
     const effectiveDistance = rawCircleDist - attackModifier + defenseModifier;
@@ -84,7 +105,9 @@ export class RangeSystem {
     if (!player) return 1;
 
     // Kỹ năng đặc biệt: Cao Lỗ (Nỏ Thần) - Tầm đánh của Chém bằng đúng điểm số (rank) lá bài
-    if (player.skills?.includes('no_than_cao_lo') && card && card.type === 'slash') {
+    const hasNoThan = globalHeroRegistry.hasSkill(player, 'no_than_cao_lo', false) || (player.skills && player.skills.includes('no_than_cao_lo'));
+    const isSlash = card && (card.type === 'slash' || card.name === 'Chém' || card.idKey === 'chem' || card.idKey === 'slash');
+    if (hasNoThan && isSlash) {
       const rankNum = typeof card.rank === 'number' ? card.rank : parseInt(card.rank, 10);
       if (!isNaN(rankNum) && rankNum > 0) {
         return rankNum;
@@ -93,8 +116,23 @@ export class RangeSystem {
 
     // Vũ khí trang bị
     const weapon = player.equipment?.weapon;
-    if (weapon && typeof weapon.range === 'number') {
-      return weapon.range;
+    if (weapon) {
+      if (typeof weapon.range === 'number') {
+        return weapon.range;
+      }
+      const rawName = weapon.idKey || weapon.name || weapon.key || weapon.id || '';
+      if (WEAPON_RANGE_MAP[rawName]) {
+        return WEAPON_RANGE_MAP[rawName];
+      }
+      const cleanSlug = String(rawName).toLowerCase().replace(/[-_][0-9]+.*$/, '');
+      if (WEAPON_RANGE_MAP[cleanSlug]) {
+        return WEAPON_RANGE_MAP[cleanSlug];
+      }
+      for (const [key, r] of Object.entries(WEAPON_RANGE_MAP)) {
+        if (typeof rawName === 'string' && rawName.toLowerCase().includes(key.toLowerCase())) {
+          return r;
+        }
+      }
     }
 
     // Mặc định tay không tầm đánh = 1
@@ -108,7 +146,7 @@ export class RangeSystem {
     if (source.id === target.id) return false;
 
     // Kỹ năng phá cự ly (VD: Dương Đình Nghệ - Dưỡng Quân, Trần Khánh Dư - Vân Đồn)
-    if (source.temporaryFlags?.unlimitedSlashRange) {
+    if (source.temporaryFlags?.unlimitedSlashRange || source.temporaryFlags?.vanDonWin) {
       return true;
     }
 
@@ -124,8 +162,8 @@ export class RangeSystem {
   static getValidSlashTargets(source, alivePlayers, card = null) {
     return alivePlayers.filter(target => {
       if (target.id === source.id) return false;
-      // Đạm Bạc (Lang Liêu): Khi không có bài trên tay và đã lật, không thể là mục tiêu của [Chém]
-      if (globalHeroRegistry.hasSkill(target, 'dam_bac', true) && (!target.hand || target.hand.length === 0)) {
+      // Đạm Bạc (Lang Liêu): Khi không có bài trên tay, không thể là mục tiêu của [Chém]
+      if (globalHeroRegistry.hasSkill(target, 'dam_bac', false) && (!target.hand || target.hand.length === 0)) {
         return false;
       }
       return this.inSlashRange(source, target, alivePlayers, card);

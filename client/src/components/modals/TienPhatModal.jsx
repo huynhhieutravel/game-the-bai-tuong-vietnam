@@ -3,8 +3,7 @@ import React, { useState } from 'react';
 import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
 
 import { CardSelector } from './CardSelector';
-
-import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine/gameState';
+import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine_v4/application/index.js';
 
 export function TienPhatModal({ req, gameState, onConfirm }) {
   const targetPlayerId = req.responderId ?? req.currentActorId ?? (typeof window !== 'undefined' ? window.playerId : 0);

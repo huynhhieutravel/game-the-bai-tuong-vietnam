@@ -1,7 +1,7 @@
 import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
 import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
-import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine/gameState';
+import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine_v4/application/index.js';
 
 
 export function AskWeaponSkillModal({ req, gameState, onConfirm }) {

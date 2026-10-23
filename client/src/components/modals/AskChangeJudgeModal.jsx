@@ -4,7 +4,7 @@ import { getFullPlayerName } from 'shared/utils/playerHelpers';
 import { CardSelector } from './CardSelector';
 
 import { getSuitEmoji } from 'shared/constants/cardTypes';
-import { hasSkillEvenIfHidden } from 'shared/engine/gameState';
+import { hasSkillEvenIfHidden } from 'shared/engine_v4/application/index.js';
 
 export function AskChangeJudgeModal({ req, gameState, onConfirm }) {
   const me = gameState.players.find(p => p.id === (req.responderId ?? req.currentActorId ?? (typeof window !== 'undefined' ? window.playerId : 0))) || gameState.players[0];

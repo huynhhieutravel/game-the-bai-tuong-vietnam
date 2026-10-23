@@ -83,6 +83,17 @@ describe('Hero Triggers Lifecycle & Special Combat Mechanics v4', () => {
     const sm = new StateMachine(state);
     sm._runPhaseDraw();
 
+    expect(state.priorityStack.peek().type).toBe('ASK_KHOI_NGHIA');
+    const dispatcher = new DispatcherV4(state);
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 0,
+        responseType: 'provide',
+        data: { doUse: true }
+      }
+    });
+
     const p0 = state.getPlayer(0);
     expect(p0.temporaryFlags.bonusDamage).toBe(1);
     expect(p0.hand.length).toBe(1); // Rút 1 lá thay vì 2
@@ -189,11 +200,24 @@ describe('Hero Triggers Lifecycle & Special Combat Mechanics v4', () => {
       }
     );
 
-    CombatRules.applyDamage(state, 0, 1, 1, 'slash');
+    const slashCard = { id: 's1', name: 'Chém', type: 'slash' };
+    state.discardPile.push(slashCard);
+    CombatRules.applyDamage(state, 0, 1, 1, 'slash', false, slashCard);
+
+    expect(state.priorityStack.peek().type).toBe('ASK_NAM_QUOC_SON_HA');
+    const dispatcher = new DispatcherV4(state);
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 1,
+        responseType: 'provide',
+        data: { doUse: true }
+      }
+    });
 
     const ltk = state.getPlayer(1);
     expect(ltk.hp).toBe(3);
-    expect(ltk.hand.length).toBe(1); // Rút 1 lá bài từ drawPile
+    expect(ltk.hand.length).toBe(2); // Rút 1 lá bài từ drawPile + 1 lá thu hồi
   });
 
   it('7. ON_DYING: Chử Đồng Tử (Hóa Tiên) khi hấp hối hồi phục 3 HP, 3 bài và thoát chết', () => {

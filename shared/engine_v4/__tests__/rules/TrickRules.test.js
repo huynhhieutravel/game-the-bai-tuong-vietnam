@@ -122,10 +122,6 @@ describe('TrickRules v4 (Cẩm Nang & Hóa Giải)', () => {
     state.getPlayer(0).hand.push(gardenCard);
 
     TrickRules.playTrick(state, 0, [], gardenCard);
-    // Bỏ qua Hóa giải
-    TrickRules.respondNegate(state, 0, null);
-    TrickRules.respondNegate(state, 1, null);
-    TrickRules.respondNegate(state, 2, null);
 
     expect(state.getPlayer(0).hp).toBe(4); // hồi 1 lên đầy 4
     expect(state.getPlayer(1).hp).toBe(3); // hồi 1 lên 3

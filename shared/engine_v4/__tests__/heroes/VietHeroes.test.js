@@ -36,12 +36,24 @@ describe('Heroes Hệ 🔴 VIỆT v4 (Nguỵ)', () => {
 
   it('Triệu Quang Phục: Dạ Trạch (Bỏ qua pha Rút bài để cướp bài)', () => {
     const state = createGameWithHero('trieu_quang_phuc');
+    state.getPlayer(1).hand = [{ id: 'card_opp', name: 'Thẻ Đối Thủ' }];
     const tqp = state.getPlayer(0);
 
     globalHeroRegistry.dispatchTrigger('DRAW_PHASE', {
       sourceId: 0,
       source: tqp
     }, state);
+
+    expect(state.priorityStack.peek().type).toBe('ASK_DA_TRACH');
+    const dispatcher = new DispatcherV4(state);
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 0,
+        responseType: 'provide',
+        data: { doUse: true, targets: [1] }
+      }
+    });
 
     expect(tqp.temporaryFlags.skipDrawPhase).toBe(true);
   });
@@ -54,6 +66,17 @@ describe('Heroes Hệ 🔴 VIỆT v4 (Nguỵ)', () => {
       sourceId: 0,
       source: phungHung
     }, state);
+
+    expect(state.priorityStack.peek().type).toBe('ASK_KHOI_NGHIA');
+    const dispatcher = new DispatcherV4(state);
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 0,
+        responseType: 'provide',
+        data: { doUse: true }
+      }
+    });
 
     expect(phungHung.temporaryFlags.drawCardCount).toBe(1);
     expect(phungHung.temporaryFlags.bonusDamage).toBe(1);
@@ -102,6 +125,17 @@ describe('Heroes Hệ 🔴 VIỆT v4 (Nguỵ)', () => {
       target: ltk,
       card: slashCard
     }, state);
+
+    expect(state.priorityStack.peek().type).toBe('ASK_NAM_QUOC_SON_HA');
+    const dispatcher = new DispatcherV4(state);
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 0,
+        responseType: 'provide',
+        data: { doUse: true }
+      }
+    });
 
     expect(ltk.hand.some(c => c.id === 'lethal_slash')).toBe(true); // Thu lấy lá Chém
     expect(ltk.hand.length).toBe(2); // 1 bài rút + 1 lá Chém thu hồi

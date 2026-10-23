@@ -8,9 +8,8 @@
 import { globalHeroRegistry } from '../heroes/HeroRegistry.js';
 import { RangeSystem } from '../rules/RangeSystem.js';
 import { PHASES } from '../../constants/phases.js';
-import { SkillDescriptions, SkillIdToName } from '../../engine/registries/SkillDescriptions.js';
+import { SkillDescriptions, SkillIdToName } from '../../data/SkillDescriptions.js';
 import { getFullPlayerName } from '../../utils/playerHelpers.js';
-import { canPlayCard } from '../../engine/rules/CardRules.js';
 
 /**
  * Chuyển đổi Phase từ v4 (IN HOA) sang constant của UI (thường)
@@ -42,7 +41,11 @@ export function toViewModel(state, mainPlayerId = 0) {
     return {
       phase: PHASES.DRAFT,
       playedCards: [],
-      logs: state.logs || [],
+      logs: (state.logs || []).map(l => {
+        if (typeof l === 'string') return { text: l, message: l, timestamp: Date.now() };
+        const text = l.text || l.message || '';
+        return { ...l, text, message: text };
+      }),
       reactions: [],
       gameOver: false,
       winner: null,
@@ -74,7 +77,11 @@ export function toViewModel(state, mainPlayerId = 0) {
   const vm = {
     phase: vmPhase,
     playedCards: state.playedCards ? [...state.playedCards] : [],
-    logs: (state.logs || state.history || []).map(l => typeof l === 'string' ? { message: l, timestamp: Date.now() } : l),
+    logs: (state.logs || state.history || []).map(l => {
+      if (typeof l === 'string') return { text: l, message: l, timestamp: Date.now() };
+      const text = l.text || l.message || '';
+      return { ...l, text, message: text };
+    }),
     reactions: state.reactions ? [...state.reactions] : [],
     gameOver: state.gameOver || false,
     winner: state.winner || null,
@@ -261,6 +268,126 @@ export function toViewModel(state, mainPlayerId = 0) {
           judgeSuit: frame.context?.judgeSuit,
           ...frame.context
         };
+      } else if (frame.type === 'ASK_THAT_TRAM_SO_PUNISH') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_that_tram_so_punish',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          judgeCard: frame.context?.judgeCard,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_DOI_SU') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_doi_su',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_HOA_NGHI') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_hoa_nghi',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          drawnCards: frame.context?.drawnCards || [],
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_DA_TRACH') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_da_trach',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_KHOI_NGHIA') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_khoi_nghia',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_PHA_THANH') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_pha_thanh',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_NAM_QUOC_SON_HA') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_nam_quoc_son_ha',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          damageCard: frame.context?.damageCard,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_TIEN_PHONG') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_tien_phong',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_SUIT') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_suit',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_HO_CHU') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_ho_chu',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_VAN_DON') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_van_don',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_XA_THAN') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_xa_than',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_DUYEN_THO') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_duyen_tho',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
       } else {
         const isDiscard = frame.type === 'ASK_DISCARD';
         const frameType = isDiscard ? 'discard_phase' : frame.type.toLowerCase();
@@ -272,7 +399,7 @@ export function toViewModel(state, mainPlayerId = 0) {
           reason: frame.context?.reason || (frame.type === 'ASK_DODGE' ? 'chem' : frameType),
           amount,
           cardsToDiscard: amount,
-          responderId: frame.currentActorId,
+          responderId: frame.currentActorId ?? frame.priorityQueue?.[0] ?? frame.targetId ?? frame.sourceId,
           sourceId: frame.sourceId,
           targetId: frame.targetId,
           askQueue: [...(frame.priorityQueue || [])],
@@ -336,8 +463,56 @@ export function toViewModel(state, mainPlayerId = 0) {
     const revealedHeroes = p.revealedHeroes ? [...p.revealedHeroes] : [false, false];
     hero1.isRevealed = Boolean(revealedHeroes[0]);
     hero2.isRevealed = Boolean(revealedHeroes[1]);
-    pVM.heroes = [hero1, hero2];
+
+    const isSelf = p.id === mainPlayerId;
+    const isGameOver = Boolean(state.gameOver);
+
+    // Che giấu danh tính và kỹ năng võ tướng chưa lộ diện của đối thủ (bảo mật dữ liệu)
+    const maskHero = (h) => ({
+      id: 'hidden',
+      name: 'Tướng Ẩn',
+      faction: 'none',
+      gender: 'none',
+      hp: h?.hp,
+      maxHp: h?.maxHp,
+      image: null,
+      bio: '',
+      isRevealed: false,
+      skills: []
+    });
+
+    const safeHero1 = (isSelf || hero1.isRevealed || isGameOver) ? hero1 : maskHero(hero1);
+    const safeHero2 = (isSelf || hero2.isRevealed || isGameOver) ? hero2 : maskHero(hero2);
+
+    pVM.heroes = [safeHero1, safeHero2];
     pVM.revealedHeroes = revealedHeroes;
+
+    if (!isSelf && !isGameOver) {
+      if (!hero1.isRevealed) {
+        pVM.mainHeroId = null;
+        if (pVM.heroId) pVM.heroId = null;
+      }
+      if (!hero2.isRevealed) {
+        pVM.subHeroId = null;
+      }
+
+      // 1. Che giấu phe phái và giới tính nếu đối thủ chưa lộ diện bất kỳ tướng nào
+      const isOpponentRevealed = Boolean(revealedHeroes[0] || revealedHeroes[1] || p.isRevealed);
+      if (!isOpponentRevealed) {
+        pVM.faction = 'none';
+        pVM.gender = 'none';
+      }
+
+      // 2. Che giấu danh sách skills ngầm của đối thủ (chỉ giữ skills của tướng đã lật)
+      const visibleSkills = [];
+      if (hero1.isRevealed && hero1.skills) {
+        visibleSkills.push(...hero1.skills.map(s => s.id));
+      }
+      if (hero2.isRevealed && hero2.skills) {
+        visibleSkills.push(...hero2.skills.map(s => s.id));
+      }
+      pVM.skills = visibleSkills;
+    }
 
     // Chuyển đổi equipment object thành mảng tương thích hoàn toàn UI
     const eqList = Array.isArray(p.equipment)
@@ -373,12 +548,24 @@ export function toViewModel(state, mainPlayerId = 0) {
       } else if (card.type === 'dodge' || card.name === 'Né') {
         isPlayable = false;
         unplayableReason = 'Không thể chủ động sử dụng lá Né trong lượt';
-      } else if ((card.type === 'slash' || card.name === 'Chém') && (p.turnStats?.slashCount || 0) >= 1 && p.equipment?.weapon?.id !== 'crossbow') {
-        isPlayable = false;
-        unplayableReason = 'Mỗi lượt chỉ được đánh 1 lá Chém';
+      } else if (card.type === 'slash' || card.name === 'Chém') {
+        const weaponId = p.equipment?.weapon?.id || p.equipment?.weapon?.key || p.equipment?.weapon?.name || '';
+        const hasCrossbow = weaponId === 'crossbow' || weaponId === 'lien-no' || weaponId === 'Liên Nỏ' || weaponId.includes('lien_no');
+        const maxSlashes = p.temporaryFlags?.vanDonWin ? 2 : 1;
+
+        if (p.temporaryFlags?.vanDonLose) {
+          isPlayable = false;
+          unplayableReason = 'Thất bại đấu điểm Vân Đồn, bị cấm Chém lượt này';
+        } else if ((p.turnStats?.slashCount || 0) >= maxSlashes && !hasCrossbow) {
+          isPlayable = false;
+          unplayableReason = maxSlashes > 1 ? `Mỗi lượt chỉ được đánh ${maxSlashes} lá Chém` : 'Mỗi lượt chỉ được đánh 1 lá Chém';
+        }
       } else if ((card.type === 'peach' || card.name === 'Đào') && p.hp >= p.maxHp) {
         isPlayable = false;
         unplayableReason = 'Máu đã đầy, không thể ăn Đào';
+      } else if ((card.type === 'wine' || card.name === 'Rượu') && (p.turnStats?.wineCount || 0) >= 1) {
+        isPlayable = false;
+        unplayableReason = 'Mỗi lượt chỉ được uống Rượu 1 lần trong pha Hành động';
       }
 
       return {
@@ -388,11 +575,14 @@ export function toViewModel(state, mainPlayerId = 0) {
       };
     });
 
-    // Helper strings cho UI
     pVM.hpText = `${p.hp}/${p.maxHp}`;
     pVM.displayName = getFullPlayerName(p);
     pVM.isRevealed = Boolean(pVM.revealedHeroes && pVM.revealedHeroes.some(Boolean));
-    pVM.faction = p.faction || hero1?.faction || 'Lạc';
+    if (!isSelf && !isGameOver && !pVM.isRevealed) {
+      pVM.faction = 'none';
+    } else {
+      pVM.faction = p.faction || hero1?.faction || 'Lạc';
+    }
 
     return pVM;
   });

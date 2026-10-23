@@ -5,10 +5,10 @@ export default defineConfig({
   test: {
     include: [
       'shared/engine_v4/**/__tests__/**/*.test.js',
-      'client/src/**/__tests__/**/*.test.{js,jsx}'
+      'client/src/**/__tests__/**/*.test.{js,jsx}',
+      'server/**/__tests__/**/*.test.js'
     ],
     exclude: [
-      'shared/engine/__tests__/**',
       'archive_cleanup/**',
       '**/node_modules/**'
     ],

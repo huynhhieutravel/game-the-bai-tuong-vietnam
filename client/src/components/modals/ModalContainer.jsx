@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useGameState, useGameAPI } from '../../contexts/GameProvider';
 import { getFullPlayerName, getPlayerFaction } from "shared/utils/playerHelpers";
 import { CardSelector } from './CardSelector';
@@ -48,6 +48,12 @@ export function ModalContainer({ mainPlayerId = 0 }) {
 
   const req = gameState?.waitingForResponse;
   const me = gameState?.players.find(p => p.id === mainPlayerId) || gameState?.players[0];
+
+  const findPlayer = useCallback((id) => {
+    if (id === null || id === undefined) return null;
+    return (gameState?.players || []).find(p => p.id === id) || gameState?.players?.[id] || null;
+  }, [gameState]);
+
   const isAskNegate = req?.type === 'ask_negate' && req?.responderId === mainPlayerId;
 
   const askNegateValidCards = useMemo(() => {
@@ -75,18 +81,58 @@ export function ModalContainer({ mainPlayerId = 0 }) {
   // Auto-skip logic for ask_negate if player has no valid cards
   useEffect(() => {
      if (isAskNegate && askNegateValidCards.length === 0) {
-         gameAPI.respond({ playerId: mainPlayerId, doNegate: false });
+         gameAPI.respond({ playerId: mainPlayerId, doNegate: false, _isAuto: true });
      }
   }, [isAskNegate, askNegateValidCards, mainPlayerId, gameAPI]);
 
+  // Client-Side Watchdog Timer (15s Auto-skip)
+  const [timeLeft, setTimeLeft] = useState(15);
+  const activeReqKey = useMemo(() => {
+    if (!req || req.responderId !== me?.id) return null;
+    const ignoredPhases = ['draw_phase', 'play_phase', 'discard_phase', 'end_phase'];
+    if (ignoredPhases.includes(req.type)) return null;
+    if (isAskNegate && askNegateValidCards.length === 0) return null;
+    return `${req.id ?? ''}_${req.type}_${req.reason ?? ''}_${req.responderId}_${req.sourceId ?? ''}_${req.targetId ?? ''}`;
+  }, [req, me?.id, isAskNegate, askNegateValidCards.length]);
+
+  useEffect(() => {
+    if (!activeReqKey) {
+      setTimeLeft(15);
+      return;
+    }
+
+    setTimeLeft(15);
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          console.warn(`[WATCHDOG TIMER] 15s expired for request [${activeReqKey}]. Auto-skipping to prevent deadlock.`);
+          handleResponseAction({
+            playerId: me?.id ?? 0,
+            askerId: me?.id ?? 0,
+            canceled: true,
+            doReact: false,
+            doNegate: false,
+            doSave: false,
+            doProvide: false,
+            doUse: false,
+            _isAuto: true
+          });
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [activeReqKey, handleResponseAction, me?.id]);
+
   if (!gameState || !req) return null;
 
-        
-      
-        
-        // Modal Styleyle
-        /** @type {import('react').CSSProperties} */
-        const modalStyle = {
+  const renderModal = () => {
+    // Modal Style
+    /** @type {import('react').CSSProperties} */
+    const modalStyle = {
           position: 'absolute',
           top: '50%',
           left: '50%',
@@ -147,7 +193,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
 
         // Quân Cơ Ask
         if (req.type === 'ask_quan_co' && req.responderId === me.id) {
-            const targetPlayer = gameState.players[req.targetId];
+            const targetPlayer = findPlayer(req.targetId);
             const targetName = getFullPlayerName(targetPlayer, me.id);
             const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => c.name === req.reqCard);
             
@@ -172,7 +218,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         
         // Quân Cơ Draw Ask (for the target)
         if (req.type === 'ask_quan_co_draw' && req.responderId === me.id) {
-            const helperPlayer = gameState.players[req.targetId];
+            const helperPlayer = findPlayer(req.targetId);
             const helperName = getFullPlayerName(helperPlayer, me.id);
             
             return (
@@ -557,7 +603,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
                 ⭐ KÍCH HOẠT UY CHẤN!
               </div>
               <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-lg)' }}>
-                {getFullPlayerName(gameState.players[req.sourceId], me.id)} phát động [Uy Chấn], bạn được chọn:
+                {getFullPlayerName(findPlayer(req.sourceId), me.id)} phát động [Uy Chấn], bạn được chọn:
               </div>
               <div style={{ display: 'flex', gap: 'var(--space-md)', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button className="btn-action primary" onClick={() => handleResponseAction({ choice: 'heal' })}>
@@ -669,7 +715,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         }
 
         if (req.type === 'ask_nghi_ngo' && req.responderId === me.id) {
-          const player = gameState.players[req.sourceId];
+          const player = findPlayer(req.sourceId);
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: 'var(--color-gold)' }}>
@@ -774,7 +820,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
                 🎋 KỸ NĂNG BỊ KHÓA!
               </div>
               <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-lg)' }}>
-                {getFullPlayerName(gameState.players[req.sourceId], me.id)} phát động [Tre Ngà]. Phán xét ra chất {suitFilter}.<br/>
+                {getFullPlayerName(findPlayer(req.sourceId), me.id)} phát động [Tre Ngà]. Phán xét ra chất {suitFilter}.<br/>
                 Bạn có muốn bỏ 1 lá bài {suitFilter} để được quyền dùng [Né] không?
               </div>
               <CardSelector 
@@ -893,11 +939,12 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         }
         
         if (req.type === 'ask_peach' && req.responderId === me.id) {
-          const isSelf = req.dyingId === 0;
-          const dyingPlayer = gameState.players[req.dyingId];
+          const dyingId = req.dyingPlayerId ?? req.dyingId ?? req.targetId;
+          const isSelf = dyingId === me.id;
+          const dyingPlayer = findPlayer(dyingId) || me;
           
           const hasNamDuoc = me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'nam-duoc'));
-          const isOutsideTurn = gameState.currentPlayerIndex !== 0;
+          const isOutsideTurn = gameState.currentPlayerIndex !== me.id;
           
           const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => {
              if (c.name === 'Đào') return true;
@@ -917,7 +964,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
                 🚨 CẤP CỨU!
               </div>
               <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-lg)' }}>
-                {isSelf ? "Bạn đang hấp hối!" : `${getFullPlayerName(dyingPlayer, me.id)} đang hấp hối!`} (HP: {dyingPlayer.hp})
+                {isSelf ? "Bạn đang hấp hối!" : `${getFullPlayerName(dyingPlayer, me.id)} đang hấp hối!`} (HP: {dyingPlayer?.hp ?? 0})
               </div>
               
               <CardSelector 
@@ -927,12 +974,12 @@ export function ModalContainer({ mainPlayerId = 0 }) {
                 onSelect={(idx) => {
                    const c = validCards.find(card => card.idx === idx);
                    if (c.originalName || (c.name !== 'Đào' && c.name !== 'Rượu')) {
-                      handleResponseAction({ askerId: 0, doSave: true, virtualCardName: c.name, activeSkill: c.virtualReason, cardIndexSelected: idx, cardId: c.id });
+                      handleResponseAction({ askerId: me.id, doSave: true, virtualCardName: c.name, activeSkill: c.virtualReason, cardIndexSelected: idx, cardId: c.id });
                    } else {
-                      handleResponseAction({ askerId: 0, doSave: true, cardIndexSelected: idx, cardId: c.id });
+                      handleResponseAction({ askerId: me.id, doSave: true, cardIndexSelected: idx, cardId: c.id });
                    }
                 }}
-                onCancel={() => handleResponseAction({ askerId: 0, doSave: false })}
+                onCancel={() => handleResponseAction({ askerId: me.id, doSave: false })}
               />
             </div>
           );
@@ -943,8 +990,8 @@ export function ModalContainer({ mainPlayerId = 0 }) {
 
           if (validCards.length === 0) return null; // Ngăn chặn flash pop-up rác trước khi useEffect auto-skip kịp chạy
 
-          const sourceName = getFullPlayerName(gameState.players[req.sourceId], me.id);
-          const targetName = getFullPlayerName(gameState.players[req.targetId], me.id);
+          const sourceName = getFullPlayerName(findPlayer(req.sourceId), me.id);
+          const targetName = getFullPlayerName(findPlayer(req.targetId), me.id);
           
           let cardName = 'Cẩm nang';
           if (req.trickType) {
@@ -961,7 +1008,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
               </div>
               <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-lg)' }}>
                 {req.isNegated 
-                  ? <span>{req.lastNegaterId !== undefined ? getFullPlayerName(gameState.players[req.lastNegaterId], me.id) : 'Ai đó'} vừa dùng [Hóa Giải] vô hiệu hóa lá <strong>[{cardName}]</strong>. Bạn có muốn dùng [Hóa Giải] để phục hồi nó không?</span>
+                  ? <span>{req.lastNegaterId !== undefined ? getFullPlayerName(findPlayer(req.lastNegaterId), me.id) : 'Ai đó'} vừa dùng [Hóa Giải] vô hiệu hóa lá <strong>[{cardName}]</strong>. Bạn có muốn dùng [Hóa Giải] để phục hồi nó không?</span>
                   : <span>{sourceName} đang dùng <strong>[{cardName}]</strong> lên {targetName}. Bạn có muốn Hóa Giải không?</span>
                 }
                 {!validCards.some(c => c.name === 'Hóa Giải' && !c.virtualReason) && (
@@ -993,7 +1040,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         if ((req.type === 'ask_dodge' && req.reason === 'van-tien' && req.responderId === me.id) ||
         (req.type === 'ask_slash' && req.reason === 'nam-man' && req.responderId === me.id)) {
           const reqCardName = req.trickType === 'barbarian' ? 'Chém' : 'Né';
-          const sourceName = getFullPlayerName(gameState.players[req.sourceId], me.id);
+          const sourceName = getFullPlayerName(findPlayer(req.sourceId), me.id);
           
           // Dời Núi (Chém <-> Né)
           const hasDoiNui = me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'doi-nui'));
@@ -1098,4 +1145,41 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         }
 
         return null; // Return null if it's someone else's turn to respond
+  };
+
+  const modalElement = renderModal();
+  if (!modalElement) return null;
+
+  return (
+    <>
+      {modalElement}
+      <div 
+        data-testid="modal-watchdog-pill"
+        style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          padding: '6px 14px',
+          borderRadius: '20px',
+          background: timeLeft <= 5 ? 'rgba(239, 68, 68, 0.9)' : 'rgba(15, 23, 42, 0.85)',
+          border: timeLeft <= 5 ? '2px solid #ef4444' : '2px solid #f59e0b',
+          color: '#ffffff',
+          fontWeight: 700,
+          fontSize: '0.85rem',
+          boxShadow: timeLeft <= 5 ? '0 0 16px rgba(239, 68, 68, 0.8)' : '0 4px 12px rgba(0,0,0,0.5)',
+          zIndex: 99999,
+          pointerEvents: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          letterSpacing: '0.5px',
+          backdropFilter: 'blur(8px)',
+          transition: 'all 0.3s ease'
+        }}
+      >
+        <span>⏳</span>
+        <span>{timeLeft}s</span>
+      </div>
+    </>
+  );
 }

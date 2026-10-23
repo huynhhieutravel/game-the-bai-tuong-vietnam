@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { getAvailableTargets } from 'shared/engine/rules/TargetResolver';
+import { getAvailableTargets } from 'shared/engine_v4/rules/TargetResolverV4.js';
 
 export function useTargeting({ 
     gameState, 

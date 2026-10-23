@@ -88,6 +88,10 @@ export class PriorityStack {
     return current ? current.type : null;
   }
 
+  get stack() {
+    return this._stack;
+  }
+
   isEmpty() {
     return this._stack.length === 0;
   }

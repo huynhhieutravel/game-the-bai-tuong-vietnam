@@ -363,6 +363,37 @@ body {
   justify-content: center;
 }
 
+.hero-hp-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.hero-hp-hearts {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.hero-hp-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #f1f5f9;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.hero-wine-tag {
+  font-size: 0.85rem;
+  margin-left: 2px;
+  filter: drop-shadow(0 0 4px #ef4444);
+}
+
 .hp-pip {
   width: 12px;
   height: 12px;
@@ -405,6 +436,53 @@ body {
   color: var(--color-gold-light);
 }
 
+/* Player Stat Badges (Số bài, Tầm đánh, Khoảng cách) */
+.player-stat-badges {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.player-stat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.player-stat-badge.stat-cards,
+.player-stat-badge.hand-cards {
+  color: #fef08a;
+  border: 1px solid rgba(234, 179, 8, 0.45);
+  background: rgba(30, 41, 59, 0.85);
+}
+
+.player-stat-badge.stat-range,
+.player-stat-badge.range {
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  background: rgba(69, 10, 10, 0.75);
+}
+
+.player-stat-badge.stat-distance,
+.player-stat-badge.distance {
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  background: rgba(23, 37, 84, 0.75);
+}
+
 /* Equipment slots */
 .equipment-area {
   display: flex;
@@ -439,7 +517,13 @@ body {
 }
 
 .equip-slot.empty {
-  opacity: 0.3;
+  opacity: 0.6;
+}
+
+.equip-slot-icon-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Judgement Area */
@@ -866,6 +950,106 @@ body {
   overflow: hidden;
 }
 
+.game-log-header {
+  display: none; /* Chỉ hiện trên mobile */
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid rgba(212, 168, 67, 0.3);
+}
+
+.game-log-title {
+  font-weight: 700;
+  color: var(--color-gold);
+  font-size: 0.95rem;
+}
+
+.mobile-log-close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.mobile-log-toggle-btn {
+  display: none; /* Chỉ hiện trên mobile */
+  background: rgba(212, 168, 67, 0.15);
+  border: 1px solid rgba(212, 168, 67, 0.4);
+  color: var(--color-gold-light);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 99px;
+  cursor: pointer;
+  align-items: center;
+  gap: 4px;
+}
+
+.mobile-log-count {
+  background: var(--color-gold);
+  color: #111;
+  font-size: 0.6rem;
+  font-weight: bold;
+  padding: 0 4px;
+  border-radius: 99px;
+  margin-left: 2px;
+}
+
+/* Mobile Quick Ticker */
+.mobile-log-ticker {
+  position: absolute;
+  top: 48px;
+  left: 10px;
+  right: 10px;
+  background: rgba(17, 24, 39, 0.9);
+  border: 1px solid rgba(212, 168, 67, 0.35);
+  backdrop-filter: blur(8px);
+  border-radius: 99px;
+  padding: 3px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 25;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  animation: logSlideIn 0.3s ease-out;
+}
+
+.mobile-log-ticker .ticker-icon {
+  font-size: 0.8rem;
+}
+
+.mobile-log-ticker .ticker-text {
+  flex: 1;
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-log-ticker .ticker-more {
+  color: var(--color-gold);
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.mobile-log-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 99;
+}
+
 .game-log-tabs {
   display: flex;
   border-bottom: 1px solid rgba(212, 168, 67, 0.3);
@@ -1024,73 +1208,291 @@ body {
 }
 
 /* ============================================
-   Responsive — Mobile (Portrait)
+   Draft Screen
    ============================================ */
-@media (max-width: 768px) {
-  .hero-card {
-    width: 85px;
-    height: 110px;
-  }
-  
-  .hero-portrait {
-    font-size: 1.8rem;
-  }
-  
-  .hero-name {
-    font-size: 0.6rem;
-  }
-  
-  .game-log-container {
-    width: 280px;
-    bottom: 250px;
-  }
-  
-  .card {
-    width: 60px;
-    height: 85px;
-  }
-  
-  .card-icon {
-    font-size: 1.3rem;
-  }
-  
-  .card-name {
-    font-size: 0.5rem;
-  }
-  
-  .game-log-container {
-    width: 160px;
-  }
-  
-  .opponents-area {
-    gap: var(--space-sm);
-  }
-  
-  .player-zone {
-    min-width: 90px;
-  }
+.draft-board {
+  position: relative;
+  padding: 20px 40px;
+  max-width: 100%;
+  margin: 0 auto;
+  text-align: center;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  overflow-y: auto;
+}
+
+.draft-title {
+  color: var(--color-gold);
+  font-size: 2rem;
+  margin-bottom: 10px;
+  text-shadow: 0 0 10px rgba(212, 168, 67, 0.5);
+}
+
+.draft-subtitle {
+  color: var(--color-text-muted);
+  font-size: 1.2rem;
+  margin-bottom: 40px;
+}
+
+.draft-heroes-container {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 25px;
+}
+
+.draft-hero-card {
+  width: 260px;
+  height: 364px;
+}
+
+.draft-confirm-btn {
+  margin-top: 25px;
+  padding: 10px 32px;
+  font-size: 1.2rem;
+  flex: none;
 }
 
 /* ============================================
-   Landscape mode optimization
+   Responsive — Mobile (Portrait <= 768px & Landscape <= 520px)
    ============================================ */
-@media (max-height: 500px) {
+@media (max-width: 768px), (max-height: 520px) {
+  /* Top Bar */
   .game-top-bar {
-    padding: 4px var(--space-md);
+    padding: 6px 10px;
   }
   
+  .game-title {
+    font-size: 1rem;
+  }
+  
+  .game-status .turn-indicator {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+  }
+
+  .mobile-log-toggle-btn {
+    display: inline-flex;
+  }
+
+  /* Draft Screen Mobile */
+  .draft-board {
+    padding: 12px 10px;
+  }
+
+  .draft-title {
+    font-size: 1.15rem;
+    margin-bottom: 4px;
+  }
+
+  .draft-subtitle {
+    font-size: 0.75rem;
+    margin-bottom: 12px;
+  }
+
+  .draft-heroes-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    max-width: 350px;
+    margin: 0 auto;
+    width: 100%;
+    justify-items: center;
+  }
+
+  .draft-hero-card {
+    width: 100% !important;
+    max-width: 160px !important;
+    height: 220px !important;
+  }
+
+  /* Opponents on Table */
+  .player-zone {
+    min-width: 80px;
+  }
+
+  /* Log Container -> Mobile Bottom Sheet Drawer */
+  .game-log-container {
+    display: none;
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 60vh;
+    max-height: 480px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    z-index: 100;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.85);
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(212, 168, 67, 0.4);
+    border-bottom: none;
+  }
+
+  .game-log-container.mobile-open {
+    display: flex;
+    animation: logDrawerUp 0.25s ease-out;
+  }
+
+  .game-log-header {
+    display: flex;
+  }
+
+  /* Hand & Cards on mobile */
+  .player-hand-area {
+    padding: 2px 8px 6px 8px;
+  }
+
+  .player-hand-area::before {
+    height: 210px;
+  }
+
+  .hand-cards {
+    padding: 6px 0;
+    gap: 6px;
+  }
+
+  .card {
+    width: 58px;
+    height: 84px;
+    border-radius: 6px;
+  }
+
+  .card-icon {
+    font-size: 1.25rem;
+  }
+
+  .card-name {
+    font-size: 0.5rem;
+  }
+
+  .card:hover {
+    transform: translateY(-8px) scale(1.04);
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .card.selected {
+    transform: translateY(-14px) scale(1.06);
+  }
+}
+
+@keyframes logDrawerUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* ============================================
+/* ============================================
+   Landscape mode optimization (height <= 520px)
+   ============================================ */
+@media (max-height: 520px) {
+  /* Safe area insets for landscape phones with notch / camera punch-hole */
+  .game-board,
+  .draft-board {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-top: max(4px, env(safe-area-inset-top));
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
+    box-sizing: border-box;
+  }
+
+  /* Draft Screen Landscape: Zero scroll, 5 cards in a single row */
+  .draft-board {
+    padding: 6px 12px;
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .draft-title {
+    font-size: 1.15rem;
+    margin-top: 0;
+    margin-bottom: 2px;
+  }
+
+  .draft-subtitle {
+    font-size: 0.75rem;
+    margin-bottom: 6px;
+  }
+
+  .draft-heroes-container {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+  }
+
+  .draft-hero-card {
+    width: clamp(105px, 15vw, 138px) !important;
+    max-width: 140px !important;
+    height: clamp(155px, 48vh, 205px) !important;
+    flex: 0 0 auto !important;
+    border-radius: 8px !important;
+  }
+
+  .draft-confirm-btn {
+    margin-top: 6px !important;
+    padding: 6px 28px !important;
+    font-size: 0.95rem !important;
+  }
+
+  .mobile-log-ticker {
+    display: none !important; /* Hide full-screen floating ticker in landscape to preserve board view */
+  }
+
+  .game-top-bar {
+    padding: 2px 10px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    z-index: 50;
+  }
+
+  .game-title {
+    font-size: 0.9rem !important;
+  }
+
+  .turn-indicator {
+    font-size: 0.7rem !important;
+    padding: 1px 6px !important;
+  }
+
+  .mobile-log-toggle-btn {
+    padding: 1px 6px !important;
+    font-size: 0.7rem !important;
+  }
+  
+  .player-zone {
+    min-width: 70px !important;
+  }
+
   .hero-card {
-    width: 80px;
-    height: 100px;
+    width: 70px !important;
+    min-height: unset !important;
+    height: 90px !important;
   }
   
   .card {
-    width: 55px;
-    height: 78px;
+    width: 48px !important;
+    height: 68px !important;
+    font-size: 0.75rem !important;
   }
   
   .player-hand-area {
-    padding: var(--space-xs) var(--space-md);
+    padding: 2px var(--space-md);
   }
 }
 

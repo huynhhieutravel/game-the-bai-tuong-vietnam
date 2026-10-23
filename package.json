@@ -3,10 +3,17 @@
   "private": true,
   "scripts": {
     "test": "vitest run",
+    "test:all": "vitest run && npm run sim:app",
     "test:v4": "vitest run shared/engine_v4/",
     "test:client": "vitest run client/",
     "build": "npm run build --workspace=client",
-    "dev": "npm run dev --workspace=client"
+    "dev": "npm run dev --workspace=client",
+    "cap:build": "npm run sim:app && npm run cap:build --workspace=client",
+    "cap:sync": "npm run cap:sync --workspace=client",
+    "cap:android": "npm run cap:android --workspace=client",
+    "cap:ios": "npm run cap:ios --workspace=client",
+    "sim:core": "node shared/engine_v4/simulation/run_1000_matches.mjs",
+    "sim:app": "node shared/engine_v4/simulation/run_application_layer_stress_test.mjs"
   },
   "workspaces": [
     "client",

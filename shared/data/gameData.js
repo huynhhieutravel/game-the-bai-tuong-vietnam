@@ -294,9 +294,10 @@ export const getCardSubType = (card) => {
     return CARD_SUBTYPES.TRICK_NORMAL;
   }
   if (card.type === CARD_TYPES.EQUIP) {
+    if (card.subtype) return card.subtype;
     if (card.name.includes('-1')) return CARD_SUBTYPES.EQUIP_MOUNT_ATK;
     if (card.name.includes('+1')) return CARD_SUBTYPES.EQUIP_MOUNT_DEF;
-    if (['Bát Quái', 'Hắc Thuẫn'].includes(card.name)) return CARD_SUBTYPES.EQUIP_ARMOR;
+    if (['Bát Quái', 'Hắc Thuẫn', 'Bạch Ngân', 'Bạch Ngân Sư Tử'].some(n => card.name.includes(n))) return CARD_SUBTYPES.EQUIP_ARMOR;
     return CARD_SUBTYPES.EQUIP_WEAPON;
   }
   return null;

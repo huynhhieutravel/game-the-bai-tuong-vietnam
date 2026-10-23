@@ -9,7 +9,7 @@ import { globalHeroRegistry } from '../heroes/HeroRegistry.js';
 import { CardDeck } from '../cards/CardDeck.js';
 import { GameState } from '../core/GameState.js';
 import { StateMachine, PHASES } from '../core/StateMachine.js';
-import { SkillDescriptions, SkillIdToName } from '../../engine/registries/SkillDescriptions.js';
+import { SkillDescriptions, SkillIdToName } from '../../data/SkillDescriptions.js';
 
 let draftSelections = {};
 
@@ -19,13 +19,42 @@ let draftSelections = {};
  */
 export function createGameState(safeCount = 4) {
   draftSelections = {};
+  const rawCount = typeof safeCount === 'object' && safeCount !== null
+    ? (safeCount.playerCount || safeCount.safeCount || 4)
+    : Number(safeCount) || 4;
+  const playerCount = Math.max(2, Math.min(8, rawCount));
+  const sessionId = typeof safeCount === 'object' && safeCount !== null ? safeCount.sessionId : undefined;
+
   const allHeroes = globalHeroRegistry.getAllHeroes();
   const mainPlayerId = typeof window !== 'undefined' && window.playerId !== undefined ? window.playerId : 0;
+  const heroesPerPlayer = playerCount >= 8 ? 4 : 5;
 
-  const players = Array.from({ length: safeCount }).map((_, i) => {
-    // Xáo danh sách tướng để rút ngẫu nhiên 5 tướng cho mỗi người chơi
-    const shuffled = [...allHeroes].sort(() => Math.random() - 0.5);
-    const draftHeroes = shuffled.slice(0, 5).map(h => {
+  let pool = [...allHeroes].sort(() => Math.random() - 0.5);
+
+  const players = Array.from({ length: playerCount }).map((_, i) => {
+    // Phân bổ tướng draft an toàn: đảm bảo mỗi người chơi có ít nhất 2 tướng cùng phe
+    const byFaction = {};
+    pool.forEach(h => {
+      if (!byFaction[h.faction]) byFaction[h.faction] = [];
+      byFaction[h.faction].push(h);
+    });
+    const eligibleFactions = Object.keys(byFaction).filter(f => byFaction[f].length >= 2);
+    let chosenDraftHeroes = [];
+    if (eligibleFactions.length > 0) {
+      const chosenFaction = eligibleFactions[Math.floor(Math.random() * eligibleFactions.length)];
+      const pair = byFaction[chosenFaction].slice(0, 2);
+      const pairIds = new Set(pair.map(h => h.id));
+      const remainingPool = pool.filter(h => !pairIds.has(h.id));
+      const rest = remainingPool.slice(0, heroesPerPlayer - 2);
+      chosenDraftHeroes = [...pair, ...rest];
+      const chosenIds = new Set(chosenDraftHeroes.map(h => h.id));
+      pool = pool.filter(h => !chosenIds.has(h.id));
+    } else {
+      chosenDraftHeroes = pool.slice(0, heroesPerPlayer);
+      pool = pool.slice(heroesPerPlayer);
+    }
+
+    const draftHeroes = chosenDraftHeroes.map(h => {
       const resolvedSkills = (h.skills || []).map(skill => {
         const skillId = skill.id;
         const realName = skill.name || SkillIdToName[skillId] || skillId;
@@ -73,6 +102,7 @@ export function createGameState(safeCount = 4) {
 
   return {
     phase: 'draft',
+    sessionId,
     players,
     playedCards: [],
     logs: [],
@@ -181,6 +211,7 @@ export function selectDraftHeroes(state, playerId, hero1Id, hero2Id) {
     });
 
     const v4GameState = new GameState({
+      sessionId: state.sessionId || null,
       players: initializedPlayers,
       drawPile: deck,
       currentTurnPlayerId: 0,

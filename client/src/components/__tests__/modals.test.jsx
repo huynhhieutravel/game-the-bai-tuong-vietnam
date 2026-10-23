@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import React from 'react';
 import { ModalContainer } from '../modals/ModalContainer';
 import * as GameProvider from '../../contexts/GameProvider';
@@ -75,4 +75,63 @@ describe('ModalContainer and all sub-modals', () => {
       expect(container).toBeTruthy(); 
     });
   });
+
+  describe('Client-Side Watchdog Timer', () => {
+    it('renders watchdog countdown pill with 15s when an interactive modal is active', () => {
+      GameProvider.useGameState.mockReturnValue({
+        players: mockPlayers,
+        waitingForResponse: {
+          type: 'ask_slash',
+          reason: 'quyet-dau',
+          responderId: 0,
+          sourceId: 1,
+          targetId: 0
+        },
+        deck: []
+      });
+      GameProvider.useGameAPI.mockReturnValue({ respond: vi.fn() });
+
+      const { getByTestId } = render(<ModalContainer />);
+      const pill = getByTestId('modal-watchdog-pill');
+      expect(pill).toBeTruthy();
+      expect(pill.textContent).toContain('15s');
+    });
+
+    it('auto-skips safely via gameAPI.respond when 15s timer expires', () => {
+      vi.useFakeTimers();
+      const mockRespond = vi.fn();
+      GameProvider.useGameState.mockReturnValue({
+        players: mockPlayers,
+        waitingForResponse: {
+          id: 'duel_frame_1',
+          type: 'ask_slash',
+          reason: 'quyet-dau',
+          responderId: 0,
+          sourceId: 1,
+          targetId: 0
+        },
+        deck: []
+      });
+      GameProvider.useGameAPI.mockReturnValue({ respond: mockRespond });
+
+      act(() => {
+        render(<ModalContainer />);
+      });
+      expect(mockRespond).not.toHaveBeenCalled();
+
+      // Advance by 15 seconds
+      act(() => {
+        vi.advanceTimersByTime(15000);
+      });
+
+      expect(mockRespond).toHaveBeenCalledWith(expect.objectContaining({
+        canceled: true,
+        _isAuto: true,
+        doReact: false
+      }));
+
+      vi.useRealTimers();
+    });
+  });
 });
+

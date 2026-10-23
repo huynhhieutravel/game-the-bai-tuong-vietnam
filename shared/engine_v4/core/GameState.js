@@ -47,6 +47,7 @@ export class GameState {
       skillUsage: p.skillUsage ? { ...p.skillUsage } : {},
       turnStats: p.turnStats ? { ...p.turnStats } : {
         slashCount: 0,
+        wineCount: 0,
         cardsDrawn: 0,
         damageDealt: 0,
         damageTaken: 0
@@ -54,6 +55,7 @@ export class GameState {
       temporaryFlags: p.temporaryFlags ? { ...p.temporaryFlags } : {}
     }));
 
+    this.sessionId = config.sessionId || null;
     this.currentTurnPlayerId = config.currentTurnPlayerId ?? 0;
     this.currentPhase = config.currentPhase || 'BEGIN'; // 'BEGIN' | 'JUDGE' | 'DRAW' | 'ACTION' | 'DISCARD' | 'END'
     this.drawPile = [...(config.drawPile || [])];
@@ -61,6 +63,8 @@ export class GameState {
     this.priorityStack = new PriorityStack();
     this.logs = [];
     this.initialTotalCards = config.initialTotalCards || (this.drawPile.length + this.discardPile.length);
+    this.turn = config.turn || 1;
+    this.round = config.round || 1;
   }
 
   getPlayer(playerId) {
@@ -80,9 +84,10 @@ export class GameState {
    */
   recycleDiscardPile() {
     if (!this.discardPile || this.discardPile.length === 0) return false;
-    this.drawPile = [...this.discardPile];
+    const recycled = [...this.discardPile];
     this.discardPile = [];
-    this._shuffle(this.drawPile);
+    this._shuffle(recycled);
+    this.drawPile = [...recycled, ...this.drawPile];
     this.addLog('Chồng bài rút đã được xáo lại từ bài bỏ.');
     return true;
   }
@@ -136,6 +141,13 @@ export class GameState {
       }
       return true;
     });
+
+    if (player.hand.length === 0 && discarded.length > 0) {
+      if (player.skills?.includes('hien_ke') || player.skills?.includes('hien-ke')) {
+        this.drawCards(playerId, 1);
+        this.addLog(`📜 [Hiến Kế] ${player.name} mất lá bài cuối cùng trên tay, lập tức rút 1 lá bài!`);
+      }
+    }
 
     return discarded;
   }

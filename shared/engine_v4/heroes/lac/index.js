@@ -32,9 +32,10 @@ export const ThanhGiong = {
         const judgeCard = state.drawCardFromDeck();
         if (judgeCard) {
           state.discardPile.push(judgeCard);
-          state.addLog(`⚡ [Tre Ngà] phán xét ra chất [${judgeCard.suit}]. Mục tiêu ${ctx.target.name} phải bỏ bài cùng chất để được Né!`);
           ctx.target.temporaryFlags = ctx.target.temporaryFlags || {};
           ctx.target.temporaryFlags.treNgaRequiredSuit = judgeCard.suit;
+          ctx.target.temporaryFlags.skillsSuppressed = true;
+          state.addLog(`🎋 [Tre Ngà] Toàn bộ kỹ năng không phải Tỏa Định Kỹ của ${ctx.target.name} bị vô hiệu hóa đến hết lượt! Phán xét ra chất [${judgeCard.suit}].`);
           return { treNgaJudgeSuit: judgeCard.suit };
         }
       }
@@ -267,10 +268,12 @@ export const LangLieu = {
       description: 'Đầu lượt xem X lá bài đầu chồng rút, xếp lại tùy ý lên đầu hoặc đáy chồng bài.',
       execute: (state, ctx) => {
         const aliveCount = state.getAlivePlayers().length;
-        const viewCount = Math.min(aliveCount, 5);
+        let viewCount = Math.min(aliveCount, 5);
         if (state.drawPile.length < viewCount) {
           state.recycleDiscardPile();
         }
+        viewCount = Math.min(viewCount, state.drawPile.length);
+        if (viewCount === 0) return;
         const viewedCards = state.drawPile.slice(-viewCount).reverse();
         state.addLog(`🍡 [Bánh Chưng] ${ctx.owner.name} kích hoạt: xem ${viewCount} lá bài đầu chồng rút để sắp xếp lại.`);
         state.priorityStack.push({

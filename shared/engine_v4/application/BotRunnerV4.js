@@ -63,8 +63,12 @@ export class BotRunnerV4 {
     }
 
     // --- 2. Xử lý phản hồi khi có PriorityFrame đang chờ ---
-    const frame = gameState.priorityStack?.peek?.() || (gameState.waitingForResponse ? {
-      currentActorId: gameState.waitingForResponse.responderId,
+    const peeked = gameState.priorityStack?.peek?.();
+    const frame = peeked ? {
+      ...peeked,
+      currentActorId: peeked.currentActorId ?? peeked.priorityQueue?.[0] ?? peeked.targetId
+    } : (gameState.waitingForResponse ? {
+      currentActorId: gameState.waitingForResponse.responderId ?? gameState.waitingForResponse.targetId,
       type: (gameState.waitingForResponse.type || '').toUpperCase(),
       context: gameState.waitingForResponse
     } : null);
@@ -83,22 +87,33 @@ export class BotRunnerV4 {
               const reaction = BotBrain.decideReaction(latestState, actor.id, latestFrame);
 
               if (latestFrame.type === 'ASK_DISCARD') {
-                const discardIds = reaction.discardCardIds || (currentActor.hand || []).slice(0, 1).map(c => c.id);
+                const required = latestFrame.context?.cardsToDiscard || 1;
+                const discardIds = (reaction.discardCardIds && reaction.discardCardIds.length === required)
+                  ? reaction.discardCardIds
+                  : (currentActor.hand || []).slice(0, required).map(c => c.id);
                 this.gameAPI.discardCards(actor.id, discardIds);
               } else {
-                const chosenCard = reaction.dodgeCard || reaction.peachCard || null;
+                const chosenCard = reaction.dodgeCard || reaction.peachCard || reaction.slashCard || reaction.negateCard || null;
+                const chosenCardId = reaction.cardId || chosenCard?.id;
+                const isCanceled = reaction.canceled !== undefined 
+                  ? reaction.canceled 
+                  : (!chosenCard && !chosenCardId && !reaction.useBagua && !reaction.doUse && !reaction.orderedCards && !reaction.doProvide && !reaction.doReact);
                 this.gameAPI.respond({
                   playerId: actor.id,
-                  cardId: chosenCard?.id,
-                  canceled: !chosenCard && !reaction.useBagua,
+                  cardId: chosenCardId,
+                  canceled: isCanceled,
+                  _isAuto: true,
                   ...reaction
                 });
               }
+            } else if (currentActor && !currentActor.isAlive) {
+              // Actor đã chết -> Tự động bỏ qua yêu cầu phản hồi để giải phóng PriorityFrame, chống kẹt game
+              this.gameAPI.respond({ playerId: actor.id, canceled: true, _isAuto: true });
             }
           } catch (err) {
             console.error('[BotRunnerV4] Error during bot reaction:', err);
             // Universal AI Fallback: Bỏ qua yêu cầu nếu bị lỗi để không kẹt game
-            this.gameAPI.respond({ playerId: actor.id, canceled: true });
+            this.gameAPI.respond({ playerId: actor.id, canceled: true, _isAuto: true });
           } finally {
             this.isProcessing = false;
           }
@@ -125,7 +140,8 @@ export class BotRunnerV4 {
               const action = BotBrain.decideAction(latestState, currentTurnId);
 
               if (action && action.type === 'PLAY_CARD') {
-                this.gameAPI.playCard(currentTurnId, action.cardId, action.targetId !== undefined ? [action.targetId] : []);
+                const targetIds = action.targetIds || (action.targetId !== undefined ? [action.targetId] : []);
+                this.gameAPI.playCard(currentTurnId, action.cardId, targetIds);
               } else {
                 this.gameAPI.endPhase(currentTurnId);
               }

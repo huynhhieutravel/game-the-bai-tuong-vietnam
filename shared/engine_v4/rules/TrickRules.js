@@ -28,8 +28,16 @@ export class TrickRules {
       }
     }
 
-    // 1. Phân loại Cẩm nang thường vs Cẩm nang Trì hoãn (Sấm Sét, Hỗn Loạn)
-    const isDelayed = ['sam_set', 'hon_loan'].includes(card.idKey || card.id) || ['Sấm Sét', 'Hỗn Loạn'].includes(card.name);
+    // 0b. Kiểm tra Nghệ An Kế (Nguyễn Chích) nếu là Cướp Bài
+    if ((card.name === 'Cướp Bài' || card.idKey === 'cuop_bai') && targets.length > 0) {
+      const target = state.getPlayer(targets[0]);
+      if (target && (globalHeroRegistry.hasSkill(target, 'nghe_an_ke', true) || target.skills?.includes('nghe_an_ke'))) {
+        throw new Error(`[Nghệ An Kế] ${target.name} không thể trở thành mục tiêu của [Cướp Bài]!`);
+      }
+    }
+
+    // 1. Phân loại Cẩm nang thường vs Cẩm nang Trì hoãn (Sấm Sét, Hỗn Loạn, Binh Lương Thốn Đoạn)
+    const isDelayed = ['sam_set', 'hon_loan', 'binh_luong'].includes(card.idKey || card.id) || ['Sấm Sét', 'Hỗn Loạn', 'Binh Lương Thốn Đoạn', 'Binh Lương'].includes(card.name);
     if (isDelayed) {
       return this._playDelayedTrick(state, sourceId, targets[0] ?? sourceId, card);
     }
@@ -42,7 +50,7 @@ export class TrickRules {
     globalHeroRegistry.dispatchTrigger('ON_TRICK_PLAYED', { sourceId, targetIds: targets, card }, state);
 
     // 3. Kiểm tra Xiềng Xích Rèn Lại (Reforge): Bỏ lá bài rút 1 lá mới, không mở hỏi Hóa Giải
-    const isXiengXich = card.name === 'Xiềng Xích' || card.idKey === 'xieng_xich';
+    const isXiengXich = card.name === 'Xiềng Xích' || card.idKey === 'xieng_xich' || extraArgs.isIronChain || extraArgs.reforge;
     const isReforge = isXiengXich && (extraArgs.reforge || !targets || targets.length === 0);
 
     if (isReforge) {
@@ -51,7 +59,19 @@ export class TrickRules {
       return;
     }
 
-    // 4. Mở vòng hỏi Hóa Giải (Negate Chain) cho Cẩm nang thường
+    // 3.5. Cẩm nang Toàn Bàn (AOE: Loạn Tiễn, Dã Man, Hồi Xuân):
+    // Theo quy tắc Việt Sát / Tam Quốc Sát: Hóa Giải chỉ hóa giải đơn thể (không có Hóa Giải Vương).
+    // Do đó cẩm nang AOE không thể bị hủy toàn bàn, mà thực thi ngay; mỗi cá nhân mục tiêu được Hóa Giải độc lập.
+    const isAOE = ['loan_tien', 'da_man', 'hoi_xuan'].includes(card.idKey || card.id) || 
+                  ['Loạn Tiễn', 'Dã Man', 'Hồi Xuân', 'Nam Man Xâm Nhập', 'Vạn Tiễn Quy Tâm', 'Đào Viên Kết Nghĩa'].includes(card.name);
+
+    if (isAOE) {
+      state.addLog(`⚡ Cẩm nang toàn bàn [${card.name}] có hiệu lực!`);
+      this._executeTrickEffect(state, sourceId, targets, card, extraArgs);
+      return;
+    }
+
+    // 4. Mở vòng hỏi Hóa Giải (Negate Chain) cho Cẩm nang đơn thể / có mục tiêu
     this._startNegateChain(state, sourceId, targets, card, extraArgs);
   }
 
@@ -67,6 +87,10 @@ export class TrickRules {
     target.judgementArea = target.judgementArea || [];
     if (target.judgementArea.some(c => (c.idKey || c.id) === (card.idKey || card.id))) {
       throw new Error(`[TrickRules] Mục tiêu đã có cẩm nang trì hoãn này trong khu phán xét!`);
+    }
+
+    if ((card.name === 'Hỗn Loạn' || card.idKey === 'hon_loan') && (globalHeroRegistry.hasSkill(target, 'nghe_an_ke', true) || target.skills?.includes('nghe_an_ke'))) {
+      throw new Error(`[Nghệ An Kế] ${target.name} không thể trở thành mục tiêu của [Hỗn Loạn]!`);
     }
 
     // Chuyển trực tiếp từ tay người chơi vào khu phán xét (KHÔNG bỏ vào discardPile)
@@ -125,6 +149,10 @@ export class TrickRules {
             player.equipment[slot] = null;
             state.discardPile.push(negateCard);
             state.addLog(`🛡️ [Chương Dương] ${player.name} tháo trang bị [${negateCard.name}] làm [Hóa Giải]!`);
+            if (negateCard.name === 'Bạch Ngân' || negateCard.idKey === 'bach_ngan' || negateCard.id?.includes('bach_ngan')) {
+              player.hp = Math.min(player.maxHp, player.hp + 1);
+              state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${player.name}, hồi 1 HP!`);
+            }
             globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: rescuerId, card: negateCard }, state);
             break;
           }
@@ -194,7 +222,7 @@ export class TrickRules {
       'Hỏa Công': 'hoa_cong',
       'Hỏa công': 'hoa_cong'
     };
-    const key = extraArgs?.trickKey || nameMap[card.name] || card.idKey || (card.id ? card.id.replace(/-/g, '_').split('_')[0] : '');
+    const key = extraArgs?.trickKey || (extraArgs?.isIronChain ? 'xieng_xich' : null) || nameMap[card.name] || card.idKey || (card.id ? card.id.replace(/-/g, '_').split('_')[0] : '');
 
     switch (key) {
       case 'quyet_dau': {
@@ -277,6 +305,10 @@ export class TrickRules {
           if (fromZoneDesc.startsWith('trang bị')) {
             globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId, card: stolenCard }, state);
           }
+          if (fromZoneDesc.startsWith('trên tay') && target.hand.length === 0 && (target.skills?.includes('hien_ke') || globalHeroRegistry.hasSkill(target, 'hien_ke', true))) {
+            state.drawCards(targetId, 1);
+            state.addLog(`📜 [Hiến Kế] ${target.name} mất lá bài cuối cùng trên tay, lập tức rút 1 lá bài!`);
+          }
         }
         break;
       }
@@ -339,6 +371,10 @@ export class TrickRules {
           state.addLog(`💥 ${source.name} đã tước 1 lá bài (${fromZoneDesc}) của ${target.name}.`);
           if (fromZoneDesc.startsWith('trang bị')) {
             globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId, card: removedCard }, state);
+          }
+          if (fromZoneDesc.startsWith('trên tay') && target.hand.length === 0 && (target.skills?.includes('hien_ke') || globalHeroRegistry.hasSkill(target, 'hien_ke', true))) {
+            state.drawCards(targetId, 1);
+            state.addLog(`📜 [Hiến Kế] ${target.name} mất lá bài cuối cùng trên tay, lập tức rút 1 lá bài!`);
           }
         }
         break;
@@ -502,7 +538,7 @@ export class TrickRules {
     if (slashCard && targetBId !== null && targetBId !== undefined) {
       const targetB = state.getPlayer(targetBId);
       state.addLog(`🗡️ ${targetA.name} đồng ý xuất [Chém] tấn công ${targetB?.name || 'mục tiêu'} theo lệnh Mượn Đao!`);
-      CombatRules.playSlash(state, targetAId, targetBId, slashCard);
+      CombatRules.playSlash(state, targetAId, targetBId, slashCard, { isRedirected: true });
       return { slashed: true };
     } else {
       // Giao vũ khí cho Borrower
@@ -536,7 +572,12 @@ export class TrickRules {
     // Lạc Long Quân: Bọc Trăm Trứng (Hỏi đồng minh Lạc Chém thay)
     if (data.callBocTramTrung) {
       const isLLQ = globalHeroRegistry.hasSkill(responder, 'boc_tram_trung', true);
-      const lacAllies = state.getAlivePlayers().filter(p => p.id !== responder.id && p.faction === 'lac');
+      const lacAllies = state.getAlivePlayers().filter(p =>
+        p.id !== responder.id &&
+        !p.isDaTam &&
+        (p.revealedHeroes ? p.revealedHeroes.some(Boolean) : p.isRevealed !== false) &&
+        (p.faction === 'lac' || p.faction === 'Lạc')
+      );
       if (isLLQ && lacAllies.length > 0) {
         state.addLog(`🐉 [Bọc Trăm Trứng] ${responder.name} kêu gọi đồng minh hệ Lạc ra [Chém] giùm trong Quyết Đấu!`);
         state.priorityStack.push({
@@ -566,11 +607,12 @@ export class TrickRules {
       frame.priorityQueue = [nextId];
       return { continued: true, nextPlayerId: nextId };
     } else {
-      // Người chơi này không có Chém -> THUA CUỘC VÀ NHẬN 1 SÁT THƯƠNG
       const winnerId = actorId === attackerId ? frame.targetId : attackerId;
+      const winner = state.getPlayer(winnerId);
+      const bonusDamage = winner?.temporaryFlags?.bonusDamage || 0;
       state.priorityStack.pop();
       state.addLog(`💥 ${responder.name} không có Chém, thua cuộc trong trận Quyết Đấu!`);
-      CombatRules.applyDamage(state, winnerId, actorId, 1, 'duel');
+      CombatRules.applyDamage(state, winnerId, actorId, 1 + bonusDamage, 'duel');
       return { continued: false, loserId: actorId };
     }
   }
@@ -589,7 +631,12 @@ export class TrickRules {
     // Lạc Long Quân: Bọc Trăm Trứng (Hỏi đồng minh Lạc Chém thay cản Dã Man)
     if (data.callBocTramTrung) {
       const isLLQ = globalHeroRegistry.hasSkill(target, 'boc_tram_trung', true);
-      const lacAllies = state.getAlivePlayers().filter(p => p.id !== target.id && p.faction === 'lac');
+      const lacAllies = state.getAlivePlayers().filter(p =>
+        p.id !== target.id &&
+        !p.isDaTam &&
+        (p.revealedHeroes ? p.revealedHeroes.some(Boolean) : p.isRevealed !== false) &&
+        (p.faction === 'lac' || p.faction === 'Lạc')
+      );
       if (isLLQ && lacAllies.length > 0) {
         state.addLog(`🐉 [Bọc Trăm Trứng] ${target.name} kêu gọi đồng minh hệ Lạc ra [Chém] giùm cản Dã Man!`);
         state.priorityStack.push({
@@ -612,7 +659,12 @@ export class TrickRules {
     state.priorityStack.pop();
 
     if (slashCard) {
+      const isNegate = slashCard.name === 'Hóa Giải' || slashCard.idKey === 'hoa_giai';
       state.discardFromHand(targetId, [slashCard.id]);
+      if (isNegate) {
+        state.addLog(`🛡️ ${target.name} dùng lá [Hóa Giải] hóa giải thành công đợt [Dã Man] cho riêng mình!`);
+        return { defended: true, negatedSingle: true };
+      }
       state.addLog(`${target.name} đánh ra lá [Chém] để cản [Dã Man]!`);
       return { defended: true };
     } else {
@@ -656,6 +708,16 @@ export class TrickRules {
   }
 
   static playChaos(state, sourceId, targetId, card) {
+    return this.playTrick(state, sourceId, [targetId], card);
+  }
+
+  static playStarvation(state, sourceId, targetId, card) {
+    const target = state.getPlayer(targetId);
+    if (!target) throw new Error(`[TrickRules] Mục tiêu ${targetId} không hợp lệ!`);
+    const dist = RangeSystem.calculateDistance(state.getPlayer(sourceId), target, state.getAlivePlayers());
+    if (dist > 1) {
+      throw new Error(`[TrickRules] Mục tiêu Binh Lương Thốn Đoạn phải ở cự ly <= 1 (Khoảng cách hiện tại: ${dist})!`);
+    }
     return this.playTrick(state, sourceId, [targetId], card);
   }
 
@@ -705,7 +767,9 @@ export class TrickRules {
       const candidateIds = state.players
         .filter(p => p.isAlive && p.hand && p.hand.length > 0 && (
           globalHeroRegistry.hasSkill(p, 'ung_bien', true) ||
-          globalHeroRegistry.hasSkill(p, 'quan_co', true)
+          p.skills?.includes('ung_bien') ||
+          globalHeroRegistry.hasSkill(p, 'quan_co', true) ||
+          p.skills?.includes('quan_co')
         ))
         .map(p => p.id);
 
@@ -747,11 +811,25 @@ export class TrickRules {
     const player = state.getPlayer(frame.targetId);
 
     if (replaceCard) {
+      const hasUngBien = globalHeroRegistry.hasSkill(responder, 'ung_bien', true) || responder.skills?.includes('ung_bien');
+      const hasQuanCo = globalHeroRegistry.hasSkill(responder, 'quan_co', true) || responder.skills?.includes('quan_co');
+      if (hasQuanCo && !hasUngBien) {
+        const isBlack = replaceCard.color === 'black' || 
+                        replaceCard.suit === 'spades' || 
+                        replaceCard.suit === 'clubs' || 
+                        replaceCard.suit === 'spade' || 
+                        replaceCard.suit === 'club' || 
+                        replaceCard.suit === '♠' || 
+                        replaceCard.suit === '♣';
+        if (!isBlack) {
+          throw new Error(`[Quân Cơ] Đinh Điền chỉ được dùng lá bài màu Đen để thay thế bài phán xét!`);
+        }
+      }
       state.priorityStack.pop();
       responder.hand = responder.hand.filter(c => c.id !== replaceCard.id);
       state.discardPile.push(finalJudgeCard);
       finalJudgeCard = replaceCard;
-      const skillName = globalHeroRegistry.hasSkill(responder, 'ung_bien', true) ? 'Ứng Biến' : 'Quân Cơ';
+      const skillName = hasUngBien ? 'Ứng Biến' : 'Quân Cơ';
       state.addLog(`☯️ [${skillName}] ${responder.name} đánh ra lá [${replaceCard.name} ${replaceCard.suit || ''}] thay thế lá phán xét!`);
       this._finalizeDelayedJudgement(state, player, delayedCard, finalJudgeCard);
       return { changed: true, newCard: replaceCard };
@@ -810,6 +888,17 @@ export class TrickRules {
         player.temporaryFlags.skipActionPhase = true;
       } else {
         state.addLog(`✨ [Hỗn Loạn] Phán xét ra CƠ (${judgeCard.name})! ${player.name} thoát khỏi Hỗn Loạn thành công.`);
+      }
+    } else if (cardKey === 'binh_luong' || cardKey === 'binh-luong') {
+      const isClub = judgeCard.suit === 'club' || judgeCard.suit === '♣';
+      state.discardPile.push(delayedCard);
+
+      if (!isClub) {
+        state.addLog(`🌾 [Binh Lương Thốn Đoạn] Phán xét KHÔNG PHẢI NHÉP (${judgeCard.name} chất ${judgeCard.suit || judgeCard.color})! ${player.name} bị mất Pha Rút Bài!`);
+        player.temporaryFlags = player.temporaryFlags || {};
+        player.temporaryFlags.skipDrawPhase = true;
+      } else {
+        state.addLog(`✨ [Binh Lương Thốn Đoạn] Phán xét ra NHÉP (${judgeCard.name})! ${player.name} thoát khỏi Binh Lương thành công.`);
       }
     } else {
       state.discardPile.push(delayedCard);

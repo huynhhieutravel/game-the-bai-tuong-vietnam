@@ -6,13 +6,13 @@
 
 import { RangeSystem } from './RangeSystem.js';
 import { GameInvariants } from '../core/Invariants.js';
-import { globalHeroRegistry } from '../heroes/HeroRegistry.js';
+import { globalHeroRegistry, getPlayerGender } from '../heroes/HeroRegistry.js';
 
 export class CombatRules {
   /**
    * Thực hiện hành động Đánh [Chém] từ Source lên Target
    */
-  static playSlash(state, sourceId, targetId, card) {
+  static playSlash(state, sourceId, targetId, card, options = {}) {
     const source = state.getPlayer(sourceId);
     const target = state.getPlayer(targetId);
     const alivePlayers = state.getAlivePlayers();
@@ -21,33 +21,56 @@ export class CombatRules {
       throw new Error(`[CombatRules] Người chơi không hợp lệ hoặc đã tử trận.`);
     }
 
+    const hasDoiNui = globalHeroRegistry.hasSkill(source, 'doi_nui', true) && (card?.name === 'Né' || card?.type === 'dodge');
+    const hasKhaiThien = globalHeroRegistry.hasSkill(source, 'khai_thien', true) && (card?.color === 'red' || card?.suit === 'heart' || card?.suit === 'diamond' || card?.suit === '♥' || card?.suit === '♦');
+    const isSlash = card?.name === 'Chém' || card?.type === 'slash' || card?.idKey === 'slash' || card?.idKey === 'chem' || card?.id?.includes('slash') || card?.id?.includes('chem') || card?.virtual || options.asSlash || hasDoiNui || hasKhaiThien;
+    if (!isSlash) {
+      throw new Error(`[CombatRules] Lá bài [${card?.name || card?.id}] không phải là lá [Chém] hợp lệ!`);
+    }
+
+    // Kiểm tra cấm Chém do thua Đấu Điểm Vân Đồn
+    if (source.temporaryFlags?.vanDonLose) {
+      throw new Error(`[CombatRules] ${source.name} đã thất bại trong đấu điểm [Vân Đồn], không thể Chém trong lượt này!`);
+    }
+
     // 0. Kiểm tra Đạm Bạc (Lang Liêu) của Target
     if (globalHeroRegistry.hasSkill(target, 'dam_bac', true) && (!target.hand || target.hand.length === 0)) {
       throw new Error(`[CombatRules] ${target.name} đang kích hoạt [Đạm Bạc] (hết bài trên tay), không thể bị Chém!`);
     }
 
-    // 1. Kiểm tra tầm đánh
-    if (!RangeSystem.inSlashRange(source, target, alivePlayers, card)) {
+    // 1. Kiểm tra tầm đánh (Bỏ qua nếu là đòn Chém vô hạn cự ly như Dưỡng Quân hoặc thắng Vân Đồn)
+    const isInfiniteRange = options.infiniteRange || card?.infiniteRange || Boolean(source.temporaryFlags?.vanDonWin);
+    if (!isInfiniteRange && !RangeSystem.inSlashRange(source, target, alivePlayers, card)) {
       const dist = RangeSystem.calculateDistance(source, target, alivePlayers);
       const range = RangeSystem.getAttackRange(source, card);
       throw new Error(`[CombatRules] Mục tiêu nằm ngoài tầm đánh! (Khoảng cách: ${dist}, Tầm đánh: ${range})`);
     }
 
     // 2. Kiểm tra giới hạn Chém trong lượt
-    source.turnStats.slashCount = (source.turnStats.slashCount || 0) + 1;
-    GameInvariants.assertSlashLimit(source);
+    if (!options.isRedirected && !card?.virtual && !options.skipSlashCount) {
+      source.turnStats.slashCount = (source.turnStats.slashCount || 0) + 1;
+      GameInvariants.assertSlashLimit(source);
+    }
 
-    // 3. Trừ lá bài trên tay Source
-    state.discardFromHand(sourceId, [card.id]);
-    state.addLog(`${source.name} đánh [Chém] lên ${target.name}.`);
+    // 3. Trừ lá bài trên tay Source (nếu chưa trừ trước và không phải lá ảo)
+    if (!options.alreadyDiscardedCard && !card?.virtual) {
+      state.discardFromHand(sourceId, [card.id]);
+      state.addLog(`${source.name} đánh [Chém] lên ${target.name}.`);
+    } else {
+      state.addLog(`${source.name} dùng cùng lá [Chém] nhắm vào ${target.name}.`);
+    }
 
     // 4. Kiểm tra Giáp Hắc Thuẫn của Target (Miễn nhiễm Chém màu Đen: ♠, ♣)
     const targetArmor = target.equipment?.armor;
-    const isBlackSlash = card.suit === 'spade' || card.suit === 'club' || card.suit === '♠' || card.suit === '♣' || card.color === 'black';
+    const effSuit = globalHeroRegistry.getEffectiveSuit(source, card);
+    const effColor = globalHeroRegistry.getEffectiveColor(source, card);
+    const isBlackSlash = effSuit === 'spade' || effSuit === 'club' || effSuit === '♠' || effSuit === '♣' || effColor === 'black';
     const isHacThuan = targetArmor && (
       targetArmor.name === 'Hắc Thuẫn' || 
       targetArmor.id === 'black_shield' || 
       targetArmor.key === 'black_shield' ||
+      targetArmor.idKey === 'hac_thuan' ||
+      targetArmor.idKey === 'black_shield' ||
       targetArmor.id?.includes('black_shield') ||
       targetArmor.id?.includes('hac_thuan') ||
       targetArmor.id?.includes('hắc-thuẫn')
@@ -61,13 +84,17 @@ export class CombatRules {
     const sourceWeapon = source.equipment?.weapon;
     const isSongKiem = sourceWeapon && (
       sourceWeapon.name === 'Song Kiếm' || 
+      sourceWeapon.idKey === 'song_kiem' ||
+      sourceWeapon.idKey === 'song-kiem' ||
       sourceWeapon.id?.includes('song_kiem') || 
-      sourceWeapon.key === 'song-kiem'
+      sourceWeapon.id?.includes('song-kiem') ||
+      sourceWeapon.key === 'song-kiem' ||
+      sourceWeapon.key === 'song_kiem'
     );
     if (isSongKiem) {
-      const pGender = source.gender;
-      const tGender = target.gender;
-      if (pGender && tGender && pGender !== 'none' && tGender !== 'none' && pGender !== tGender) {
+      const pGender = getPlayerGender(source);
+      const tGender = getPlayerGender(target);
+      if (pGender !== 'none' && tGender !== 'none' && pGender !== tGender) {
         if (target.hand && target.hand.length > 0) {
           const [discarded] = target.hand.splice(0, 1);
           state.discardPile.push(discarded);
@@ -88,8 +115,11 @@ export class CombatRules {
     // 6. Kiểm tra Vũ khí: Phương Thiên Kích (Sky Halberd - Chém bài cuối cùng trên tay)
     const isPhuongThien = sourceWeapon && (
       sourceWeapon.name === 'Phương Thiên Kích' ||
+      sourceWeapon.idKey === 'phuong_thien_kich' ||
+      sourceWeapon.idKey === 'phuong-thien-kich' ||
       sourceWeapon.id?.includes('phuong_thien') ||
-      sourceWeapon.key === 'phuong-thien-kich'
+      sourceWeapon.key === 'phuong-thien-kich' ||
+      sourceWeapon.key === 'phuong_thien_kich'
     );
     if (isPhuongThien && source.hand.length === 0) {
       const extraTargets = RangeSystem.getValidSlashTargets(source, alivePlayers, card)
@@ -107,7 +137,7 @@ export class CombatRules {
       source,
       target,
       card,
-      damageAmount: (source.temporaryFlags?.wineActive ? 2 : 1),
+      damageAmount: (source.temporaryFlags?.wineActive ? 2 : 1) + (source.temporaryFlags?.bonusDamage || 0),
       requiredDodges: source.skills?.includes('pha_quan_nguyen_xi') ? 2 : 1,
       unavoidable: false
     };
@@ -116,11 +146,39 @@ export class CombatRules {
     // Nếu cú Chém bị khóa không thể Né (Nỏ Thần, v.v.) -> Gây sát thương trực tiếp
     if (slashEvent.unavoidable) {
       state.addLog(`🎯 Cú Chém của ${source.name} không thể Né!`);
-      this.applyDamage(state, sourceId, targetId, slashEvent.damageAmount, 'slash');
+      this.applyDamage(state, sourceId, targetId, slashEvent.damageAmount, 'slash', false, card);
       if (source.temporaryFlags?.wineActive) {
         source.temporaryFlags.wineActive = false;
       }
       return { success: true, unavoidable: true };
+    }
+
+    // 7.5. Nếu mục tiêu là Công Chúa An Tư sở hữu [Xả Thân]: Bỏ 1 bài chuyển hướng Chém
+    const hasXaThan = globalHeroRegistry.hasSkill(target, 'xa_than', true) || 
+                      globalHeroRegistry.hasSkill(target, 'xa_than_an_tu', true) ||
+                      globalHeroRegistry.hasSkill(target, 'xa-than', true);
+    const targetCardsCount = (target.hand?.length || 0) + (target.equipment ? Object.values(target.equipment).filter(Boolean).length : 0);
+    const validRedirects = alivePlayers.filter(p => p.id !== target.id && p.id !== source.id && RangeSystem.inSlashRange(target, p, alivePlayers));
+
+    if (hasXaThan && targetCardsCount > 0 && validRedirects.length > 0 && !options.skipXaThan) {
+      state.priorityStack.push({
+        type: 'ASK_XA_THAN',
+        sourceId,
+        targetId,
+        currentActorId: targetId,
+        priorityQueue: [targetId],
+        context: {
+          attackerId: sourceId,
+          card,
+          validTargets: validRedirects.map(p => p.id),
+          slashEvent
+        }
+      });
+      state.addLog(`🕊️ [Xả Thân] ${target.name} có thể bỏ 1 lá bài để chuyển hướng cú [Chém] sang người khác!`);
+      if (source.temporaryFlags?.wineActive) {
+        source.temporaryFlags.wineActive = false;
+      }
+      return { success: true, pendingXaThan: true };
     }
 
     // 8. Đẩy Frame yêu cầu Né (ASK_DODGE) vào PriorityStack
@@ -161,6 +219,85 @@ export class CombatRules {
   }
 
   /**
+   * Phản hồi Xả Thân (Công Chúa An Tư chuyển hướng Chém)
+   */
+  static respondXaThan(state, targetId, discardCard = null, redirectedTargetId = null) {
+    const frame = state.priorityStack.peek();
+    if (!frame || frame.type !== 'ASK_XA_THAN' || frame.currentActorId !== targetId) {
+      throw new Error(`[CombatRules] Không có yêu cầu Xả Thân hợp lệ cho người chơi ${targetId}`);
+    }
+
+    state.priorityStack.pop();
+
+    const target = state.getPlayer(targetId);
+    const sourceId = frame.sourceId;
+    const card = frame.context.card;
+    const slashEvent = frame.context.slashEvent;
+
+    if (discardCard && redirectedTargetId !== null && redirectedTargetId !== undefined) {
+      const validTargets = frame.context?.validTargets || [];
+      if (validTargets.length > 0 && !validTargets.includes(redirectedTargetId)) {
+        throw new Error(`[CombatRules] Mục tiêu chuyển hướng ${redirectedTargetId} không hợp lệ hoặc ngoài tầm công kích!`);
+      }
+
+      const redirectedTarget = state.getPlayer(redirectedTargetId);
+      const cardId = discardCard.id || discardCard;
+      if (target.hand && target.hand.some(c => c.id === cardId)) {
+        state.discardFromHand(targetId, [cardId]);
+      } else if (target.equipment) {
+        for (const slot in target.equipment) {
+          if (target.equipment[slot]?.id === cardId) {
+            const eqCard = target.equipment[slot];
+            target.equipment[slot] = null;
+            state.discardPile.push(eqCard);
+            if (eqCard.name === 'Bạch Ngân' || eqCard.idKey === 'bach_ngan' || eqCard.id?.includes('bach_ngan')) {
+              target.hp = Math.min(target.maxHp, target.hp + 1);
+              state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${target.name}, hồi 1 HP!`);
+            }
+            globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId, card: eqCard }, state);
+            break;
+          }
+        }
+      } else {
+        state.discardFromHand(targetId, [cardId]);
+      }
+
+      state.addLog(`🕊️ [Xả Thân] ${target.name} bỏ 1 lá bài, đem cú [Chém] chuyển hướng sang ${redirectedTarget.name}!`);
+
+      state.priorityStack.push({
+        type: 'ASK_DODGE',
+        sourceId,
+        targetId: redirectedTargetId,
+        currentActorId: redirectedTargetId,
+        priorityQueue: [redirectedTargetId],
+        context: {
+          card,
+          requiredDodges: slashEvent.requiredDodges || 1,
+          dodgesProvided: 0,
+          damageAmount: slashEvent.damageAmount || 1
+        }
+      });
+      return { redirected: true, redirectedTargetId };
+    } else {
+      // Từ chối -> Tiếp tục đòn Chém lên An Tư
+      state.priorityStack.push({
+        type: 'ASK_DODGE',
+        sourceId,
+        targetId,
+        currentActorId: targetId,
+        priorityQueue: [targetId],
+        context: {
+          card,
+          requiredDodges: slashEvent.requiredDodges || 1,
+          dodgesProvided: 0,
+          damageAmount: slashEvent.damageAmount || 1
+        }
+      });
+      return { redirected: false };
+    }
+  }
+
+  /**
    * Phản hồi lá [Né] hoặc kích hoạt Phán xét [Bát Quái / Thần Giáp] từ Target
    */
   static respondDodge(state, targetId, dodgeCard = null, options = {}) {
@@ -173,7 +310,13 @@ export class CombatRules {
 
     // 0. Gọi đồng minh trợ chiến (Bọc Trăm Trứng / Tiên Phát)
     if (options.callBocTramTrung) {
-      const allies = state.players.filter(p => p.id !== targetId && p.isAlive && p.faction === 'lac');
+      const allies = state.players.filter(p =>
+        p.id !== targetId &&
+        p.isAlive &&
+        !p.isDaTam &&
+        (p.revealedHeroes ? p.revealedHeroes.some(Boolean) : p.isRevealed !== false) &&
+        (p.faction === 'lac' || p.faction === 'Lạc')
+      );
       if (allies.length > 0) {
         state.addLog(`🐉 ${target.name} phát động [Bọc Trăm Trứng], kêu gọi đồng minh hệ Lạc ra [Né] giùm!`);
         state.priorityStack.push({
@@ -194,7 +337,13 @@ export class CombatRules {
     }
 
     if (options.doTienPhat) {
-      const allies = state.players.filter(p => p.id !== targetId && p.isAlive && p.faction === 'viet');
+      const allies = state.players.filter(p =>
+        p.id !== targetId &&
+        p.isAlive &&
+        !p.isDaTam &&
+        (p.revealedHeroes ? p.revealedHeroes.some(Boolean) : p.isRevealed !== false) &&
+        (p.faction === 'viet' || p.faction === 'Việt')
+      );
       if (allies.length > 0) {
         state.addLog(`👑 ${target.name} phát động [Tiên Phát], kêu gọi đồng minh hệ Việt ra [Né] giùm!`);
         state.priorityStack.push({
@@ -219,7 +368,9 @@ export class CombatRules {
       const hasBaguaArmor = target.equipment?.armor && (
         target.equipment.armor.name === 'Bát Quái' ||
         target.equipment.armor.id === 'bat_quai' ||
-        target.equipment.armor.key === 'bat_quai'
+        target.equipment.armor.idKey === 'bat_quai' ||
+        target.equipment.armor.key === 'bat_quai' ||
+        target.equipment.armor.id?.includes('bat_quai')
       );
       const hasThanGiap = !target.equipment?.armor && globalHeroRegistry.hasSkill(target, 'than_giap', true);
 
@@ -261,6 +412,20 @@ export class CombatRules {
     }
 
     if (dodgeCard) {
+      const isNegate = (dodgeCard.name === 'Hóa Giải' || dodgeCard.idKey === 'hoa_giai') && frame.context?.reason === 'van-tien';
+      if (isNegate) {
+        state.discardFromHand(targetId, [dodgeCard.id]);
+        state.priorityStack.pop();
+        state.addLog(`🛡️ ${target.name} dùng lá [Hóa Giải] hóa giải thành công [Loạn Tiễn] cho riêng mình!`);
+        return { dodged: true, negatedSingle: true };
+      }
+      const hasDoiNui = globalHeroRegistry.hasSkill(target, 'doi_nui', true) && (dodgeCard.name === 'Chém' || dodgeCard.type === 'slash');
+      const isBlackCard = dodgeCard && (dodgeCard.color === 'black' || dodgeCard.suit === 'spade' || dodgeCard.suit === 'club' || dodgeCard.suit === '♠' || dodgeCard.suit === '♣');
+      const hasThinhChinh = (globalHeroRegistry.hasSkill(target, 'thinh_chinh', true) || target.skills?.includes('thinh_chinh')) && isBlackCard;
+      const isDodge = dodgeCard.name === 'Né' || dodgeCard.type === 'dodge' || dodgeCard.idKey === 'ne' || dodgeCard.idKey === 'dodge' || dodgeCard.id?.includes('dodge') || dodgeCard.id?.includes('ne') || hasDoiNui || hasThinhChinh;
+      if (!isDodge) {
+        throw new Error(`[CombatRules] Lá bài [${dodgeCard.name || dodgeCard.id}] không phải là lá [Né] hợp lệ!`);
+      }
       // Người chơi cung cấp lá Né hợp lệ
       state.discardFromHand(targetId, [dodgeCard.id]);
       frame.context.dodgesProvided += 1;
@@ -271,7 +436,7 @@ export class CombatRules {
         state.priorityStack.pop();
         state.addLog(`${target.name} đã né thành công cú Chém!`);
         globalHeroRegistry.dispatchTrigger('ON_DODGE_SUCCESS', { sourceId: frame.sourceId, targetId, card: dodgeCard }, state);
-        return this._handlePostDodgeWeapons(state, frame, target);
+        return this._handlePostDodgeWeapons(state, frame, target, options);
       }
       return { dodged: false, pendingMoreDodges: true };
     } else {
@@ -281,7 +446,7 @@ export class CombatRules {
       const damageType = frame.context?.reason === 'van-tien' ? 'arrow_rain' : 'slash';
 
       state.priorityStack.pop(); // Giải phóng frame ASK_DODGE
-      this.applyDamage(state, sourceId, targetId, damageAmount, damageType);
+      this.applyDamage(state, sourceId, targetId, damageAmount, damageType, false, frame.context?.card || null);
       return { dodged: false };
     }
   }
@@ -422,7 +587,7 @@ export class CombatRules {
   /**
    * Xử lý hiệu ứng Vũ Khí sau khi mục tiêu Né thành công (Rìu Đá, Thanh Long Đao)
    */
-  static _handlePostDodgeWeapons(state, frame, target) {
+  static _handlePostDodgeWeapons(state, frame, target, options = {}) {
     if (frame.context?.reason === 'van-tien') {
       return { dodged: true };
     }
@@ -435,21 +600,31 @@ export class CombatRules {
     const sourceWeapon = source.equipment?.weapon;
     const weaponName = sourceWeapon?.name || '';
     const weaponId = sourceWeapon?.id || '';
+    const weaponKey = sourceWeapon?.idKey || sourceWeapon?.key || '';
 
     // 1. Rìu Đá (Rock Axe): Bỏ 2 lá bài để bắt buộc Chém trúng đích (xuyên giáp)
-    const isRiuDa = weaponName === 'Rìu Đá' || weaponId.includes('riu_da') || sourceWeapon?.key === 'riu-da';
-    if (isRiuDa && source.hand && source.hand.length >= 2) {
-      const discards = source.hand.slice(0, 2);
-      state.discardFromHand(source.id, discards.map(c => c.id));
-      state.addLog(`🪓 [Rìu Đá] ${source.name} bỏ 2 lá bài [${discards.map(c => c.name).join(', ')}] để xuyên phá cú Né của ${target.name}!`);
-      this.applyDamage(state, source.id, target.id, frame.context.damageAmount || 1, 'slash_penetrate');
-      return { dodged: false, penetrated: true };
+    const isRiuDa = weaponName === 'Rìu Đá' || weaponName === 'Quán Thạch Phủ' || weaponId.includes('riu_da') || weaponKey === 'riu-da' || weaponKey === 'riu_da';
+    if (isRiuDa && options.useRockAxe !== false) {
+      if (options.rockAxeCardIds && Array.isArray(options.rockAxeCardIds) && options.rockAxeCardIds.length === 2) {
+        state.discardFromHand(source.id, options.rockAxeCardIds);
+        state.addLog(`🪓 [Rìu Đá] ${source.name} bỏ 2 lá bài chỉ định để xuyên phá cú Né của ${target.name}!`);
+        this.applyDamage(state, source.id, target.id, frame.context.damageAmount || 1, 'slash_penetrate');
+        return { dodged: false, penetrated: true };
+      } else if (source.hand && source.hand.length >= 2) {
+        const discards = source.hand.slice(0, 2);
+        state.discardFromHand(source.id, discards.map(c => c.id));
+        state.addLog(`🪓 [Rìu Đá] ${source.name} bỏ 2 lá bài [${discards.map(c => c.name).join(', ')}] để xuyên phá cú Né của ${target.name}!`);
+        this.applyDamage(state, source.id, target.id, frame.context.damageAmount || 1, 'slash_penetrate');
+        return { dodged: false, penetrated: true };
+      }
     }
 
     // 2. Thanh Long Đao: Chém bị Né -> Được Chém tiếp nếu còn bài Chém trên tay
-    const isThanhLong = weaponName === 'Thanh Long Đao' || weaponId.includes('thanh_long') || sourceWeapon?.key === 'thanh-long-dao';
-    if (isThanhLong) {
-      const nextSlash = source.hand?.find(c => c.type === 'slash' || c.name === 'Chém');
+    const isThanhLong = weaponName === 'Thanh Long Đao' || weaponId.includes('thanh_long') || weaponKey === 'thanh-long-dao' || weaponKey === 'thanh_long_dao';
+    if (isThanhLong && options.useDragonBlade !== false) {
+      const nextSlash = options.dragonBladeCardId
+        ? source.hand?.find(c => c.id === options.dragonBladeCardId)
+        : source.hand?.find(c => c.type === 'slash' || c.name === 'Chém' || c.idKey === 'slash');
       if (nextSlash) {
         state.discardFromHand(source.id, [nextSlash.id]);
         state.addLog(`🐉 [Thanh Long Đao] ${source.name} lập tức đánh tiếp lá [Chém] thứ hai lên ${target.name}!`);
@@ -475,13 +650,13 @@ export class CombatRules {
   /**
    * Áp dụng Sát thương lên Target (Hỗ trợ truyền sát thương Xiềng Xích)
    */
-  static applyDamage(state, sourceId, targetId, amount = 1, reason = 'normal', isChainedPropagation = false) {
+  static applyDamage(state, sourceId, targetId, amount = 1, reason = 'normal', isChainedPropagation = false, card = null) {
     const target = state.getPlayer(targetId);
     const source = sourceId !== null ? state.getPlayer(sourceId) : null;
     if (!target || !target.isAlive) return;
 
     // Kiểm tra kỹ năng Hiền Hậu (Ngọc Hân Công Chúa): Chặn sát thương nếu có bài Cơ (hoặc Bích do Quốc Sắc)
-    if (globalHeroRegistry.hasSkill(target, 'hien_hau', true) && !target.temporaryFlags?.hienHauAttempted) {
+    if ((globalHeroRegistry.hasSkill(target, 'hien_hau', true) || target.skills?.includes('hien_hau')) && !target.temporaryFlags?.hienHauAttempted) {
       const hasHeartOrSpade = target.hand?.some(c => {
         const s = c.suit?.toLowerCase() || '';
         return s === 'heart' || s === 'cơ' || s === 'spade' || s === 'bích' || c.suit === '♥' || c.suit === '♠';
@@ -497,7 +672,8 @@ export class CombatRules {
             attackerId: sourceId,
             damageAmount: amount,
             reason,
-            isChainedPropagation
+            isChainedPropagation,
+            card
           }
         });
         return;
@@ -509,8 +685,14 @@ export class CombatRules {
       const sourceWeapon = source.equipment?.weapon;
       const isQuatSat = sourceWeapon && (
         sourceWeapon.name === 'Quạt Sắt' ||
+        sourceWeapon.name === 'Cổ Đĩnh Đao' ||
+        sourceWeapon.idKey === 'quat_sat' ||
+        sourceWeapon.idKey === 'quat-sat' ||
+        sourceWeapon.idKey === 'co_dinh_dao' ||
         sourceWeapon.id?.includes('quat_sat') ||
-        sourceWeapon.key === 'quat-sat'
+        sourceWeapon.id?.includes('quat-sat') ||
+        sourceWeapon.key === 'quat-sat' ||
+        sourceWeapon.key === 'quat_sat'
       );
       if (isQuatSat && (!target.hand || target.hand.length === 0)) {
         amount += 1;
@@ -542,9 +724,6 @@ export class CombatRules {
 
     state.addLog(`${target.name} nhận ${amount} điểm sát thương (${reason}). Sinh lực còn lại: ${target.hp}/${target.maxHp}`);
 
-    // Kích hoạt kỹ năng phản ứng khi chịu sát thương (Lý Thường Kiệt, Khúc Thừa Dụ, Đinh Bộ Lĩnh...)
-    globalHeroRegistry.dispatchTrigger('ON_DAMAGED', { sourceId, targetId, damageAmount: amount, reason, card: null }, state);
-
     // 3. Cơ chế Truyền Sát Thương Qua Xiềng Xích (Chained Elemental Damage)
     if (wasChained && isElemental && !isChainedPropagation) {
       target.isChained = false;
@@ -563,9 +742,12 @@ export class CombatRules {
       const sourceWeapon = source.equipment?.weapon;
       const isKirinBow = sourceWeapon && (
         sourceWeapon.name === 'Kỳ Lân Cung' ||
+        sourceWeapon.idKey === 'ky_lan_cung' ||
+        sourceWeapon.idKey === 'ky-lan-cung' ||
         sourceWeapon.id?.includes('ky_lan') ||
         sourceWeapon.id?.includes('wp_bow') ||
-        sourceWeapon.key === 'ky-lan-cung'
+        sourceWeapon.key === 'ky-lan-cung' ||
+        sourceWeapon.key === 'ky_lan_cung'
       );
       if (isKirinBow) {
         if (target.equipment?.horse_defense) {
@@ -587,6 +769,11 @@ export class CombatRules {
     // Kiểm tra Trạng thái Hấp hối (Dying State) khi HP <= 0
     if (target.hp <= 0) {
       this.enterDyingState(state, targetId, sourceId);
+    }
+
+    // Kích hoạt kỹ năng phản ứng khi chịu sát thương (chỉ kích hoạt nếu tướng còn sống và đã thoát khỏi hấp hối)
+    if (target.isAlive && target.hp > 0) {
+      globalHeroRegistry.dispatchTrigger('ON_DAMAGED', { sourceId, targetId, damageAmount: amount, reason, card }, state);
     }
   }
 
@@ -639,14 +826,23 @@ export class CombatRules {
     const rescuer = state.getPlayer(rescuerId);
 
     if (peachCard) {
-      const isWine = peachCard.name === 'Rượu' || peachCard.type === 'wine';
+      const isWine = peachCard.name === 'Rượu' || peachCard.type === 'wine' || peachCard.idKey === 'wine' || peachCard.idKey === 'ruou' || peachCard.id?.includes('wine') || peachCard.id?.includes('ruou');
+      const isPeach = peachCard.name === 'Đào' || peachCard.type === 'peach' || peachCard.idKey === 'peach' || peachCard.idKey === 'dao' || peachCard.id?.includes('peach') || peachCard.id?.includes('dao');
+      const hasNamDuoc = globalHeroRegistry.hasSkill(rescuer, 'nam_duoc', true) && state.currentTurnPlayerId !== rescuerId;
+      const isRed = peachCard.color === 'red' || peachCard.suit === 'heart' || peachCard.suit === 'diamond' || peachCard.suit === '♥' || peachCard.suit === '♦';
+      const isNamDuocPeach = hasNamDuoc && isRed;
+
+      if (!isWine && !isPeach && !isNamDuocPeach) {
+        throw new Error(`[CombatRules] Lá bài [${peachCard.name || peachCard.id}] không thể dùng để cứu người hấp hối!`);
+      }
+
       if (isWine && rescuerId !== dyingPlayer.id) {
         throw new Error(`[CombatRules] Rượu chỉ được dùng để tự cứu chính mình khi hấp hối!`);
       }
 
       state.discardFromHand(rescuerId, [peachCard.id]);
       dyingPlayer.hp += 1;
-      const cardLabel = isWine ? 'Rượu' : 'Đào';
+      const cardLabel = isWine ? 'Rượu' : (isNamDuocPeach ? `Nam Dược (${peachCard.name})` : 'Đào');
       state.addLog(`${rescuer.name} dùng [${cardLabel}] cứu ${dyingPlayer.name}! Sinh lực hồi phục lên ${dyingPlayer.hp}.`);
 
       if (dyingPlayer.hp >= 1) {
@@ -676,8 +872,14 @@ export class CombatRules {
   static handleDeath(state, deadPlayerId, killerId = null) {
     const deadPlayer = state.getPlayer(deadPlayerId);
     deadPlayer.isAlive = false;
-    const deadFaction = deadPlayer.faction || deadPlayer.identity;
-    state.addLog(`💀 ${deadPlayer.name} ĐÃ TỬ TRẬN! Phe phái: [${(deadFaction || 'Vô danh').toUpperCase()}].`);
+    deadPlayer.revealedHeroes = [true, true];
+    deadPlayer.isRevealed = true;
+
+    const h1 = globalHeroRegistry.getHero(deadPlayer.mainHeroId || deadPlayer.heroId);
+    const h2 = globalHeroRegistry.getHero(deadPlayer.subHeroId);
+    const heroNames = [h1?.name, h2?.name].filter(Boolean).join(' & ') || 'Võ Tướng';
+    const deadFaction = deadPlayer.faction || h1?.faction || deadPlayer.identity;
+    state.addLog(`💀 [${deadPlayer.name}] (${heroNames}) ĐÃ TỬ TRẬN! Phe phái: [${(deadFaction || 'Vô danh').toUpperCase()}].`);
 
     // 1. Thu hồi toàn bộ bài trên tay + trang bị + bài phán xét vào discardPile
     if (deadPlayer.hand.length > 0) {
@@ -693,6 +895,10 @@ export class CombatRules {
     if (deadPlayer.judgementArea.length > 0) {
       state.discardPile.push(...deadPlayer.judgementArea);
       deadPlayer.judgementArea = [];
+    }
+    if (deadPlayer.trungCards && deadPlayer.trungCards.length > 0) {
+      state.discardPile.push(...deadPlayer.trungCards);
+      deadPlayer.trungCards = [];
     }
 
     // 2. Thưởng / Phạt Phe Phái (Quốc Chiến & Nội Chiến)
@@ -783,18 +989,34 @@ export class CombatRules {
     const firstPlayer = alivePlayers[0];
     const firstFaction = firstPlayer.faction;
     const isValidFaction = Boolean(firstFaction) && firstFaction !== 'none';
+    const maxAllowedFaction = Math.floor(state.players.length / 2);
 
-    // Kiểm tra xem tất cả người còn sống có cùng phe hợp lệ hay không VÀ không ai là Dã Tâm
-    const allSameFaction = isValidFaction && alivePlayers.every(p => p.faction === firstFaction && !p.isDaTam);
-    if (allSameFaction) {
-      state.gameOver = true;
-      state.winner = alivePlayers.map(p => p.id);
-      // Force reveal toàn bộ người sống sót
-      alivePlayers.forEach(p => {
-        p.revealedHeroes = [true, true];
-      });
-      state.addLog(`🏆 TRÒ CHƠI KẾT THÚC! PHE ${firstFaction.toUpperCase()} ĐẠI THẮNG ĐỒNG ĐỘI!`);
-      return true;
+    // Nếu tất cả người sống sót đều cùng phe gốc:
+    if (isValidFaction && alivePlayers.every(p => p.faction === firstFaction)) {
+      // Nếu số lượng người sống sót vượt quá giới hạn phe (ví dụ 3 người phe Lạc trong bàn 4 người):
+      // Buộc các tướng chưa lật phải lộ diện để kích hoạt cơ chế Dã Tâm!
+      if (state.players.length >= 4 && alivePlayers.length > maxAllowedFaction) {
+        alivePlayers.forEach(p => {
+          if (!p.revealedHeroes || !p.revealedHeroes.some(Boolean)) {
+            globalHeroRegistry.revealPlayerHero(state, p, 0, null, true);
+          }
+        });
+      }
+
+      // Kiểm tra lại: Tất cả phải cùng phe VÀ số lượng <= maxAllowedFaction VÀ không ai là Dã Tâm
+      const canTeamWin = (state.players.length < 4 || alivePlayers.length <= maxAllowedFaction) &&
+        alivePlayers.every(p => !p.isDaTam);
+
+      if (canTeamWin) {
+        state.gameOver = true;
+        state.winner = alivePlayers.map(p => p.id);
+        // Force reveal toàn bộ người sống sót
+        alivePlayers.forEach(p => {
+          p.revealedHeroes = [true, true];
+        });
+        state.addLog(`🏆 TRÒ CHƠI KẾT THÚC! PHE ${firstFaction.toUpperCase()} ĐẠI THẮNG ĐỒNG ĐỘI!`);
+        return true;
+      }
     }
 
     return false;

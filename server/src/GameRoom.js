@@ -135,8 +135,14 @@ class GameRoom {
         
         // Gắn socketId và tên cho người chơi
         this.gameState.players.forEach((p, idx) => {
-            p.name = this.players[idx].name;
-            p.socketId = this.players[idx].socketId;
+            if (this.players[idx]) {
+                p.name = this.players[idx].name;
+                p.socketId = this.players[idx].socketId;
+                p.isBot = false;
+            } else {
+                p.name = `Bot ${idx + 1}`;
+                p.isBot = true;
+            }
         });
 
         // Gửi state nháp cho mọi người để chọn tướng

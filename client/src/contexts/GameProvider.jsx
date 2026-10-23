@@ -60,6 +60,7 @@ export function GameProvider({ children, playerCount = 4 }) {
       
       // Subscribe để React update UI mỗi khi State thay đổi trong Engine
       dispatcher.subscribe((engineState) => {
+        isSubmittingGlobal = false; // Mở khóa ngay khi Engine đã xử lý xong và cập nhật State!
         _setGameState(toViewModel(engineState));
         
         // BotRunner phản ứng với State mới
@@ -135,10 +136,17 @@ export function useGameAPI() {
         const origMethod = target[propKey];
         if (typeof origMethod === 'function') {
           return (...args) => {
+            // QUAN TRỌNG: Tuyệt đối KHÔNG chặn respond()!
+            // respond() là phản hồi cho waitingForResponse của StateMachine (Hóa Giải, Né, Đào, Quyết Đấu...).
+            // Chặn respond() sẽ khiến StateMachine chờ vĩnh viễn và gây treo game (deadlock).
+            if (propKey === 'respond') {
+              return origMethod.apply(target, args);
+            }
+
             // Bypass cờ _isAuto (các lệnh từ useEffect tự động gửi)
             const isAuto = args[0] && args[0]._isAuto === true;
 
-            // Chống lỗi click đúp / spam nút cho mọi hành động gửi lên server
+            // Chống lỗi click đúp / spam nút cho các hành động chủ động (chơi bài, dùng skill, kết thúc lượt)
             if (!isAuto && isSubmittingGlobal) {
                console.warn(`[Global API Throttle] Đã chặn lệnh gọi trùng lặp tới gameAPI.${String(propKey)}()`);
                return;
@@ -146,10 +154,10 @@ export function useGameAPI() {
             
             if (!isAuto) {
                isSubmittingGlobal = true;
-               // Khóa an toàn 400ms, đủ dài để ngăn click đúp, đủ ngắn để không gây lag thao tác bình thường
+               // Khóa an toàn 250ms, tự động nhả nếu chưa có state update
                setTimeout(() => {
                   isSubmittingGlobal = false;
-               }, 400);
+               }, 250);
             }
             
             return origMethod.apply(target, args);

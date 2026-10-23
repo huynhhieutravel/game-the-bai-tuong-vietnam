@@ -4,7 +4,7 @@ import { GameStateContext, GameAPIContext } from './GameProvider';
 import { toViewModel, GameAPI } from 'shared/engine_v4/application/index.js';
 import { ChatWidget } from '../components/game/ChatWidget';
 
-const SOCKET_URL = 'http://localhost:4000'; // Default local server port
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000'; // Configurable socket server URL
 
 export const SocketContext = createContext(null);
 

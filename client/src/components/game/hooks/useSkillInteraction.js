@@ -1,8 +1,7 @@
 import { useCallback } from 'react';
-import { canUseSkill } from 'shared/engine/rules/SkillRules';
+import { canUseSkill, canAttack } from 'shared/engine_v4/rules/TargetResolverV4.js';
 import { PHASES } from 'shared/data/gameData';
-import { canAttack } from 'shared/engine/rangeSystem';
-import { getPlayerGender } from 'shared/engine/gameState';
+import { getPlayerGender } from 'shared/engine_v4/application/index.js';
 
 export function useSkillInteraction({
     gameState,

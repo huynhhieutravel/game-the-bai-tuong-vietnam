@@ -44,7 +44,21 @@ export class BotBrain {
     if (trickCard && Math.random() < 0.6) {
       const candidates = alivePlayers.filter(p => p.id !== bot.id);
       const enemyTargets = this._sortTargetsByPriority(bot, candidates);
-      if (enemyTargets.length > 0) {
+
+      if (trickCard.name === 'Mượn Đao') {
+        const weaponOwner = candidates.find(p => p.equipment?.weapon && !this._isKnownAlly(bot, p)) || candidates.find(p => p.equipment?.weapon);
+        if (weaponOwner) {
+          const validVictim = candidates.find(p => p.id !== weaponOwner.id && !this._isKnownAlly(bot, p));
+          if (validVictim) {
+            return {
+              type: 'PLAY_CARD',
+              cardId: trickCard.id,
+              targetId: weaponOwner.id,
+              targetIds: [weaponOwner.id, validVictim.id]
+            };
+          }
+        }
+      } else if (enemyTargets.length > 0) {
         return {
           type: 'PLAY_CARD',
           cardId: trickCard.id,
@@ -55,10 +69,32 @@ export class BotBrain {
 
     // 3. Nếu chưa đánh Chém và có Chém trên tay -> Tìm mục tiêu hợp lệ trong tầm
     const hasCrossbow = bot.equipment?.weapon?.id === 'crossbow';
-    const canSlash = hasCrossbow || (bot.turnStats.slashCount || 0) < 1;
+    const canSlash = hasCrossbow || (bot.turnStats?.slashCount || 0) < 1;
+
+    // 2.8 Nếu chuẩn bị Chém và có Rượu trên tay và chưa uống Rượu -> Uống Rượu để buff +1 sát thương!
+    if (canSlash && !bot.temporaryFlags?.wineActive && (bot.turnStats?.wineCount || 0) < 1) {
+      const slashCard = bot.hand.find(c => c.type === 'slash' || c.name === 'Chém');
+      const wineCard = bot.hand.find(c => c.type === 'wine' || c.name === 'Rượu');
+      if (slashCard && wineCard) {
+        const validTargets = RangeSystem.getValidSlashTargets(bot, alivePlayers, slashCard);
+        const enemyTargets = this._sortTargetsByPriority(bot, validTargets.filter(t => t.id !== bot.id));
+        if (enemyTargets.length > 0) {
+          return {
+            type: 'PLAY_CARD',
+            cardId: wineCard.id,
+            targetId: bot.id
+          };
+        }
+      }
+    }
 
     if (canSlash) {
-      const slashCard = bot.hand.find(c => c.type === 'slash' || c.name === 'Chém');
+      const hasDoiNui = globalHeroRegistry.hasSkill(bot, 'doi_nui', true);
+      const hasKhaiThien = globalHeroRegistry.hasSkill(bot, 'khai_thien', true);
+      const isRed = c => c && (c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+      const slashCard = bot.hand.find(c => c.type === 'slash' || c.name === 'Chém') || 
+        (hasDoiNui ? bot.hand.find(c => c.type === 'dodge' || c.name === 'Né') : null) ||
+        (hasKhaiThien ? bot.hand.find(c => isRed(c) && c.type !== 'peach' && c.name !== 'Đào') : null);
       if (slashCard) {
         const validTargets = RangeSystem.getValidSlashTargets(bot, alivePlayers, slashCard);
         const enemyTargets = this._sortTargetsByPriority(bot, validTargets.filter(t => t.id !== bot.id));
@@ -141,7 +177,8 @@ export class BotBrain {
           };
         }
 
-        const dodgeCard = bot.hand.find(c => c.type === 'dodge' || c.name === 'Né');
+        const hasDoiNui = globalHeroRegistry.hasSkill(bot, 'doi_nui', true);
+        const dodgeCard = bot.hand.find(c => c.type === 'dodge' || c.name === 'Né') || (hasDoiNui ? bot.hand.find(c => c.type === 'slash' || c.name === 'Chém') : null);
         return {
           type: 'ACTION_REACT',
           dodgeCard: dodgeCard || null
@@ -153,12 +190,15 @@ export class BotBrain {
         const victim = state.getPlayer(frame.targetId);
         const isSelf = frame.targetId === bot.id;
         const isAlly = victim && this._isKnownAlly(bot, victim);
-        const peachCard = bot.hand.find(c => c.type === 'peach' || c.name === 'Đào');
+        let healCard = bot.hand.find(c => c.type === 'peach' || c.name === 'Đào');
+        if (!healCard && isSelf) {
+          healCard = bot.hand.find(c => c.type === 'wine' || c.name === 'Rượu');
+        }
 
-        if (peachCard && (isSelf || isAlly)) {
+        if (healCard && (isSelf || isAlly)) {
           return {
             type: 'ACTION_REACT',
-            peachCard
+            peachCard: healCard
           };
         }
         return {
@@ -171,7 +211,9 @@ export class BotBrain {
         const card = frame.context?.card;
         const targetId = frame.targetId;
         const target = targetId !== null && targetId !== undefined ? state.getPlayer(targetId) : null;
-        const negateCard = bot.hand.find(c => c.name === 'Hóa Giải' || c.idKey === 'hoa_giai');
+        const hasLinhGiam = globalHeroRegistry.hasSkill(bot, 'linh_giam', true);
+        const isBlack = c => c && (c.color === 'black' || c.suit === 'spade' || c.suit === 'club' || c.suit === '♠' || c.suit === '♣');
+        const negateCard = bot.hand.find(c => c.name === 'Hóa Giải' || c.idKey === 'hoa_giai') || (hasLinhGiam ? bot.hand.find(isBlack) : null);
 
         if (!negateCard) {
           return { type: 'ACTION_REACT', negateCard: null };
@@ -192,6 +234,29 @@ export class BotBrain {
         }
 
         return { type: 'ACTION_REACT', negateCard: null };
+      }
+
+      case 'ASK_TRE_NGA_DISCARD': {
+        const requiredSuit = frame.context?.judgeSuit;
+        const matchCard = bot.hand?.find(c => (
+          c.suit === requiredSuit ||
+          (requiredSuit === 'heart' && (c.suit === '♥' || c.suit === 'heart')) ||
+          (requiredSuit === 'diamond' && (c.suit === '♦' || c.suit === 'diamond')) ||
+          (requiredSuit === 'spade' && (c.suit === '♠' || c.suit === 'spade')) ||
+          (requiredSuit === 'club' && (c.suit === '♣' || c.suit === 'club'))
+        ));
+
+        if (matchCard) {
+          return {
+            type: 'ACTION_REACT',
+            doDiscard: true,
+            cardId: matchCard.id
+          };
+        }
+        return {
+          type: 'ACTION_REACT',
+          doDiscard: false
+        };
       }
 
       case 'ASK_DISCARD': {
@@ -226,7 +291,25 @@ export class BotBrain {
       }
 
       case 'ASK_SLASH_DUEL': {
-        const slashCard = bot.hand.find(c => c.type === 'slash' || c.name === 'Chém');
+        const hasDoiNui = globalHeroRegistry.hasSkill(bot, 'doi_nui', true);
+        const hasKhaiThien = globalHeroRegistry.hasSkill(bot, 'khai_thien', true);
+        const isRed = c => c && (c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+        const slashCard = bot.hand.find(c => c.type === 'slash' || c.name === 'Chém') ||
+          (hasDoiNui ? bot.hand.find(c => c.type === 'dodge' || c.name === 'Né') : null) ||
+          (hasKhaiThien ? (bot.hand.find(c => isRed(c) && c.type !== 'peach' && c.name !== 'Đào') || bot.hand.find(isRed)) : null);
+        return {
+          type: 'ACTION_REACT',
+          slashCard: slashCard || null
+        };
+      }
+
+      case 'ASK_SLASH_RESPONSE': {
+        const hasDoiNui = globalHeroRegistry.hasSkill(bot, 'doi_nui', true);
+        const hasKhaiThien = globalHeroRegistry.hasSkill(bot, 'khai_thien', true);
+        const isRed = c => c && (c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+        const slashCard = bot.hand.find(c => c.type === 'slash' || c.name === 'Chém') ||
+          (hasDoiNui ? bot.hand.find(c => c.type === 'dodge' || c.name === 'Né') : null) ||
+          (hasKhaiThien ? (bot.hand.find(c => isRed(c) && c.type !== 'peach' && c.name !== 'Đào') || bot.hand.find(isRed)) : null);
         return {
           type: 'ACTION_REACT',
           slashCard: slashCard || null
@@ -250,11 +333,50 @@ export class BotBrain {
         };
       }
 
-      case 'ASK_NEGATE': {
-        const negateCard = bot.hand.find(c => c.name === 'Hóa Giải' || c.idKey === 'hoa_giai');
+      case 'ASK_BANH_CHUNG': {
+        const viewedCards = frame.context?.viewedCards || [];
+        const top = [];
+        const bottom = [];
+        for (const c of viewedCards) {
+          if (c.name === 'Đào' || c.type === 'peach' || c.name === 'Chém' || c.type === 'slash' || c.name === 'Né' || c.type === 'dodge') {
+            top.push(c);
+          } else {
+            bottom.push(c);
+          }
+        }
         return {
           type: 'ACTION_REACT',
-          negateCard: negateCard || null
+          orderedCards: true,
+          deckTop: top,
+          deckBottom: bottom
+        };
+      }
+
+      case 'ASK_DA_TRACH': {
+        const opponents = state.getAlivePlayers ? 
+          state.getAlivePlayers().filter(p => p.id !== bot.id && p.hand && p.hand.length > 0 && !this._isKnownAlly(bot, p)) : [];
+        if (opponents.length > 0) {
+          const targetIds = opponents.slice(0, 2).map(p => p.id);
+          return {
+            type: 'ACTION_REACT',
+            doUse: true,
+            targets: targetIds
+          };
+        }
+        return {
+          type: 'ACTION_REACT',
+          doUse: false,
+          canceled: true
+        };
+      }
+
+      case 'ASK_KHOI_NGHIA': {
+        const hasCombatCard = bot.hand && bot.hand.some(c => 
+          c.type === 'slash' || c.name === 'Chém' || c.name === 'Quyết Đấu' || c.trickType === 'quyet_dau'
+        );
+        return {
+          type: 'ACTION_REACT',
+          doUse: !!hasCombatCard
         };
       }
 

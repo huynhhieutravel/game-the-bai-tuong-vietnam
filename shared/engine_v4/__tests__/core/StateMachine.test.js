@@ -109,4 +109,41 @@ describe('StateMachine & 6-Phase Turn Loop v4', () => {
       GameInvariants.assertDiscardLimit(p);
     }).toThrow(/vượt quá giới hạn cho phép/);
   });
+
+  it('bỏ qua lượt khi người chơi bị lật mặt úp (isFlipped), tự động lật ngửa lại và chuyển lượt', () => {
+    const { gameState, stateMachine } = createMockGame();
+    const p0 = gameState.getPlayer(0);
+    p0.isFlipped = true;
+
+    // Bắt đầu lượt của p0 đang bị lật úp
+    stateMachine.startTurn(0);
+
+    // p0 phải được lật ngửa lại
+    expect(p0.isFlipped).toBe(false);
+    expect(p0.isFaceUp).toBe(true);
+
+    // Lượt phải được chuyển ngay sang người chơi tiếp theo (p1)
+    expect(gameState.currentTurnPlayerId).toBe(1);
+    // p0 không được rút bài vì bị mất lượt
+    expect(p0.hand.length).toBe(0);
+  });
+
+  it('tăng biến đếm turn khi hoàn tất một vòng quanh bàn', () => {
+    const { gameState, stateMachine } = createMockGame();
+    expect(gameState.turn).toBe(1);
+
+    // Bắt đầu lượt của p0
+    stateMachine.startTurn(0);
+    expect(gameState.currentTurnPlayerId).toBe(0);
+
+    // Chuyển lượt p0 -> sang p1
+    stateMachine.nextTurn();
+    expect(gameState.currentTurnPlayerId).toBe(1);
+    expect(gameState.turn).toBe(1);
+
+    // Chuyển lượt p1 -> hoàn tất vòng, quay lại p0 và tăng turn = 2
+    stateMachine.nextTurn();
+    expect(gameState.currentTurnPlayerId).toBe(0);
+    expect(gameState.turn).toBe(2);
+  });
 });

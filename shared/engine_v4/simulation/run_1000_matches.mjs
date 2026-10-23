@@ -98,6 +98,50 @@ for (let g = 0; g < 1000; g++) {
     while (step < maxSteps) {
       step++;
 
+      const prevCardLocations = new Map();
+      state.drawPile?.forEach(c => c && prevCardLocations.set(c.id, 'drawPile'));
+      state.discardPile?.forEach(c => c && prevCardLocations.set(c.id, 'discardPile'));
+      for (const p of state.players) {
+        p.hand?.forEach(c => c && prevCardLocations.set(c.id, `player_${p.id}_hand`));
+        if (p.equipment) {
+          for (const s in p.equipment) {
+            if (p.equipment[s]) prevCardLocations.set(p.equipment[s].id, `player_${p.id}_equip_${s}`);
+          }
+        }
+        p.judgementArea?.forEach(c => c && prevCardLocations.set(c.id, `player_${p.id}_judge`));
+        p.trungCards?.forEach(c => c && prevCardLocations.set(c.id, `player_${p.id}_trung`));
+      }
+
+      const assertAllCards = (contextLabel) => {
+        const present = new Set();
+        state.drawPile?.forEach(c => c && present.add(c.id));
+        state.discardPile?.forEach(c => c && present.add(c.id));
+        for (const p of state.players) {
+          p.hand?.forEach(c => c && present.add(c.id));
+          if (p.equipment) {
+            Object.values(p.equipment).forEach(c => c && present.add(c.id));
+          }
+          p.judgementArea?.forEach(c => c && present.add(c.id));
+          p.trungCards?.forEach(c => c && present.add(c.id));
+        }
+        if (state.priorityStack?.stack) {
+          for (const frame of state.priorityStack.stack) {
+            if (frame.context?.judgeCard) present.add(frame.context.judgeCard.id);
+            if (frame.context?.delayedCard) present.add(frame.context.delayedCard.id);
+            if (Array.isArray(frame.context?.drawnCards)) {
+              frame.context.drawnCards.forEach(c => c && present.add(c.id));
+            }
+          }
+        }
+        const missing = deck.filter(c => !present.has(c.id));
+        if (missing.length > 0) {
+          console.error(`💥 [STEP ${step} - ${contextLabel}] Missing:`, missing.map(c => `${c.id} (${c.name})`));
+          console.error(`💥 Previous location:`, missing.map(c => `${c.id} was at: ${prevCardLocations.get(c.id)}`));
+          console.error(`💥 Last 3 logs:`, state.logs.slice(-3).map(l => l.message));
+          throw new Error(`[INVARIANT_VIOLATION] Lệch tại ${contextLabel}!`);
+        }
+      };
+
       // Kiểm tra điều kiện thắng (bao gồm Đại Thắng Đồng Đội khi còn lại cùng 1 Phe)
       if (state.gameOver) {
         if (state.winner && state.winner.length > 0) {
@@ -132,6 +176,10 @@ for (let g = 0; g < 1000; g++) {
         } else if (frame.type === 'ASK_SLASH_DUEL') {
           if (reaction.slashCard) stats.totalSlashes++;
           TrickRules.respondDuel(state, actorId, reaction.slashCard);
+        } else if (frame.type === 'ASK_SLASH_RESPONSE') {
+          const slashCard = state.getPlayer(actorId).hand?.find(c => c.type === 'slash' || c.name === 'Chém');
+          if (slashCard) stats.totalSlashes++;
+          TrickRules.respondBarbarian(state, actorId, slashCard || null);
         } else if (frame.type === 'ASK_NEGATE') {
           if (reaction.negateCard) stats.totalNegates++;
           TrickRules.respondNegate(state, actorId, reaction.negateCard);
@@ -140,6 +188,9 @@ for (let g = 0; g < 1000; g++) {
           TrickRules.respondBorrowSlash(state, actorId, reaction.slashCard);
         } else if (frame.type === 'ASK_CHANGE_JUDGE') {
           TrickRules.respondChangeJudge(state, actorId, null);
+          if (state.currentPhase === PHASES.JUDGE && state.priorityStack.isEmpty()) {
+            stateMachine._completeJudgePhase();
+          }
         } else if (frame.type === 'ASK_BOC_TRAM_TRUNG_DODGE') {
           CombatRules.respondBocTramTrungDodge(state, actorId, reaction.dodgeCard || null);
         } else if (frame.type === 'ASK_BOC_TRAM_TRUNG_SLASH') {
@@ -187,6 +238,9 @@ for (let g = 0; g < 1000; g++) {
           if (p.hand && p.hand.length > 0) {
             state.discardFromHand(actorId, [p.hand[0].id]);
           }
+          if (state.currentPhase === PHASES.END && state.priorityStack.isEmpty()) {
+            stateMachine.nextTurn();
+          }
         } else if (frame.type === 'ASK_HIEN_HAU') {
           state.priorityStack.pop();
           const p = state.getPlayer(actorId);
@@ -208,14 +262,210 @@ for (let g = 0; g < 1000; g++) {
           if (deficit > 0) {
             state.drawCards(actorId, deficit);
           }
+        } else if (frame.type === 'ASK_THAT_TRAM_SO_PUNISH') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          if (p.hand && p.hand.length >= 2) {
+            state.discardFromHand(actorId, [p.hand[0].id, p.hand[1].id]);
+          } else {
+            CombatRules.applyDamage(state, frame.context.sourceId, actorId, 1, 'that_tram_so');
+          }
+        } else if (frame.type === 'ASK_DOI_SU') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          const target = state.getPlayer(frame.targetId);
+          if (target && target.hand && target.hand.length > 0) {
+            p.hand.push(target.hand.pop());
+          }
+        } else if (frame.type === 'ASK_HOA_NGHI') {
+          state.priorityStack.pop();
+        } else if (frame.type === 'ASK_DA_TRACH') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          p.temporaryFlags = p.temporaryFlags || {};
+          p.temporaryFlags.skipDrawPhase = true;
+          const enemies = state.getAlivePlayers().filter(o => o.id !== actorId && o.hand && o.hand.length > 0);
+          for (const target of enemies.slice(0, 2)) {
+            p.hand.push(target.hand.pop());
+          }
+          if (state.currentPhase === PHASES.DRAW && state.priorityStack.isEmpty()) {
+            stateMachine._completeDrawPhase();
+          }
+        } else if (frame.type === 'ASK_KHOI_NGHIA') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          p.temporaryFlags = p.temporaryFlags || {};
+          p.temporaryFlags.drawCardCount = 1;
+          p.temporaryFlags.bonusDamage = 1;
+          if (state.currentPhase === PHASES.DRAW && state.priorityStack.isEmpty()) {
+            stateMachine._completeDrawPhase();
+          }
+        } else if (frame.type === 'ASK_DUONG_QUAN_1') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          const targets = (frame.context?.validTargets || []).filter(tid => {
+            const t = state.getPlayer(tid);
+            return t && t.isAlive && (!globalHeroRegistry.hasSkill(t, 'dam_bac', false) || (t.hand && t.hand.length > 0));
+          });
+          if (targets.length > 0 && Math.random() < 0.5) {
+            CombatRules.playSlash(state, actorId, targets[0], { name: 'Chém', virtual: true, infiniteRange: true }, { infiniteRange: true });
+            if (state.currentPhase === PHASES.BEGIN && state.priorityStack.isEmpty()) {
+              stateMachine._runPhaseAction();
+            }
+          } else {
+            if (state.currentPhase === PHASES.BEGIN && state.priorityStack.isEmpty()) {
+              stateMachine._completeBeginPhase();
+            }
+          }
+        } else if (frame.type === 'ASK_DUONG_QUAN_3') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          const targets = (frame.context?.validTargets || []).filter(tid => {
+            const t = state.getPlayer(tid);
+            return t && t.isAlive && (!globalHeroRegistry.hasSkill(t, 'dam_bac', false) || (t.hand && t.hand.length > 0));
+          });
+          const excess = (p?.hand?.length || 0) - (p?.hp || 0);
+          if (targets.length > 0 && excess >= 2 && p?.isFaceUp) {
+            p.isFaceUp = false;
+            CombatRules.playSlash(state, actorId, targets[0], { name: 'Chém', virtual: true, infiniteRange: true }, { infiniteRange: true });
+            if (state.currentPhase === PHASES.DISCARD && state.priorityStack.isEmpty()) {
+              stateMachine._runPhaseEnd();
+            }
+          } else {
+            if (state.currentPhase === PHASES.DISCARD && state.priorityStack.isEmpty()) {
+              stateMachine._checkDiscardLimit(p);
+            }
+          }
+        } else if (frame.type === 'ASK_PHA_THANH') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          const judgeCard = state.drawCardFromDeck();
+          if (judgeCard) {
+            p.hand.push(judgeCard);
+            p.temporaryFlags = p.temporaryFlags || {};
+            p.temporaryFlags.skipDrawPhase = true;
+            p.temporaryFlags.phaThanhOppositeColor = judgeCard.color === 'red' ? 'black' : 'red';
+          }
+          if (state.currentPhase === PHASES.DRAW && state.priorityStack.isEmpty()) {
+            stateMachine._completeDrawPhase();
+          }
+        } else if (frame.type === 'ASK_NAM_QUOC_SON_HA') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          state.drawCards(actorId, 1);
+          const dmgCard = frame.context?.damageCard;
+          if (dmgCard && dmgCard.id && !dmgCard.virtual) {
+            const idx = state.discardPile.findIndex(c => c.id === dmgCard.id);
+            if (idx !== -1) {
+              const [retrieved] = state.discardPile.splice(idx, 1);
+              p.hand.push(retrieved);
+            }
+          }
+        } else if (frame.type === 'ASK_TIEN_PHONG') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          if (p && p.hp > 1) {
+            p.hp -= 1;
+            const target = state.getPlayer(frame.targetId);
+            if (target && target.isAlive) {
+              CombatRules.applyDamage(state, actorId, target.id, 1, 'tien_phong');
+            }
+          }
+        } else if (frame.type === 'ASK_SUIT') {
+          state.priorityStack.pop();
+          const asker = state.getPlayer(frame.context?.sourceId);
+          const p = state.getPlayer(actorId);
+          if (asker && asker.hand && asker.hand.length > 0) {
+            const card = asker.hand.pop();
+            p.hand.push(card);
+            if (Math.random() > 0.25) {
+              CombatRules.applyDamage(state, asker.id, actorId, 1, 'tam_cong');
+            }
+          }
+        } else if (frame.type === 'ASK_HO_CHU') {
+          state.priorityStack.pop();
+          const card = state.drawCardFromDeck();
+          if (card) {
+            const p = state.getPlayer(actorId);
+            p.trungCards = p.trungCards || [];
+            const isDuplicate = p.trungCards.some(c => c.rank === card.rank);
+            if (!isDuplicate) {
+              p.trungCards.push(card);
+              p.hp = Math.max(1, p.hp);
+              if (!state.priorityStack.isEmpty() && state.priorityStack.peek().type === 'ASK_PEACH') {
+                state.priorityStack.pop();
+              }
+            } else {
+              state.discardPile.push(card);
+            }
+          }
         } else if (frame.type === 'ASK_BANH_CHUNG') {
           state.priorityStack.pop();
+          if (state.currentPhase === PHASES.BEGIN && state.priorityStack.isEmpty()) {
+            stateMachine._completeBeginPhase();
+          }
+        } else if (frame.type === 'ASK_XA_THAN') {
+          const p = state.getPlayer(actorId);
+          const validTargets = frame.context?.validTargets || [];
+          if (p && p.hand && p.hand.length > 0 && validTargets.length > 0) {
+            CombatRules.respondXaThan(state, actorId, p.hand[0], validTargets[0]);
+          } else {
+            CombatRules.respondXaThan(state, actorId, null, null);
+          }
+        } else if (frame.type === 'ASK_VAN_DON') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          const target = state.getPlayer(frame.targetId);
+          if (p && target && p.hand?.length > 0 && target.hand?.length > 0) {
+            const myCard = p.hand[0];
+            const oppCard = target.hand[0];
+            state.discardFromHand(actorId, [myCard.id]);
+            state.discardFromHand(target.id, [oppCard.id]);
+
+            const rankToNum = (r) => {
+              if (typeof r === 'number') return r;
+              if (!r) return 1;
+              const s = String(r).trim().toUpperCase();
+              if (s === 'A') return 1;
+              if (s === 'J') return 11;
+              if (s === 'Q') return 12;
+              if (s === 'K') return 13;
+              const n = parseInt(s, 10);
+              return isNaN(n) ? 1 : n;
+            };
+
+            const myRank = rankToNum(myCard.rank);
+            const oppRank = rankToNum(oppCard.rank);
+
+            p.temporaryFlags = p.temporaryFlags || {};
+            if (myRank > oppRank) {
+              p.temporaryFlags.vanDonWin = true;
+            } else {
+              p.temporaryFlags.vanDonLose = true;
+            }
+          }
+        } else if (frame.type === 'ASK_DUYEN_THO') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          const validTargets = frame.context?.validTargets || [];
+          if (p && p.hand && p.hand.length >= 2 && validTargets.length > 0) {
+            state.discardFromHand(actorId, [p.hand[0].id, p.hand[1].id]);
+            if (p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + 1);
+            const target = state.getPlayer(validTargets[0]);
+            if (target && target.isAlive && target.hp < target.maxHp) {
+              target.hp = Math.min(target.maxHp, target.hp + 1);
+            }
+            p.skillUsage = p.skillUsage || {};
+            p.skillUsage.duyen_tho = p.skillUsage.duyen_tho || {};
+            p.skillUsage.duyen_tho.usedThisTurn = true;
+          }
         } else {
           if (frame.context?.judgeCard) state.discardPile.push(frame.context.judgeCard);
           if (frame.context?.delayedCard) state.discardPile.push(frame.context.delayedCard);
           state.priorityStack.pop();
         }
 
+        assertAllCards('AFTER_FRAME_' + frame.type);
         continue;
       }
 
@@ -228,7 +478,11 @@ for (let g = 0; g < 1000; g++) {
           const card = state.getPlayer(currentBotId).hand.find(c => c.id === action.cardId);
           if (card && (card.type === 'slash' || card.name === 'Chém')) {
             stats.totalSlashes++;
-            CombatRules.playSlash(state, currentBotId, action.targetId, card);
+            try {
+              CombatRules.playSlash(state, currentBotId, action.targetId, card);
+            } catch (e) {
+              stateMachine.endActionPhase();
+            }
           } else if (card && (card.type === 'trick' || card.type === 'TRICK')) {
             stats.totalTricks++;
             try {
@@ -268,12 +522,33 @@ for (let g = 0; g < 1000; g++) {
           stateMachine.endActionPhase();
         }
 
+        assertAllCards('AFTER_ACTION');
         continue;
       }
 
       // 3. Pha bỏ bài (DISCARD)
       if (state.currentPhase === PHASES.DISCARD) {
         stateMachine._runPhaseDiscard();
+      }
+
+      assertAllCards('AFTER_DISCARD');
+
+      const allPresentCardIds = new Set();
+      state.drawPile?.forEach(c => c && allPresentCardIds.add(c.id));
+      state.discardPile?.forEach(c => c && allPresentCardIds.add(c.id));
+      for (const p of state.players) {
+        p.hand?.forEach(c => c && allPresentCardIds.add(c.id));
+        if (p.equipment) {
+          Object.values(p.equipment).forEach(c => c && allPresentCardIds.add(c.id));
+        }
+        p.judgementArea?.forEach(c => c && allPresentCardIds.add(c.id));
+        p.trungCards?.forEach(c => c && allPresentCardIds.add(c.id));
+      }
+      const missingCards = deck.filter(c => !allPresentCardIds.has(c.id));
+      if (missingCards.length > 0) {
+        console.error(`💥 [STEP ${step}] Missing cards:`, missingCards.map(c => `${c.id} (${c.name})`));
+        console.error(`💥 Last 3 logs:`, state.logs.slice(-3).map(l => l.message));
+        throw new Error(`[INVARIANT_VIOLATION] Lệch tổng số bài trong bàn! Ban đầu: ${initialTotalCards}, Hiện tại: ${allPresentCardIds.size}.`);
       }
     }
 

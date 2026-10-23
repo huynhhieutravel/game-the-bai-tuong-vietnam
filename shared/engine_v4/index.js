@@ -11,6 +11,7 @@ export * from './core/Invariants.js';
 export * from './rules/RangeSystem.js';
 export * from './rules/CombatRules.js';
 export * from './rules/TrickRules.js';
+export * from './rules/TargetResolverV4.js';
 
 export * from './heroes/base/SkillContract.js';
 export * from './heroes/HeroRegistry.js';
@@ -36,11 +37,21 @@ export function isPlayerRevealed(player) {
 
 export function getPlayerFaction(player) {
   if (!player) return 'none';
+  if (player.revealedHeroes && Array.isArray(player.revealedHeroes) && !player.revealedHeroes.some(Boolean)) {
+    return 'none';
+  }
+  if (player.isRevealed === false) {
+    return 'none';
+  }
   return player.faction || 'none';
 }
 
 export function getPlayerGender(player) {
-  if (!player) return 'male';
+  if (!player) return 'none';
+  const hasHeroes = Boolean(player.mainHeroId || player.subHeroId || (player.heroes && player.heroes.length > 0));
+  if (hasHeroes && player.revealedHeroes && Array.isArray(player.revealedHeroes) && !player.revealedHeroes.some(Boolean)) {
+    return 'none';
+  }
   return player.gender || 'male';
 }
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
 
 import { CardSelector } from './CardSelector';
-import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine/gameState';
+import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine_v4/application/index.js';
 
 export function DodgeModal({ req, gameState, onConfirm }) {
   const me = gameState.players.find(p => p.id === (req.responderId ?? req.targetId ?? (typeof window !== 'undefined' ? window.playerId : 0))) || gameState.players[0];
@@ -16,10 +16,10 @@ export function DodgeModal({ req, gameState, onConfirm }) {
   const hasThinhChinh = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'thinh-chinh');
 
   const hasBocTramTrung = !me.isSkillsSuppressed && (hasSkillEvenIfHidden(me, 'boc-tram-trung') || hasSkillEvenIfHidden(me, 'boc_tram_trung') || me.heroes?.some(h => h.id === 'lac-long-quan'));
-  const canBocTramTrung = hasBocTramTrung && gameState.players.some(p => p.id !== me.id && p.isAlive && (getPlayerFaction(p) === 'Lạc' || p.faction === 'lac'));
+  const canBocTramTrung = hasBocTramTrung && gameState.players.some(p => p.id !== me.id && p.isAlive && !p.isDaTam && (p.revealedHeroes ? p.revealedHeroes.some(Boolean) : p.isRevealed !== false) && (getPlayerFaction(p) === 'Lạc' || p.faction === 'Lạc' || p.faction === 'lac'));
 
   const hasTienPhat = !me.isSkillsSuppressed && (hasSkillEvenIfHidden(me, 'tien-phat') || hasSkillEvenIfHidden(me, 'tien_phat') || me.heroes?.some(h => h.id === 'ly-thuong-kiet'));
-  const canTienPhat = hasTienPhat && gameState.players.some(p => p.id !== me.id && p.isAlive && (getPlayerFaction(p) === 'Việt' || p.faction === 'viet'));
+  const canTienPhat = hasTienPhat && gameState.players.some(p => p.id !== me.id && p.isAlive && !p.isDaTam && (p.revealedHeroes ? p.revealedHeroes.some(Boolean) : p.isRevealed !== false) && (getPlayerFaction(p) === 'Việt' || p.faction === 'Việt' || p.faction === 'viet'));
   
   const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => {
      if (c.name === 'Né') return true;

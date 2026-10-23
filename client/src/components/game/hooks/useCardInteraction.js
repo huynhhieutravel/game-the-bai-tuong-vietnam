@@ -1,9 +1,8 @@
 // @ts-check
 import { useCallback, useState } from 'react';
 import { CARD_TYPES, CARD_SUITS } from 'shared/constants/cardTypes';
-import { getTargetingDefinition, getAvailableTargets } from 'shared/engine/rules/TargetResolver';
-import { canPlayCard } from 'shared/engine/rules/CardRules';
-import { hasSkill } from 'shared/engine/gameState';
+import { getTargetingDefinition, getAvailableTargets, canPlayCard } from 'shared/engine_v4/rules/TargetResolverV4.js';
+import { hasSkill } from 'shared/engine_v4/application/index.js';
 import { PHASES } from 'shared/data/gameData';
 
 /**

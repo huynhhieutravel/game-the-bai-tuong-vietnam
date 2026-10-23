@@ -21,20 +21,24 @@ export class HeroRegistry {
     }
 
     // Tự động bổ sung image, bio và faction chuẩn tiếng Việt từ database thẻ bài
-    const rawFac = (heroModule.faction || heroModule.rawFaction || '').toLowerCase();
+    const normalizeStr = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const rawFac = normalizeStr(heroModule.faction || heroModule.rawFaction || '');
     const match = GAME_DATA_HEROES.find(gh => 
       gh.id === heroModule.id || 
       gh.id === heroModule.id.replace(/_/g, '-') ||
       gh.id === heroModule.id.replace(/-/g, '_')
     ) || GAME_DATA_HEROES.find(gh => 
       gh.name === heroModule.name && 
-      (gh.faction || '').toLowerCase() === rawFac
+      normalizeStr(gh.faction) === rawFac
     );
     if (match) {
       if (!heroModule.image) heroModule.image = match.image;
       if (!heroModule.bio) heroModule.bio = match.bio;
       heroModule.rawFaction = (heroModule.faction || '').toLowerCase();
       heroModule.faction = match.faction; // 'Lạc' | 'Việt' | 'Hà' | 'Sơn'
+      this._heroes.set(match.id, heroModule);
+      this._heroes.set(match.id.replace(/-/g, '_'), heroModule);
+      this._heroes.set(match.id.replace(/_/g, '-'), heroModule);
     } else {
       heroModule.rawFaction = (heroModule.faction || '').toLowerCase();
       const facMap = { lac: 'Lạc', viet: 'Việt', ha: 'Hà', son: 'Sơn' };
@@ -120,6 +124,15 @@ export class HeroRegistry {
     const norm = skillId.replace(/-/g, '_');
     const keb = skillId.replace(/_/g, '-');
 
+    if (player.heroes && player.heroes[0]) {
+      const s0 = player.heroes[0].skills || [];
+      if (s0.some(s => (s.id || s) === skillId || (s.id || s) === norm || (s.id || s) === keb)) return 0;
+    }
+    if (player.heroes && player.heroes[1]) {
+      const s1 = player.heroes[1].skills || [];
+      if (s1.some(s => (s.id || s) === skillId || (s.id || s) === norm || (s.id || s) === keb)) return 1;
+    }
+
     const h1 = this.getHero(player.mainHeroId || player.heroId);
     if (h1 && (h1.skills || []).some(s => s.id === skillId || s.id === norm || s.id === keb)) {
       return 0;
@@ -157,6 +170,11 @@ export class HeroRegistry {
       if (h2 && (h2.skills || []).some(s => s.id === skillId || s.id === normalized || s.id === kebab)) has = true;
     }
 
+    if (!has && Array.isArray(player.heroes)) {
+      if (player.heroes[0] && (player.heroes[0].skills || []).some(s => (s.id || s) === skillId || (s.id || s) === normalized || (s.id || s) === kebab)) has = true;
+      if (player.heroes[1] && (player.heroes[1].skills || []).some(s => (s.id || s) === skillId || (s.id || s) === normalized || (s.id || s) === kebab)) has = true;
+    }
+
     if (!has) return false;
 
     if (requireRevealed) {
@@ -166,7 +184,57 @@ export class HeroRegistry {
       }
     }
 
+    // Nếu người chơi đang bị khóa kỹ năng (Tre Ngà - Thánh Gióng): Vô hiệu hóa mọi kỹ năng không phải Tỏa Định Kỹ
+    if (player.temporaryFlags?.skillsSuppressed && !this.isLockSkill(skillId)) {
+      return false;
+    }
+
     return true;
+  }
+
+  /**
+   * Kiểm tra xem kỹ năng có phải là Tỏa Định Kỹ (Lock Skill) hay không
+   */
+  isLockSkill(skillId) {
+    if (!skillId) return false;
+    const norm = skillId.replace(/-/g, '_');
+    const lockSkills = [
+      'thiet_ma',
+      'no_than_cao_lo',
+      'tien_duyen_khoang_cach',
+      'dam_bac',
+      'than_giap',
+      'ho_gia',
+      'quoc_sac'
+    ];
+    return lockSkills.includes(norm);
+  }
+
+  /**
+   * Lấy chất thực tế của lá bài khi tính đến các kỹ năng biến đổi chất (Quốc Sắc - Ngọc Hân Công Chúa: Spade -> Heart)
+   */
+  getEffectiveSuit(player, card) {
+    if (!card) return null;
+    const suit = card.suit;
+    if (this.hasSkill(player, 'quoc_sac', true) && (suit === 'spade' || suit === '♠')) {
+      return 'heart';
+    }
+    return suit;
+  }
+
+  /**
+   * Lấy màu thực tế của lá bài khi tính đến các kỹ năng biến đổi chất
+   */
+  getEffectiveColor(player, card) {
+    if (!card) return null;
+    const effSuit = this.getEffectiveSuit(player, card);
+    if (effSuit === 'heart' || effSuit === 'diamond' || effSuit === '♥' || effSuit === '♦') {
+      return 'red';
+    }
+    if (effSuit === 'spade' || effSuit === 'club' || effSuit === '♠' || effSuit === '♣') {
+      return 'black';
+    }
+    return card.color || 'black';
   }
 
   /**
@@ -199,27 +267,7 @@ export class HeroRegistry {
           // Tự động lật mặt tướng nếu tướng sở hữu đang ẩn
           const heroIdx = this.getHeroIndexForSkill(player, skillId);
           if (player.revealedHeroes && !player.revealedHeroes[heroIdx]) {
-            player.revealedHeroes[heroIdx] = true;
-            const heroId = heroIdx === 0 ? (player.mainHeroId || player.heroId) : player.subHeroId;
-            const hero = this.getHero(heroId);
-            if (hero) {
-              player.faction = hero.faction;
-              state.addLog(`👁️ [${player.name}] phát động kỹ năng [${skill.name}], tự động hiển lộ chân dung [${hero.name}] (Phe ${hero.faction})!`);
-
-              // Kiểm tra cơ chế Dã Tâm (Careerist)
-              const alivePlayers = state.getAlivePlayers();
-              const sameFactionCount = alivePlayers.filter(p => 
-                p.id !== player.id && 
-                p.faction === hero.faction && 
-                !p.isDaTam && 
-                p.revealedHeroes && (p.revealedHeroes[0] || p.revealedHeroes[1])
-              ).length;
-              const threshold = Math.floor(state.players.length / 2);
-              if (sameFactionCount >= threshold && !player.isDaTam) {
-                player.isDaTam = true;
-                state.addLog(`🐺 [DÃ TÂM]: Số lượng phe ${hero.faction} đã vượt quá giới hạn (${sameFactionCount + 1} > ${threshold})! ${player.name} thoái hóa thành DÃ TÂM độc lập!`);
-              }
-            }
+            this.revealPlayerHero(state, player, heroIdx, skill.name);
           }
 
           // Thực thi kỹ năng hoặc đẩy yêu cầu vào stack
@@ -234,6 +282,91 @@ export class HeroRegistry {
 
     return responses;
   }
+
+  /**
+   * Lật mặt tướng của người chơi và xử lý trọn vẹn toàn bộ các cơ chế Quốc Chiến:
+   * 1. Cập nhật player.revealedHeroes[heroIndex] = true
+   * 2. Cập nhật faction & gender
+   * 3. Thưởng Tiên Phong Cắm Cờ (+2 bài cho người đầu tiên lật tướng)
+   * 4. Thưởng Âm Dương Giao Hòa (+1 bài khi lật đủ 2 tướng nếu tổng máu gốc là số lẻ)
+   * 5. Kiểm tra cơ chế Dã Tâm (Careerist nếu số người cùng phe đã lật > N/2)
+   */
+  revealPlayerHero(state, player, heroIndex, triggeredSkillName = null, isExplicitReveal = false) {
+    if (!player) return;
+    player.revealedHeroes = player.revealedHeroes || [false, false];
+    if (player.revealedHeroes[heroIndex]) return;
+
+    player.revealedHeroes[heroIndex] = true;
+
+    const heroId = heroIndex === 0 ? (player.mainHeroId || player.heroId) : player.subHeroId;
+    const hero = this.getHero(heroId);
+    const heroName = hero?.name || 'Tướng';
+    const faction = hero?.faction ? ` (Phe ${hero.faction})` : '';
+    if (hero?.faction) {
+      player.faction = hero.faction;
+    }
+
+    if (triggeredSkillName) {
+      state.addLog(`👁️ [${player.name}] phát động kỹ năng [${triggeredSkillName}], tự động hiển lộ chân dung [${heroName}]${faction}!`);
+    } else {
+      state.addLog(`👁️ ${player.name} đã lộ diện tướng [${heroName}]${faction}!`);
+    }
+
+    // Cập nhật giới tính theo tướng đã lộ diện (ưu tiên Chủ tướng nếu đã lật, hoặc Phó tướng nếu chỉ lật Phó tướng)
+    const h1Id = player.mainHeroId || player.heroId;
+    const h2Id = player.subHeroId;
+    const h1 = this.getHero(h1Id);
+    const h2 = this.getHero(h2Id);
+    if (player.revealedHeroes[0]) {
+      player.gender = h1?.gender || 'male';
+    } else if (player.revealedHeroes[1]) {
+      player.gender = h2?.gender || 'male';
+    }
+
+    // Phần thưởng Lộ Diện Tướng (chỉ trao khi người chơi chủ động lật tướng / Mở Tướng)
+    if (isExplicitReveal) {
+      // 1. Thưởng Tiên Phong Cắm Cờ: Người chơi đầu tiên trong ván đấu lộ diện tướng được nhận thưởng 2 lá bài
+      if (!state.hasPioneerRewardClaimed) {
+        state.hasPioneerRewardClaimed = true;
+        state.pioneerPlayerId = player.id;
+        const drawn = state.drawCards(player.id, 2);
+        if (drawn && drawn.length > 0) {
+          state.addLog(`🎉 [Tiên Phong Cắm Cờ] ${player.name} là người đầu tiên lộ diện tướng trong ván đấu, nhận thưởng ngay 2 lá bài!`);
+        }
+      }
+
+      // 2. Thưởng Âm Dương Giao Hoà: Khi lật mặt cả 2 võ tướng, nếu tổng sinh lực của 2 tướng gốc là số lẻ -> thưởng rút 1 lá bài (1 lần/ván)
+      if (player.revealedHeroes[0] && player.revealedHeroes[1] && !player.hasReceivedYinYangReward) {
+        if (h1 && h2) {
+          const h1Hp = h1.maxHp || h1.hp || 4;
+          const h2Hp = h2.maxHp || h2.hp || 4;
+          const totalRawHp = h1Hp + h2Hp;
+          if (totalRawHp % 2 !== 0) {
+            player.hasReceivedYinYangReward = true;
+            const drawn = state.drawCards(player.id, 1);
+            if (drawn && drawn.length > 0) {
+              state.addLog(`☯️ [Âm Dương Giao Hoà] ${player.name} đã lộ diện cả 2 tướng có tổng sinh lực lẻ (${h1Hp} + ${h2Hp} = ${totalRawHp}), nhận thưởng bù 1 lá bài!`);
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Kiểm tra Cơ Chế Dã Tâm (Careerist)
+    if (!player.isDaTam && player.faction && player.faction !== 'none') {
+      const maxAllowed = Math.floor(state.players.length / 2);
+      const revealedSameFactionCount = state.players.filter(p =>
+        p.revealedHeroes?.some(Boolean) &&
+        p.faction === player.faction &&
+        !p.isDaTam
+      ).length;
+
+      if (revealedSameFactionCount > maxAllowed) {
+        player.isDaTam = true;
+        state.addLog(`🐺 [Dã Tâm] Phe ${player.faction.toUpperCase()} đã vượt quá số lượng cho phép (${revealedSameFactionCount} > ${maxAllowed})! ${player.name} thoái hóa thành DÃ TÂM!`);
+      }
+    }
+  }
 }
 
 export const globalHeroRegistry = new HeroRegistry();
@@ -247,4 +380,19 @@ import { SON_HEROES } from './son/index.js';
 [...LAC_HEROES, ...VIET_HEROES, ...HA_HEROES, ...SON_HEROES].forEach(hero => {
   globalHeroRegistry.registerHero(hero);
 });
+
+// Helper functions tương thích hoàn toàn cho Client UI và Rules
+export const hasSkill = (player, skillId) => globalHeroRegistry.hasSkill(player, skillId, true);
+export const hasSkillEvenIfHidden = (player, skillId) => globalHeroRegistry.hasSkill(player, skillId, false);
+export function getPlayerGender(player) {
+  if (!player) return 'none';
+  const hasHeroes = Boolean(player.mainHeroId || player.subHeroId || (player.heroes && player.heroes.length > 0));
+  if (hasHeroes && player.revealedHeroes && Array.isArray(player.revealedHeroes) && !player.revealedHeroes.some(Boolean)) {
+    return 'none';
+  }
+  return player.gender || 'male';
+}
+export const getEffectiveSuit = (player, card) => globalHeroRegistry.getEffectiveSuit(player, card);
+export const getEffectiveColor = (player, card) => globalHeroRegistry.getEffectiveColor(player, card);
+
 

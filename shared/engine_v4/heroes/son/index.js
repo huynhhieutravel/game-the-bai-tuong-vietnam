@@ -51,13 +51,27 @@ export const DinhBoLinh = {
       name: 'Uy Chấn',
       type: 'lock',
       trigger: 'ON_DAMAGED',
-      filter: (ctx) => ctx.ownerId === ctx.targetId && ctx.card?.color === 'red' && ctx.card?.type === 'slash',
+      filter: (ctx) => {
+        if (ctx.ownerId !== ctx.targetId) return false;
+        const card = ctx.card;
+        if (!card) return false;
+        const isRed = card.color === 'red' || card.suit === 'hearts' || card.suit === 'diamonds';
+        const isSlash = card.type === 'slash' || card.id?.includes('slash') || ctx.reason === 'slash';
+        return isRed && isSlash;
+      },
       description: 'Khi bị [Chém] Đỏ gây sát thương, kẻ tấn công phải chọn: hồi 1 HP hoặc rút 1 bài.',
       execute: (state, ctx) => {
-        const attacker = ctx.actor;
+        const attacker = ctx.actor || (ctx.sourceId !== undefined ? state.getPlayer(ctx.sourceId) : null);
         if (attacker && attacker.isAlive) {
-          state.drawCards(attacker.id, 1);
-          state.addLog(`👑 [Uy Chấn] kích hoạt: Kẻ tấn công ${attacker.name} được nhận 1 lá bài!`);
+          const canHeal = attacker.hp < attacker.maxHp;
+          const wantHeal = ctx.choice === 'heal' || (canHeal && ctx.choice !== 'draw');
+          if (canHeal && wantHeal) {
+            attacker.hp = Math.min(attacker.maxHp, attacker.hp + 1);
+            state.addLog(`👑 [Uy Chấn] kích hoạt: ${ctx.owner.name} uy nghi lẫm liệt, kẻ tấn công ${attacker.name} chọn hồi 1 HP (${attacker.hp}/${attacker.maxHp})!`);
+          } else {
+            state.drawCards(attacker.id, 1);
+            state.addLog(`👑 [Uy Chấn] kích hoạt: ${ctx.owner.name} uy nghi lẫm liệt, kẻ tấn công ${attacker.name} nhận 1 lá bài!`);
+          }
         }
       }
     })
@@ -135,13 +149,18 @@ export const DinhDien = {
       type: 'reactive',
       trigger: 'ON_DODGE_SUCCESS',
       // CHỐT CHẶN: Chỉ kích hoạt khi chính Đinh Điền là người Né thành công!
-      filter: (ctx) => ctx.ownerId === ctx.targetId && ctx.actorId !== undefined,
+      filter: (ctx) => ctx.ownerId === ctx.targetId && (ctx.actorId !== undefined || ctx.sourceId !== undefined),
       description: 'Khi Né thành công, ép kẻ tấn công chịu 1 damage hoặc cho Đinh Điền rút bài.',
       execute: (state, ctx) => {
-        const attacker = ctx.actor;
+        const attacker = ctx.actor || (ctx.sourceId !== undefined ? state.getPlayer(ctx.sourceId) : null);
         if (attacker && attacker.isAlive) {
-          state.addLog(`⚡ [Phạt Tội] kích hoạt: ${ctx.owner.name} trừng phạt kẻ tấn công ${attacker.name}!`);
-          attacker.hp -= 1;
+          if (ctx.choice === 'draw') {
+            state.drawCards(ctx.ownerId, 1);
+            state.addLog(`⚡ [Phạt Tội] kích hoạt: ${ctx.owner.name} thu nhận 1 lá bài quân nhu!`);
+          } else {
+            state.addLog(`⚡ [Phạt Tội] kích hoạt: ${ctx.owner.name} trừng phạt kẻ tấn công ${attacker.name}!`);
+            attacker.hp -= 1;
+          }
         }
       }
     }),
@@ -228,15 +247,13 @@ export const DoDocBao = {
       filter: (ctx) => ctx.ownerId === ctx.actorId,
       description: 'Trong giai đoạn Rút bài, có thể phán xét thu lấy lá đó; dùng bài khác màu như [Quyết Đấu].',
       execute: (state, ctx) => {
-        const judgeCard = state.drawCardFromDeck();
-        if (judgeCard) {
-          ctx.owner.hand.push(judgeCard);
-          ctx.owner.temporaryFlags = ctx.owner.temporaryFlags || {};
-          ctx.owner.temporaryFlags.skipDrawPhase = true;
-          const isRed = judgeCard.color === 'red' || judgeCard.suit === 'heart' || judgeCard.suit === 'diamond' || judgeCard.suit === '♥' || judgeCard.suit === '♦';
-          ctx.owner.temporaryFlags.phaThanhOppositeColor = isRed ? 'black' : 'red';
-          state.addLog(`⚡ [Phá Thành] kích hoạt: ${ctx.owner.name} phán xét ra lá [${judgeCard.name || judgeCard.id}] màu ${judgeCard.color}, có thể dùng bài màu ${ctx.owner.temporaryFlags.phaThanhOppositeColor} như [Quyết Đấu]!`);
-        }
+        state.priorityStack.push({
+          type: 'ASK_PHA_THANH',
+          sourceId: ctx.ownerId,
+          targetId: ctx.ownerId,
+          currentActorId: ctx.ownerId,
+          priorityQueue: [ctx.ownerId]
+        });
       }
     })
   ]

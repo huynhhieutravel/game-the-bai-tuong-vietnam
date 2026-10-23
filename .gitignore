@@ -43,3 +43,5 @@ client/test_card_type.js
 client/test_card_types.js
 client/test_debug.js
 client/test_integration.log
+/*.png
+

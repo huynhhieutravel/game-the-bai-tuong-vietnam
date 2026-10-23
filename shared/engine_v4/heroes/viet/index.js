@@ -23,8 +23,16 @@ export const TrieuQuangPhuc = {
       filter: (ctx) => ctx.ownerId === ctx.actorId,
       description: 'Trong giai đoạn Rút bài, có thể thay vào đó cướp ngẫu nhiên 1 lá bài trên tay của tối đa 2 tướng khác.',
       execute: (state, ctx) => {
-        ctx.owner.temporaryFlags.skipDrawPhase = true;
-        state.addLog(`🌙 [Dạ Trạch] kích hoạt: ${ctx.owner.name} bỏ qua rút bài để cướp bài!`);
+        const opponentsWithCards = state.getAlivePlayers().filter(p => p.id !== ctx.ownerId && p.hand && p.hand.length > 0);
+        if (opponentsWithCards.length > 0) {
+          state.priorityStack.push({
+            type: 'ASK_DA_TRACH',
+            sourceId: ctx.ownerId,
+            targetId: ctx.ownerId,
+            currentActorId: ctx.ownerId,
+            priorityQueue: [ctx.ownerId]
+          });
+        }
       }
     })
   ]
@@ -48,9 +56,13 @@ export const PhungHung = {
       filter: (ctx) => ctx.ownerId === ctx.actorId,
       description: 'Trong giai đoạn Rút bài, có thể rút ít hơn 1 lá bài để Chém và Quyết Đấu lượt này +1 sát thương.',
       execute: (state, ctx) => {
-        ctx.owner.temporaryFlags.drawCardCount = 1; // Rút 1 lá thay vì 2
-        ctx.owner.temporaryFlags.bonusDamage = 1; // +1 sát thương lượt này
-        state.addLog(`🔥 [Khởi Nghĩa] kích hoạt: ${ctx.owner.name} rút ít hơn 1 bài để nhận +1 sát thương cho Chém & Quyết Đấu!`);
+        state.priorityStack.push({
+          type: 'ASK_KHOI_NGHIA',
+          sourceId: ctx.ownerId,
+          targetId: ctx.ownerId,
+          currentActorId: ctx.ownerId,
+          priorityQueue: [ctx.ownerId]
+        });
       }
     })
   ]
@@ -108,7 +120,71 @@ export const DuongDinhNghe = {
       id: 'duong_quan',
       name: 'Dưỡng Quân',
       type: 'active',
-      description: 'Bỏ các pha lượt chơi để đổi lấy các cú Chém không giới hạn cự ly.'
+      description: 'Bỏ qua các pha trong lượt (Phán xét & Rút bài / Hành động & Bỏ trang bị / Bỏ bài & Lật mặt) để Chém không giới hạn cự ly.'
+    }),
+    new SkillContract({
+      id: 'duong_quan_1',
+      name: 'Dưỡng Quân (Pha Bắt đầu)',
+      type: 'reactive',
+      frequency: 'turn',
+      trigger: 'BEGIN_PHASE',
+      filter: (ctx) => ctx.ownerId === ctx.actorId,
+      description: 'Đầu lượt có thể bỏ qua Phán xét và Rút bài để Chém không giới hạn cự ly.',
+      execute: (state, ctx) => {
+        const hasDamBac = p => (p.skills && (p.skills.includes('dam_bac') || p.skills.some(s => s?.id === 'dam_bac'))) ||
+          p.heroes?.some(h => h.id === 'lang_lieu' || h.skills?.some(s => s === 'dam_bac' || s?.id === 'dam_bac')) ||
+          p.mainHeroId === 'lang_lieu' || p.subHeroId === 'lang_lieu';
+
+        const otherAlive = state.getAlivePlayers().filter(p => {
+          if (p.id === ctx.ownerId) return false;
+          if (hasDamBac(p) && (!p.hand || p.hand.length === 0)) return false;
+          return true;
+        });
+        if (otherAlive.length > 0) {
+          state.priorityStack.push({
+            type: 'ASK_DUONG_QUAN_1',
+            sourceId: ctx.ownerId,
+            targetId: ctx.ownerId,
+            currentActorId: ctx.ownerId,
+            priorityQueue: [ctx.ownerId],
+            context: {
+              validTargets: otherAlive.map(p => p.id)
+            }
+          });
+        }
+      }
+    }),
+    new SkillContract({
+      id: 'duong_quan_3',
+      name: 'Dưỡng Quân (Pha Bỏ bài)',
+      type: 'reactive',
+      frequency: 'turn',
+      trigger: 'DISCARD_PHASE',
+      filter: (ctx) => ctx.ownerId === ctx.actorId,
+      description: 'Pha Bỏ bài có thể lật úp mặt tướng và bỏ qua bỏ bài để Chém không giới hạn cự ly.',
+      execute: (state, ctx) => {
+        const hasDamBac = p => (p.skills && (p.skills.includes('dam_bac') || p.skills.some(s => s?.id === 'dam_bac'))) ||
+          p.heroes?.some(h => h.id === 'lang_lieu' || h.skills?.some(s => s === 'dam_bac' || s?.id === 'dam_bac')) ||
+          p.mainHeroId === 'lang_lieu' || p.subHeroId === 'lang_lieu';
+
+        const otherAlive = state.getAlivePlayers().filter(p => {
+          if (p.id === ctx.ownerId) return false;
+          if (hasDamBac(p) && (!p.hand || p.hand.length === 0)) return false;
+          return true;
+        });
+        if (otherAlive.length > 0 && ctx.owner.isFaceUp) {
+          state.priorityStack.push({
+            type: 'ASK_DUONG_QUAN_3',
+            sourceId: ctx.ownerId,
+            targetId: ctx.ownerId,
+            currentActorId: ctx.ownerId,
+            priorityQueue: [ctx.ownerId],
+            context: {
+              validTargets: otherAlive.map(p => p.id)
+            }
+          });
+        }
+      }
     })
   ]
 };
@@ -130,16 +206,16 @@ export const LyThuongKiet = {
       filter: (ctx) => ctx.ownerId === ctx.targetId,
       description: 'Sau khi nhận sát thương, rút 1 lá bài và thu lấy lá bài gây sát thương.',
       execute: (state, ctx) => {
-        const owner = ctx.owner;
-        state.drawCards(owner.id, 1);
-        if (ctx.card) {
-          owner.hand.push(ctx.card);
-          // Xóa khỏi discardPile nếu bài đang ở đó
-          state.discardPile = state.discardPile.filter(c => c.id !== ctx.card.id);
-          state.addLog(`📜 [Nam Quốc Sơn Hà] kích hoạt: ${owner.name} rút 1 bài và thu hồi lá bài [${ctx.card.name}]!`);
-        } else {
-          state.addLog(`📜 [Nam Quốc Sơn Hà] kích hoạt: ${owner.name} rút 1 bài!`);
-        }
+        state.priorityStack.push({
+          type: 'ASK_NAM_QUOC_SON_HA',
+          sourceId: ctx.ownerId,
+          targetId: ctx.ownerId,
+          currentActorId: ctx.ownerId,
+          priorityQueue: [ctx.ownerId],
+          context: {
+            damageCard: ctx.card
+          }
+        });
       }
     }),
     new SkillContract({

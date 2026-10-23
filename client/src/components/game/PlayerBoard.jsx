@@ -2,6 +2,7 @@ import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React from 'react';
 import { CARD_SUBTYPES, getCardSubType } from 'shared/data/gameData';
 import { getCardBg } from 'shared/utils/cardStyles';
+import { WeaponIcon, ArmorIcon, MountAtkIcon, MountDefIcon, HpHeartIcon, HandCardsIcon, RangeIcon, DistanceIcon } from '../common/GameIcons';
 
 // @ts-check
 /** 
@@ -189,31 +190,41 @@ export function PlayerBoard({
                     </>
                   )}
                 </div>
-                <div className="hero-hp">
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '2px' }}>
+                <div className="hero-hp-container">
+                  <div className="hero-hp-hearts">
                     {Array.from({ length: player.maxHp }).map((_, i) => (
-                      <span key={i} className={`hp-pip ${i >= player.hp ? 'lost' : ''}`} />
+                      <HpHeartIcon key={i} size={15} lost={i >= player.hp} />
                     ))}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: 'white', fontWeight: 'bold', marginTop: '2px', background: 'rgba(0,0,0,0.5)', padding: '0 6px', borderRadius: '4px', display: 'inline-block' }}>{player.hp}/{player.maxHp} HP</div>
-                  {player.drankWine && <span style={{ marginLeft: '4px', fontSize: '0.9rem', filter: 'drop-shadow(0 0 4px red)' }}>🍷</span>}
+                  <div className="hero-hp-badge">
+                    {player.hp}/{player.maxHp}
+                  </div>
+                  {player.drankWine && (
+                    <span className="hero-wine-tag" title="Đang say rượu (+1 Sát thương)">🍷</span>
+                  )}
                 </div>
               </div>
               </div>
             );
             })()}
-            <div className="hand-count" style={{ display: 'flex', gap: '8px', justifyContent: 'center', fontSize: '0.85rem' }}>
-              <span title="Số bài trên tay">🎴 ×{player.hand.length}</span>
-              <span title="Tầm đánh của người này">⚔️ {player.attackRange}</span>
-              <span title="Khoảng cách từ bạn đến người này">📍 {player.distanceFromMe}</span>
+            <div className="player-stat-badges">
+              <span className="player-stat-badge stat-cards" title="Số lá bài trên tay">
+                <HandCardsIcon size={14} /> <span>{player.hand.length}</span>
+              </span>
+              <span className="player-stat-badge stat-range" title={`Tầm đánh của người này: ${player.attackRange}`}>
+                <RangeIcon size={14} /> <span>{player.attackRange}</span>
+              </span>
+              <span className="player-stat-badge stat-distance" title={`Khoảng cách từ bạn đến người này: ${player.distanceFromMe}`}>
+                <DistanceIcon size={14} /> <span>{player.distanceFromMe}</span>
+              </span>
             </div>
             {player.equipment?.length > 0 && (
               <div className="equipment-area">
                 {[
-                  { type: CARD_SUBTYPES.EQUIP_WEAPON, icon: '⚔️', title: 'Vũ khí' },
-                  { type: CARD_SUBTYPES.EQUIP_ARMOR, icon: '🛡️', title: 'Phòng cụ' },
-                  { type: CARD_SUBTYPES.EQUIP_MOUNT_ATK, icon: '🐎', title: 'Ngựa công (-1)' },
-                  { type: CARD_SUBTYPES.EQUIP_MOUNT_DEF, icon: '🐴', title: 'Ngựa thủ (+1)' }
+                  { type: CARD_SUBTYPES.EQUIP_WEAPON, icon: <WeaponIcon size={16} />, title: 'Vũ khí' },
+                  { type: CARD_SUBTYPES.EQUIP_ARMOR, icon: <ArmorIcon size={16} />, title: 'Phòng cụ' },
+                  { type: CARD_SUBTYPES.EQUIP_MOUNT_ATK, icon: <MountAtkIcon size={16} />, title: 'Ngựa công (-1)' },
+                  { type: CARD_SUBTYPES.EQUIP_MOUNT_DEF, icon: <MountDefIcon size={16} />, title: 'Ngựa thủ (+1)' }
                 ].map((slot, i) => {
                   const eqCard = player.equipment.find(c => getCardSubType(c) === slot.type);
                   const bgImage = eqCard ? getCardBg(eqCard.name) : null;
@@ -229,7 +240,7 @@ export function PlayerBoard({
                           )}
                         </>
                       ) : (
-                        <div style={{ opacity: 0.5, fontSize: '0.8rem' }}>{slot.icon}</div>
+                        <span className="equip-slot-icon-empty">{slot.icon}</span>
                       )}
                     </div>
                   );

@@ -10,13 +10,26 @@ export class GameInvariants {
    * Tuyệt đối không được đánh > 1 Chém nếu không có Liên Nỏ hoặc cờ phá giới hạn
    */
   static assertSlashLimit(player) {
-    const hasCrossbow = player.equipment?.weapon?.id === 'crossbow' || player.equipment?.weapon?.key === 'crossbow';
+    const hasCrossbow = player.equipment?.weapon?.id === 'crossbow' || 
+                        player.equipment?.weapon?.key === 'crossbow' || 
+                        player.equipment?.weapon?.name === 'Liên Nỏ';
     const hasUnlimitedFlag = player.temporaryFlags?.unlimitedSlash === true;
+    const hasVanDonBonus = player.temporaryFlags?.vanDonWin === true && (player.turnStats?.slashCount || 0) <= 2;
 
-    if (!hasCrossbow && !hasUnlimitedFlag) {
+    if (!hasCrossbow && !hasUnlimitedFlag && !hasVanDonBonus) {
       if ((player.turnStats?.slashCount || 0) > 1) {
         throw new Error(`[INVARIANT_VIOLATION] Người chơi ${player.id} (${player.name}) đã đánh ${player.turnStats.slashCount} lá Chém mà không có Liên Nỏ hoặc kỹ năng cho phép!`);
       }
+    }
+  }
+
+  /**
+   * Bất biến 1b: Giới hạn uống Rượu trong Pha Hành Động
+   * Mỗi lượt người chơi chỉ được uống Rượu tối đa 1 lần trong pha Hành động
+   */
+  static assertWineLimit(player) {
+    if ((player.turnStats?.wineCount || 0) > 1) {
+      throw new Error(`[INVARIANT_VIOLATION] Người chơi ${player.id} (${player.name}) đã uống ${player.turnStats.wineCount} lần Rượu trong giai đoạn Hành động!`);
     }
   }
 
@@ -25,7 +38,10 @@ export class GameInvariants {
    * Số bài trên tay không được vượt quá HP hiện tại (trừ kỹ năng đặc thù)
    */
   static assertDiscardLimit(player, state = null) {
-    const hasToHienThanh = (player.skills?.includes('nhiep_chinh_to_hien_thanh') || player.temporaryFlags?.skipDiscardPhase) && (player.turnStats?.slashCount || 0) === 0;
+    if (!player || player.isAlive === false) {
+      return;
+    }
+    const hasToHienThanh = (player.skills?.includes('nhiep_chinh_to_hien_thanh') || player.skills?.includes('nhiep_chinh') || player.skills?.includes('nhiep-chinh') || player.temporaryFlags?.skipDiscardPhase) && (player.turnStats?.slashCount || 0) === 0;
     if (player.temporaryFlags?.skipDiscardPhase || hasToHienThanh) {
       return;
     }
@@ -36,7 +52,7 @@ export class GameInvariants {
 
     const hasKhaiQuoc = player.skills?.includes('khai_quoc') || (player.heroes && Object.values(player.heroes).some(h => h?.skills?.includes('khai_quoc')));
     if (hasKhaiQuoc && state?.players) {
-      const allySonCount = state.players.filter(p => p.id !== player.id && p.isAlive && p.faction === 'son').length;
+      const allySonCount = state.players.filter(p => p.id !== player.id && p.isAlive && (p.faction === 'son' || p.faction === 'Sơn' || p.rawFaction === 'son')).length;
       bonusMaxHand += allySonCount * 2;
     }
 
@@ -72,6 +88,20 @@ export class GameInvariants {
         if (p.equipment.horse_defense) currentTotal += 1;
       }
       currentTotal += p.judgementArea?.length || 0;
+      currentTotal += p.trungCards?.length || 0;
+    }
+
+    if (state.priorityStack?.stack) {
+      for (const frame of state.priorityStack.stack) {
+        if (frame.context?.judgeCard) currentTotal += 1;
+        if (frame.context?.delayedCard) currentTotal += 1;
+        if (Array.isArray(frame.context?.drawnCards)) {
+          for (const card of frame.context.drawnCards) {
+            const alreadyInHand = state.players.some(p => p.hand?.some(c => c.id === card?.id));
+            if (!alreadyInHand) currentTotal += 1;
+          }
+        }
+      }
     }
 
     if (currentTotal !== initialTotalCards) {

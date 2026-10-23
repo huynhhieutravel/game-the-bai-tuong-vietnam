@@ -34,12 +34,21 @@ export class StateMachine {
       return this.nextTurn();
     }
 
+    // Nếu người chơi đang bị lật úp mặt tướng (isFlipped) -> Tự động lật ngửa lại và bỏ qua lượt này
+    if (player.isFlipped) {
+      player.isFlipped = false;
+      player.isFaceUp = true;
+      this.state.addLog(`🔄 ${player.name} bị lật úp mặt tướng, phải bỏ qua lượt này và tự lật ngửa lại!`);
+      return this.nextTurn();
+    }
+
     this.state.currentTurnPlayerId = nextPlayerId;
     this.state.currentPhase = PHASES.BEGIN;
 
     // Reset chỉ số và cờ tạm thời trong lượt của người chơi
     player.turnStats = {
       slashCount: 0,
+      wineCount: 0,
       cardsDrawn: 0,
       damageDealt: 0,
       damageTaken: 0
@@ -94,10 +103,24 @@ export class StateMachine {
       TrickRules.resolveJudgementPhase(this.state, player.id);
     }
 
-    // Nếu người chơi chết do Sấm Sét trong pha phán xét -> dừng lượt
-    if (!player.isAlive) {
-      return;
+    if (this.state.priorityStack.isEmpty()) {
+      this._completeJudgePhase();
     }
+  }
+
+  _completeJudgePhase() {
+    const player = this.state.getCurrentPlayer();
+    if (!player || !player.isAlive) return;
+
+    // Nếu còn cẩm nang trì hoãn khác cần phán xét tiếp
+    if (player.judgementArea && player.judgementArea.length > 0) {
+      TrickRules.resolveJudgementPhase(this.state, player.id);
+      if (!this.state.priorityStack.isEmpty()) {
+        return;
+      }
+    }
+
+    if (!player.isAlive) return;
 
     this._runPhaseDraw();
   }
@@ -112,6 +135,15 @@ export class StateMachine {
 
     // Kích hoạt kỹ năng rút bài qua HeroRegistry (Triệu Quang Phục - Dạ Trạch, Phùng Hưng - Khởi Nghĩa, Đô Đốc Bảo - Phá Thành...)
     globalHeroRegistry.dispatchTrigger('DRAW_PHASE', { sourceId: player.id }, this.state);
+
+    if (this.state.priorityStack.isEmpty()) {
+      this._completeDrawPhase();
+    }
+  }
+
+  _completeDrawPhase() {
+    const player = this.state.getCurrentPlayer();
+    if (!player || !player.isAlive) return;
 
     if (!player.temporaryFlags?.skipDrawPhase) {
       const drawCount = player.temporaryFlags?.drawCardCount ?? 2;
@@ -133,6 +165,10 @@ export class StateMachine {
     this._runPhaseAction();
   }
 
+  _completeBeginPhase() {
+    this._runPhaseJudge();
+  }
+
   /**
    * Pha 4: ACTION (Pha Ra bài / Hành động)
    * Người chơi đánh bài, dùng kỹ năng. Dừng lại chờ lệnh từ người chơi / Bot.
@@ -151,6 +187,26 @@ export class StateMachine {
       throw new Error(`[StateMachine] Không thể kết thúc Pha Hành động khi đang ở pha ${this.state.currentPhase}`);
     }
 
+    const player = this.state.getCurrentPlayer();
+    if (!player || player.isAlive === false || (player.hp !== undefined && player.hp <= 0)) {
+      this.nextTurn();
+      return;
+    }
+
+    // Tô Hiến Thành - [Nhiếp Chính]: Nếu không dùng lá Chém nào trong lượt, bỏ qua Pha Bỏ bài
+    const hasNhiepChinh = player && (
+      globalHeroRegistry.hasSkill(player, 'nhiep_chinh') ||
+      globalHeroRegistry.hasSkill(player, 'nhiep-chinh') ||
+      player.skills?.includes('nhiep_chinh') ||
+      player.skills?.includes('nhiep-chinh') ||
+      player.skills?.includes('nhiep_chinh_to_hien_thanh')
+    );
+    if (hasNhiepChinh && (!player.turnStats?.slashCount || player.turnStats.slashCount === 0)) {
+      this.state.addLog(`✨ [Nhiếp Chính] ${player.name} không đánh [Chém] trong lượt, bỏ qua Giai đoạn Bỏ bài!`);
+      this._runPhaseEnd();
+      return;
+    }
+
     this._runPhaseDiscard();
   }
 
@@ -161,6 +217,32 @@ export class StateMachine {
   _runPhaseDiscard() {
     this.state.currentPhase = PHASES.DISCARD;
     const player = this.state.getCurrentPlayer();
+    if (!player || player.isAlive === false || (player.hp !== undefined && player.hp <= 0)) {
+      this.nextTurn();
+      return;
+    }
+
+    // Trigger DISCARD_PHASE (Dương Đình Nghệ - Dưỡng Quân 3...)
+    globalHeroRegistry.dispatchTrigger('DISCARD_PHASE', { sourceId: player.id }, this.state);
+
+    if (this.state.priorityStack.isEmpty()) {
+      this._checkDiscardLimit(player);
+    }
+  }
+
+  _checkDiscardLimit(player = null) {
+    if (!player) player = this.state.getCurrentPlayer();
+    if (!player || player.isAlive === false || (player.hp !== undefined && player.hp <= 0)) {
+      this.nextTurn();
+      return;
+    }
+
+    if (player.temporaryFlags?.skipDiscardPhase) {
+      this.state.addLog(`⚡ ${player.name} bỏ qua Pha Bỏ bài!`);
+      player.temporaryFlags.skipDiscardPhase = false;
+      this._runPhaseEnd();
+      return;
+    }
 
     const baseMaxHand = Math.max(0, player.hp);
     let bonusMaxHand = player.bonusMaxHand || 0;
@@ -168,7 +250,7 @@ export class StateMachine {
     // Nguyễn Bặc - Khai Quốc (Chủ Công Kỹ): Giới hạn bài tay +2 × (số tướng hệ Sơn)
     const hasKhaiQuoc = globalHeroRegistry.hasSkill(player, 'khai_quoc', true) || globalHeroRegistry.hasSkill(player, 'khai_quoc_nguyen_bac', true);
     if (hasKhaiQuoc) {
-      const allySonCount = this.state.players.filter(p => p.id !== player.id && p.isAlive && p.faction === 'son').length;
+      const allySonCount = this.state.players.filter(p => p.id !== player.id && p.isAlive && (p.faction === 'son' || p.faction === 'Sơn' || p.rawFaction === 'son')).length;
       bonusMaxHand += allySonCount * 2;
     }
 
@@ -182,9 +264,14 @@ export class StateMachine {
     const excess = player.hand.length - effectiveMaxHand;
 
     // Nhiếp chính Tô Hiến Thành: Chỉ được miễn bỏ bài nếu lượt này KHÔNG sử dụng lá Chém nào
-    const hasToHienThanh = globalHeroRegistry.hasSkill(player, 'nhiep_chinh_to_hien_thanh', true) && (player.turnStats?.slashCount || 0) === 0;
+    const hasToHienThanh = (
+      globalHeroRegistry.hasSkill(player, 'nhiep_chinh', true) ||
+      globalHeroRegistry.hasSkill(player, 'nhiep_chinh_to_hien_thanh', true) ||
+      player.skills?.includes('nhiep_chinh') ||
+      player.skills?.includes('nhiep_chinh_to_hien_thanh')
+    ) && (player.turnStats?.slashCount || 0) === 0;
 
-    if (excess > 0 && !player.temporaryFlags?.skipDiscardPhase && !hasToHienThanh) {
+    if (excess > 0 && !hasToHienThanh) {
       // Đẩy Frame yêu cầu bỏ bài vào PriorityStack
       this.state.priorityStack.push({
         type: 'ASK_DISCARD',
@@ -254,8 +341,10 @@ export class StateMachine {
       this.eventBus.emit('PHASE_END', { player, state: this.state });
     }
 
-    // Chuyển sang lượt của người tiếp theo
-    this.nextTurn();
+    // Chuyển sang lượt của người tiếp theo nếu không có kỹ năng nào đang chờ
+    if (this.state.priorityStack.isEmpty()) {
+      this.nextTurn();
+    }
   }
 
   /**
@@ -271,6 +360,18 @@ export class StateMachine {
     const currentIdx = alivePlayers.findIndex(p => p.id === this.state.currentTurnPlayerId);
     const nextIdx = (currentIdx + 1) % alivePlayers.length;
     const nextPlayer = alivePlayers[nextIdx];
+
+    if (nextIdx === 0 || nextIdx <= currentIdx) {
+      this.state.turn = (this.state.turn || 1) + 1;
+    }
+
+    // Dọn dẹp các cờ khóa kỹ năng tạm thời của lượt trước (Tre Ngà...)
+    for (const p of alivePlayers) {
+      if (p.temporaryFlags) {
+        p.temporaryFlags.skillsSuppressed = false;
+        p.temporaryFlags.treNgaRequiredSuit = null;
+      }
+    }
 
     this.startTurn(nextPlayer.id);
   }

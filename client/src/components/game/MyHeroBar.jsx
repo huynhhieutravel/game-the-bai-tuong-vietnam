@@ -2,8 +2,9 @@ import { getSuitEmoji } from 'shared/constants/cardTypes';
 // @ts-check
 import React from 'react';
 import { CARD_SUBTYPES, getCardSubType } from 'shared/data/gameData';
-import { getPlayerFaction } from 'shared/engine';
+import { getPlayerFaction } from 'shared/engine_v4/application/index.js';
 import { getCardBg } from 'shared/utils/cardStyles';
+import { WeaponIcon, ArmorIcon, MountAtkIcon, MountDefIcon, HpHeartIcon, RangeIcon, DistanceIcon } from '../common/GameIcons';
 import './MyHeroBar.css';
 
 /**
@@ -53,10 +54,10 @@ export default function MyHeroBar(props) {
                   {/* Equipment left side */}
                   <div className="my-hero-equipment-area">
                     {[
-                      { type: CARD_SUBTYPES.EQUIP_WEAPON, icon: '⚔️', title: 'Vũ khí' },
-                      { type: CARD_SUBTYPES.EQUIP_ARMOR, icon: '🛡️', title: 'Phòng cụ' },
-                      { type: CARD_SUBTYPES.EQUIP_MOUNT_ATK, icon: '🐎', title: 'Ngựa công (-1)' },
-                      { type: CARD_SUBTYPES.EQUIP_MOUNT_DEF, icon: '🐴', title: 'Ngựa thủ (+1)' }
+                      { type: CARD_SUBTYPES.EQUIP_WEAPON, icon: <WeaponIcon size={28} />, title: 'Vũ khí' },
+                      { type: CARD_SUBTYPES.EQUIP_ARMOR, icon: <ArmorIcon size={28} />, title: 'Phòng cụ' },
+                      { type: CARD_SUBTYPES.EQUIP_MOUNT_ATK, icon: <MountAtkIcon size={28} />, title: 'Ngựa công (-1)' },
+                      { type: CARD_SUBTYPES.EQUIP_MOUNT_DEF, icon: <MountDefIcon size={28} />, title: 'Ngựa thủ (+1)' }
                     ].map((slot, i) => {
                       const eqCard = me.equipment?.find(c => getCardSubType(c) === slot.type);
                       const bgImage = eqCard ? getCardBg(eqCard.name) : null;
@@ -184,22 +185,24 @@ export default function MyHeroBar(props) {
               </div>
               
               <div className="my-hero-hp-bar">
-                {Array.from({ length: me.maxHp }).map((_, i) => (
-                  <span key={i} className={`my-hero-hp-pip ${i >= me.hp ? 'lost' : ''}`} />
-                ))}
+                <div className="my-hero-hp-hearts">
+                  {Array.from({ length: me.maxHp }).map((_, i) => (
+                    <HpHeartIcon key={i} size={18} lost={i >= me.hp} />
+                  ))}
+                </div>
                 <span className="my-hero-hp-text">
-                  {me.hp}/{me.maxHp}
+                  {me.hp}/{me.maxHp} HP
                 </span>
                 {me.drankWine && <span className="my-hero-wine-status">🍷 Say</span>}
               </div>
               
               <div className="my-hero-stats-box">
                 <div className="my-hero-stat-row" title="Tầm đánh (quyết định khoảng cách tối đa có thể Chém)">
-                  <span className="my-hero-stat-label atk">⚔️ Tầm đánh:</span> 
+                  <span className="my-hero-stat-label atk"><RangeIcon size={16} /> Tầm đánh:</span> 
                   <strong className="my-hero-stat-value">{me.attackRange}</strong>
                 </div>
                 <div className="my-hero-stat-row" title="Khoảng cách phòng vệ (người khác phải có Tầm đánh >= Khoảng cách này mới Chém được bạn)">
-                  <span className="my-hero-stat-label def">🛡️ Khoảng cách:</span> 
+                  <span className="my-hero-stat-label def"><DistanceIcon size={16} /> Khoảng cách:</span> 
                   <strong className="my-hero-stat-value">+{me.equipment?.find(c => getCardSubType(c) === CARD_SUBTYPES.EQUIP_MOUNT_DEF) ? 1 : 0}</strong>
                 </div>
               </div>

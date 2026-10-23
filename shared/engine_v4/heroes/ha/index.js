@@ -1,9 +1,10 @@
 /**
  * Heroes Hệ 🔵 HÀ (Ngô) trong Việt Sát v4.
- * Bao gồm đầy đủ các tướng Hà với các kỹ năng chuyển hóa và bảo vệ đồng đội.
+ * Bao gồm đầy đủ 15 vị tướng Hà với các kỹ năng chuyển hóa, bảo hộ và phán xét.
  */
 
 import { SkillContract } from '../base/SkillContract.js';
+import { getPlayerGender } from '../HeroRegistry.js';
 
 // 1. Ngô Quyền
 export const NgoQuyen = {
@@ -19,23 +20,42 @@ export const NgoQuyen = {
       name: 'Bạch Đằng',
       type: 'active',
       frequency: 'turn',
-      description: 'Bỏ X bài, rút X bài; nếu bỏ hết tay thì rút thêm 1 lá bài.',
+      description: 'Trong giai đoạn Hành động, mỗi lượt một lần, bạn có thể bỏ tùy ý số lá bài, sau đó rút số lá bài tương ứng. Nếu bằng cách này bạn bỏ toàn bộ bài trên tay, hãy rút thêm 1 lá bài.',
+      canUse: (state, ctx) => {
+        if (!ctx.owner || ctx.owner.hand?.length === 0) return false;
+        if (ctx.owner.skillUsage?.bach_dang?.usedThisTurn) return false;
+        return true;
+      },
       execute: (state, ctx) => {
         const owner = ctx.owner;
-        const count = owner.hand.length;
-        if (count > 0) {
+        const handCards = owner.hand || [];
+        if (handCards.length === 0) return;
+        const cardIds = ctx.cardIds || (ctx.options && ctx.options.cardIds);
+        let count = 0;
+        let discardedAll = false;
+        if (Array.isArray(cardIds) && cardIds.length > 0) {
+          count = cardIds.length;
+          discardedAll = (count === handCards.length);
+          state.discardFromHand(owner.id, cardIds);
+        } else {
+          count = handCards.length;
+          discardedAll = true;
           state.discardPile.push(...owner.hand);
           owner.hand = [];
-          state.drawCards(owner.id, count + 1); // Rút count + 1 vì bỏ hết bài tay!
-          state.addLog(`🌊 [Bạch Đằng] kích hoạt: ${owner.name} đổi toàn bộ ${count} bài và rút thêm 1 lá bài thưởng!`);
         }
+        const drawCount = discardedAll ? count + 1 : count;
+        state.drawCards(owner.id, drawCount);
+        owner.skillUsage = owner.skillUsage || {};
+        owner.skillUsage.bach_dang = owner.skillUsage.bach_dang || {};
+        owner.skillUsage.bach_dang.usedThisTurn = true;
+        state.addLog(`🌊 [Bạch Đằng] kích hoạt: ${owner.name} đổi ${count} bài và rút ${drawCount} lá bài mới!`);
       }
     }),
     new SkillContract({
       id: 'hau_vien',
       name: 'Hậu Viện',
       type: 'reactive',
-      description: 'Chủ Công Kỹ: Khi tướng Hà ăn Đào có thể nhường cho Ngô Quyền hồi máu và rút 1 bài.'
+      description: 'Chúa Công Kỹ: Khi một tướng thuộc hệ 🔵 HÀ sử dụng [Đào] lên bản thân, nếu sinh lực của họ lớn hơn bạn, họ có thể để bạn hồi phục 1 điểm sinh lực thay cho mình. Nếu làm vậy, họ rút 1 lá bài.'
     })
   ]
 };
@@ -53,9 +73,12 @@ export const YetKieu = {
       id: 'lan_sau',
       name: 'Lặn Sâu',
       type: 'active',
-      description: 'Mất 1 HP -> Rút 2 lá bài.',
+      description: 'Trong giai đoạn Hành động, bạn có thể mất 1 điểm Sinh lực, sau đó rút 2 lá bài.',
       canUse: (state, ctx) => ctx.owner.hp > 1,
       execute: (state, ctx) => {
+        if (ctx.owner.hp <= 1) {
+          throw new Error('[Lặn Sâu] Không thể mất máu khi chỉ còn 1 HP!');
+        }
         ctx.owner.hp -= 1;
         state.drawCards(ctx.owner.id, 2);
         state.addLog(`🌊 [Lặn Sâu] kích hoạt: ${ctx.owner.name} mất 1 HP để rút 2 lá bài!`);
@@ -79,10 +102,11 @@ export const NguyenTrai = {
       type: 'reactive',
       trigger: 'DRAW_PHASE',
       filter: (ctx) => ctx.ownerId === ctx.actorId,
-      description: 'Giai đoạn Rút bài được rút thêm 1 lá bài (tổng 3 lá).',
+      description: 'Trong giai đoạn Rút bài, bạn có thể rút thêm 1 lá bài (tổng cộng 3 lá bài).',
       execute: (state, ctx) => {
+        ctx.owner.temporaryFlags = ctx.owner.temporaryFlags || {};
         ctx.owner.temporaryFlags.drawCardCount = 3;
-        state.addLog(`📜 [Bình Ngô] kích hoạt: ${ctx.owner.name} được rút 3 lá bài!`);
+        state.addLog(`📜 [Bình Ngô] kích hoạt: ${ctx.owner.name} được rút 3 lá bài trong lượt này!`);
       }
     }),
     new SkillContract({
@@ -90,7 +114,29 @@ export const NguyenTrai = {
       name: 'Tâm Công',
       type: 'active',
       frequency: 'turn',
-      description: 'Đoán chất bài đối thủ; nếu sai họ nhận 1 sát thương.'
+      description: 'Trong giai đoạn Hành động, mỗi lượt một lần, bạn có thể chỉ định một tướng khác chọn một chất bài. Sau đó, họ thu lấy ngẫu nhiên 1 lá bài trên tay bạn và mở ra. Nếu chất của lá bài đó khác với chất họ đã chọn, bạn gây 1 điểm sát thương lên họ.',
+      canUse: (state, ctx) => {
+        if (!ctx.owner || ctx.owner.hand?.length === 0) return false;
+        if (ctx.owner.skillUsage?.tam_cong?.usedThisTurn) return false;
+        return state.getAlivePlayers().some(p => p.id !== ctx.ownerId);
+      },
+      execute: (state, ctx) => {
+        const target = ctx.target || (ctx.targets && state.getPlayer(ctx.targets[0])) || state.getAlivePlayers().find(p => p.id !== ctx.ownerId);
+        if (!target) return;
+        ctx.owner.skillUsage = ctx.owner.skillUsage || {};
+        ctx.owner.skillUsage.tam_cong = ctx.owner.skillUsage.tam_cong || {};
+        ctx.owner.skillUsage.tam_cong.usedThisTurn = true;
+        state.priorityStack.push({
+          type: 'ASK_SUIT',
+          sourceId: ctx.ownerId,
+          targetId: target.id,
+          currentActorId: target.id,
+          priorityQueue: [target.id],
+          context: {
+            sourceId: ctx.ownerId
+          }
+        });
+      }
     })
   ]
 };
@@ -105,10 +151,16 @@ export const ToHienThanh = {
   maxHp: 3,
   skills: [
     new SkillContract({
+      id: 'nhiep_chinh',
+      name: 'Nhiếp Chính',
+      type: 'lock',
+      description: 'Tỏa Định Kỹ: Nếu trong giai đoạn Hành động bạn không sử dụng hoặc đánh ra [Chém], thì bạn có thể bỏ qua giai đoạn Bỏ bài (giữ toàn bộ bài trên tay).'
+    }),
+    new SkillContract({
       id: 'nhiep_chinh_to_hien_thanh',
       name: 'Nhiếp Chính',
       type: 'lock',
-      description: 'Nếu trong Action Phase không đánh Chém -> Bỏ qua Discard Phase (giữ toàn bộ bài tay).'
+      description: 'Alias hỗ trợ backward compatibility cho Nhiếp Chính.'
     })
   ]
 };
@@ -123,10 +175,10 @@ export const NguyenPhiYLan = {
   maxHp: 3,
   skills: [
     new SkillContract({
-      id: 'nhiep_chinh_y_lan',
-      name: 'Nhiếp Chính',
+      id: 'thinh_chinh',
+      name: 'Thính Chính',
       type: 'active',
-      description: 'Bài Đen trên tay có thể dùng như [Né].'
+      description: 'Bạn có thể sử dụng hoặc đánh ra một lá bài Đen trên tay như [Né].'
     }),
     new SkillContract({
       id: 'phat_tam',
@@ -135,7 +187,28 @@ export const NguyenPhiYLan = {
       frequency: 'turn',
       trigger: 'BEGIN_PHASE',
       filter: (ctx) => ctx.ownerId === ctx.actorId,
-      description: 'Đầu lượt phán xét bài Đen -> rút tiếp và thu toàn bộ bài Đen.'
+      description: 'Trong giai đoạn Chuẩn bị, bạn có thể tiến hành phán xét. Nếu kết quả là bài Đen, bạn có thể lặp lại quá trình này. Sau đó, thu lấy tất cả các lá bài phán xét màu Đen.',
+      execute: (state, ctx) => {
+        const owner = ctx.owner;
+        const blackCards = [];
+        while (true) {
+          const judge = state.drawCardFromDeck();
+          if (!judge) break;
+          const isBlack = judge.color === 'black' || judge.suit === 'spade' || judge.suit === 'club' || judge.suit === '♠' || judge.suit === '♣';
+          if (isBlack) {
+            blackCards.push(judge);
+            state.addLog(`🧘 [Phật Tâm] ${owner.name} phán xét ra lá [${judge.name} ${judge.suit}] (ĐEN), tiếp tục phán xét!`);
+          } else {
+            state.discardPile.push(judge);
+            state.addLog(`🧘 [Phật Tâm] ${owner.name} phán xét ra lá [${judge.name} ${judge.suit}] (ĐỎ), kết thúc phán xét.`);
+            break;
+          }
+        }
+        if (blackCards.length > 0) {
+          owner.hand.push(...blackCards);
+          state.addLog(`🧘 [Phật Tâm] ${owner.name} thu được ${blackCards.length} lá bài Đen về tay!`);
+        }
+      }
     })
   ]
 };
@@ -154,7 +227,26 @@ export const HoXuanHuong = {
       name: 'Duyên Thơ',
       type: 'active',
       frequency: 'turn',
-      description: 'Bỏ 2 bài -> Hồi 1 HP cho mình và 1 tướng Nam bị thương.'
+      description: 'Trong giai đoạn Hành động, mỗi lượt một lần, bạn có thể bỏ 2 lá bài trên tay. Sau đó, bạn và một tướng Nam đã bị thương mỗi người hồi phục 1 điểm Sinh lực.',
+      canUse: (state, ctx) => {
+        if (!ctx.owner || ctx.owner.hand?.length < 2) return false;
+        if (ctx.owner.skillUsage?.duyen_tho?.usedThisTurn) return false;
+        const validMale = state.getAlivePlayers().some(p => getPlayerGender(p) === 'male' && p.hp < p.maxHp);
+        return validMale || ctx.owner.hp < ctx.owner.maxHp;
+      },
+      execute: (state, ctx) => {
+        state.priorityStack.push({
+          type: 'ASK_DUYEN_THO',
+          sourceId: ctx.ownerId,
+          targetId: ctx.ownerId,
+          currentActorId: ctx.ownerId,
+          priorityQueue: [ctx.ownerId],
+          context: {
+            reason: 'duyen_tho',
+            validTargets: state.getAlivePlayers().filter(p => getPlayerGender(p) === 'male' && p.hp < p.maxHp).map(p => p.id)
+          }
+        });
+      }
     }),
     new SkillContract({
       id: 'xuan_huong',
@@ -162,7 +254,7 @@ export const HoXuanHuong = {
       type: 'reactive',
       trigger: 'ON_EQUIP_LOST',
       filter: (ctx) => ctx.ownerId === ctx.targetId,
-      description: 'Khi mất 1 lá trang bị, được rút 2 lá bài.',
+      description: 'Sau khi bạn mất 1 lá bài ở khu Trang bị, bạn có thể rút 2 lá bài.',
       execute: (state, ctx) => {
         state.drawCards(ctx.ownerId, 2);
         state.addLog(`🌺 [Xuân Hương] kích hoạt: ${ctx.owner.name} mất trang bị, được rút 2 lá bài!`);
@@ -184,18 +276,18 @@ export const NgocHanCongChua = {
       id: 'hien_hau',
       name: 'Hiền Hậu',
       type: 'reactive',
-      description: 'Bỏ 1 lá Heart chặn damage, ép người khác nhận 1 damage hoặc mất 1 HP.'
+      description: 'Khi bạn nhận sát thương, bạn có thể bỏ 1 lá bài ♥ trên tay để ngăn chặn sát thương đó, rồi chọn 1 tướng khác và chọn một: Tướng đó nhận 1 điểm sát thương, sau đó rút X lá bài (X là số Sinh lực đã mất của họ, tối đa 5). Tướng đó mất 1 điểm Sinh lực, sau đó thu lấy lá bài bạn vừa bỏ.'
     }),
     new SkillContract({
       id: 'quoc_sac',
       name: 'Quốc Sắc',
       type: 'lock',
-      description: 'Mọi lá bài Spade (Bích) của mình được xem như Heart (Cơ).'
+      description: 'Tỏa Định Kỹ: Mọi lá bài Spade (♠) của bạn được xem như Heart (♥).'
     })
   ]
 };
 
-// 8. Dã Tượng (Hệ Hà)
+// 8. Dã Tượng
 export const DaTuong = {
   id: 'da_tuong',
   name: 'Dã Tượng',
@@ -208,7 +300,7 @@ export const DaTuong = {
       id: 'ky_tap',
       name: 'Kỳ Tập',
       type: 'active',
-      description: 'Bạn có thể sử dụng một lá bài Đen như một lá [Tước Bài].'
+      description: 'Bạn có thể sử dụng một lá bài Đen trên tay như một lá [Tước Bài].'
     })
   ]
 };
@@ -226,7 +318,19 @@ export const NguyenChich = {
       id: 'nghe_an_ke',
       name: 'Nghệ An Kế',
       type: 'lock',
-      description: 'Tỏa Định Kỹ: Không thể trở thành mục tiêu của [Thuận Thủ Khiên Dương] và [Lạc Bất Tư Thục].'
+      description: 'Tỏa Định Kỹ: Bạn không thể trở thành mục tiêu của [Cướp Bài] và [Hỗn Loạn].'
+    }),
+    new SkillContract({
+      id: 'hien_ke',
+      name: 'Hiến Kế',
+      type: 'reactive',
+      trigger: 'ON_LOSE_LAST_HAND',
+      filter: (ctx) => ctx.ownerId === ctx.targetId,
+      description: 'Sau khi bạn mất lá bài cuối cùng trên tay, bạn có thể rút 1 lá bài.',
+      execute: (state, ctx) => {
+        state.drawCards(ctx.ownerId, 1);
+        state.addLog(`📜 [Hiến Kế] kích hoạt: ${ctx.owner.name} mất lá bài cuối cùng trên tay, lập tức rút 1 lá bài!`);
+      }
     })
   ]
 };
@@ -261,10 +365,20 @@ export const TranNhatDuat = {
       type: 'reactive',
       trigger: 'ON_DAMAGED',
       filter: (ctx) => ctx.ownerId === ctx.targetId,
-      description: 'Sau khi nhận 1 điểm sát thương, xem 2 bài đầu chồng rút, chia cho người chơi tùy ý.',
+      description: 'Sau khi nhận 1 điểm sát thương, xem 2 lá bài trên cùng của chồng bài rút, sau đó phân phối những lá bài đó cho các tướng tùy ý.',
       execute: (state, ctx) => {
-        const drawn = state.drawCards(ctx.ownerId, 2);
-        state.addLog(`🕊️ [Hòa Nghị] kích hoạt: ${ctx.owner.name} nhận 2 lá bài từ chồng bài rút!`);
+        const drawnCards = state.drawCards(ctx.ownerId, 2);
+        state.priorityStack.push({
+          type: 'ASK_HOA_NGHI',
+          sourceId: ctx.ownerId,
+          targetId: ctx.ownerId,
+          currentActorId: ctx.ownerId,
+          priorityQueue: [ctx.ownerId],
+          context: {
+            reason: 'hoa_nghi',
+            drawnCards
+          }
+        });
       }
     })
   ]
@@ -284,7 +398,30 @@ export const TranKhanhDu = {
       name: 'Vân Đồn',
       type: 'active',
       frequency: 'turn',
-      description: 'Đấu điểm; thắng được thêm 1 Chém vô hạn cự ly; thua bị cấm Chém lượt này.'
+      description: 'Trong giai đoạn Hành động, mỗi lượt một lần, bạn có thể đấu điểm với một tướng khác. Nếu thắng, trong lượt này bạn được sử dụng thêm 1 lá [Chém], [Chém] không giới hạn cự ly và có thể chỉ định thêm 1 mục tiêu. Nếu không thắng, bạn không thể sử dụng [Chém] trong lượt này.',
+      canUse: (state, ctx) => {
+        if (!ctx.owner || ctx.owner.hand?.length === 0) return false;
+        if (ctx.owner.temporaryFlags?.vanDonUsed) return false;
+        return state.getAlivePlayers().some(p => p.id !== ctx.ownerId && p.hand?.length > 0);
+      },
+      execute: (state, ctx) => {
+        const targetId = ctx.targetId !== undefined ? ctx.targetId : ctx.target?.id;
+        const validTarget = targetId !== undefined ? targetId : state.getAlivePlayers().find(p => p.id !== ctx.ownerId && p.hand?.length > 0)?.id;
+        ctx.owner.temporaryFlags = ctx.owner.temporaryFlags || {};
+        ctx.owner.temporaryFlags.vanDonUsed = true;
+        state.priorityStack.push({
+          type: 'ASK_VAN_DON',
+          sourceId: ctx.ownerId,
+          targetId: validTarget,
+          currentActorId: ctx.ownerId,
+          priorityQueue: [ctx.ownerId],
+          context: {
+            reason: 'van_don',
+            sourceId: ctx.ownerId,
+            targetId: validTarget
+          }
+        });
+      }
     })
   ]
 };
@@ -303,21 +440,27 @@ export const MacDinhChi = {
       name: 'Đối Sứ',
       type: 'reactive',
       trigger: 'ON_DAMAGED',
-      filter: (ctx) => ctx.ownerId === ctx.targetId && ctx.actor && ctx.actor.hand.length > 0,
+      filter: (ctx) => ctx.ownerId === ctx.targetId && ctx.actor && ctx.actor.hand && ctx.actor.hand.length > 0,
       description: 'Sau khi nhận sát thương, thu lấy 1 lá bài từ nguồn sát thương.',
       execute: (state, ctx) => {
-        const stolen = ctx.actor.hand.pop();
-        if (stolen) {
-          ctx.owner.hand.push(stolen);
-          state.addLog(`📜 [Đối Sứ] kích hoạt: ${ctx.owner.name} thu lấy 1 lá bài từ ${ctx.actor.name}!`);
-        }
+        state.priorityStack.push({
+          type: 'ASK_DOI_SU',
+          sourceId: ctx.ownerId,
+          targetId: ctx.actor.id,
+          currentActorId: ctx.ownerId,
+          priorityQueue: [ctx.ownerId],
+          context: {
+            reason: 'doi_su',
+            actorId: ctx.actor.id
+          }
+        });
       }
     }),
     new SkillContract({
       id: 'ung_bien',
       name: 'Ứng Biến',
       type: 'reactive',
-      description: 'Đánh ra 1 lá bài trên tay để thay thế lá bài phán xét.'
+      description: 'Trước khi lá bài phán xét của một người chơi có hiệu lực, bạn có thể đánh ra 1 lá bài trên tay để thay thế lá bài phán xét đó.'
     })
   ]
 };
@@ -337,16 +480,27 @@ export const ChuVanAn = {
       type: 'reactive',
       trigger: 'ON_DAMAGED',
       filter: (ctx) => ctx.ownerId === ctx.targetId && ctx.actor,
-      description: 'Nhận sát thương: Phán xét không phải Heart thì nguồn sát thương bỏ 2 bài hoặc nhận 1 sát thương.',
+      description: 'Sau khi nhận sát thương, bạn có thể tiến hành phán xét. Nếu kết quả không phải chất ♥, nguồn sát thương phải chọn một: Bỏ 2 lá bài trên tay; hoặc Nhận 1 điểm sát thương do bạn gây ra.',
       execute: (state, ctx) => {
         const judgeCard = state.drawCardFromDeck();
         if (!judgeCard) return;
         state.discardPile.push(judgeCard);
         state.addLog(`📜 [Thất Trảm Sớ] phán xét: ra lá chất [${judgeCard.suit}].`);
 
-        if (judgeCard.suit !== 'heart' && judgeCard.suit !== '♥') {
-          ctx.actor.hp -= 1;
-          state.addLog(`⚡ Kẻ gây sát thương ${ctx.actor.name} nhận 1 sát thương do [Thất Trảm Sớ] gây ra!`);
+        const isHeart = judgeCard.suit === 'heart' || judgeCard.suit === '♥' || judgeCard.suit === 'cơ';
+        if (!isHeart && ctx.actor && ctx.actor.isAlive) {
+          state.priorityStack.push({
+            type: 'ASK_THAT_TRAM_SO_PUNISH',
+            sourceId: ctx.ownerId,
+            targetId: ctx.actor.id,
+            currentActorId: ctx.actor.id,
+            priorityQueue: [ctx.actor.id],
+            context: {
+              reason: 'that_tram_so',
+              sourceId: ctx.ownerId,
+              judgeCard
+            }
+          });
         }
       }
     })
@@ -368,24 +522,38 @@ export const NguyenDiaLo = {
       type: 'lock',
       trigger: 'ON_DYING',
       filter: (ctx) => ctx.ownerId === ctx.targetId,
-      description: 'Hấp hối: Lật bài Trung, khác điểm với các lá cũ thì hồi 1 HP.',
-      execute: (state, ctx, stack) => {
+      description: 'Khi bạn rơi vào trạng thái Hấp hối, lật lá bài trên cùng của chồng bài rút và đặt lên tướng của bạn, gọi là "Trung". Nếu điểm số của lá bài này khác với tất cả các lá "Trung" đã có, bạn hồi phục đến 1 điểm Sinh lực. Nếu trùng điểm số, bỏ lá bài đó vào chồng bài bỏ. Khi trên tướng của bạn có "Trung", giới hạn trữ bài bằng số lá "Trung".',
+      execute: (state, ctx) => {
+        const owner = ctx.owner;
         const card = state.drawCardFromDeck();
         if (card) {
-          state.discardPile.push(card);
-          ctx.owner.hp = 1;
-          state.addLog(`🛡️ [Hộ Chủ] kích hoạt: ${ctx.owner.name} lật lá Trung [${card.name || card.id}], hồi phục lên 1 HP!`);
-          if (stack && !stack.isEmpty() && stack.peek().type === 'ASK_PEACH') {
-            stack.pop();
+          owner.trungCards = owner.trungCards || [];
+          const isDuplicate = owner.trungCards.some(c => c.rank === card.rank);
+          if (!isDuplicate) {
+            owner.trungCards.push(card);
+            owner.hp = Math.max(1, owner.hp);
+            state.addLog(`🛡️ [Hộ Chủ] ${owner.name} lật [Trung]: ${card.suit} ${card.rank} (không trùng điểm)! Thoát chết hồi phục lên 1 HP!`);
+          } else {
+            state.discardPile.push(card);
+            state.addLog(`❌ [Hộ Chủ] ${owner.name} lật [Trung]: ${card.suit} ${card.rank} (bị trùng điểm)! Thất bại.`);
           }
         }
       }
     }),
     new SkillContract({
-      id: 'xa_than_dia_lo',
-      name: 'Xả Thân',
+      id: 'can_gian',
+      name: 'Can Gián',
       type: 'reactive',
-      description: 'Đồng minh bị mất bài trên tay -> Mất 1 HP cho họ rút 2 bài.'
+      description: 'Khi một tướng bị bỏ hoặc bị thu lấy bài trên tay, bạn có thể mất 1 điểm Sinh lực. Nếu làm vậy, tướng đó rút 2 lá bài.',
+      canUse: (state, ctx) => ctx.owner.hp > 1,
+      execute: (state, ctx) => {
+        if (ctx.owner.hp <= 1) return;
+        const target = ctx.target;
+        if (!target || !target.isAlive) return;
+        ctx.owner.hp -= 1;
+        state.drawCards(target.id, 2);
+        state.addLog(`🕊️ [Can Gián] ${ctx.owner.name} mất 1 HP giúp ${target.name} rút 2 lá bài!`);
+      }
     })
   ]
 };
@@ -403,13 +571,13 @@ export const CongChuaAnTu = {
       id: 'hoa_than_an_tu',
       name: 'Hòa Thân',
       type: 'active',
-      description: 'Sử dụng bài Diamond (♦) như [Lạc Bất Tư Thục].'
+      description: 'Trong giai đoạn Hành động, bạn có thể sử dụng một lá bài chất ♦ như [Lạc Bất Tư Thục].'
     }),
     new SkillContract({
-      id: 'xa_than_an_tu',
+      id: 'xa_than',
       name: 'Xả Thân',
       type: 'reactive',
-      description: 'Bị Chém -> Bỏ 1 bài chuyển hướng Chém sang tướng khác trong tầm.'
+      description: 'Khi bạn trở thành mục tiêu của [Chém], bạn có thể bỏ đi một lá bài và đem lá [Chém] này di chuyển sang một người chơi khác nằm trong phạm vi công kích của bạn.'
     })
   ]
 };
@@ -431,4 +599,3 @@ export const HA_HEROES = [
   NguyenDiaLo,
   CongChuaAnTu
 ];
-

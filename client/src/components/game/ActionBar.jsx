@@ -1,7 +1,7 @@
 // @ts-check
 import React from 'react';
 import { PHASES } from 'shared/data/gameData';
-import { hasSkill } from 'shared/engine/gameState';
+import { hasSkill } from 'shared/engine_v4/application/index.js';
 /**
  * @typedef {import('../../engine/types/view/PlayerViewModel').PlayerViewModel} PlayerViewModel
  * @typedef {import('../../engine/types/view/GameViewModel').GameViewModel} GameViewModel

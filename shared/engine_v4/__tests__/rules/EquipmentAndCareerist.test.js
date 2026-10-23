@@ -240,4 +240,35 @@ describe('Equipment Passives, Bát Quái & Dã Tâm (Engine v4)', () => {
     expect(state.priorityStack.peek().type).toBe('ASK_DODGE');
     expect(p0.hand.length).toBe(0); // Đã dùng cả 2 lá Chém
   });
+
+  it('10. Quốc Chiến: Bàn 4 người có 3 người phe Lạc, người thứ 3 chưa lật tướng -> Tự động ép lộ diện thành Dã Tâm khi đối thủ chết, trận đấu tiếp tục', () => {
+    const state = createMockGame(4);
+    const p0 = state.getPlayer(0);
+    const p1 = state.getPlayer(1);
+    const p2 = state.getPlayer(2);
+    const p3 = state.getPlayer(3);
+
+    p0.faction = 'Lạc';
+    p0.revealedHeroes = [true, false];
+    p1.faction = 'Lạc';
+    p1.revealedHeroes = [true, false];
+    p2.faction = 'Lạc';
+    p2.revealedHeroes = [false, false]; // Người thứ 3 chưa lật tướng!
+    p3.faction = 'Sơn';
+    p3.revealedHeroes = [true, false];
+
+    // Tiêu diệt p3 (phe Sơn)
+    CombatRules.handleDeath(state, 3, 0);
+
+    // Vì có 3 người sống sót > maxAllowed (2) -> p2 buộc phải lộ diện và biến thành Dã Tâm!
+    expect(p2.isDaTam).toBe(true);
+    expect(p2.revealedHeroes[0]).toBe(true);
+    // Game KHÔNG kết thúc bằng chiến thắng đồng đội 3 người!
+    expect(state.gameOver).toBeFalsy();
+
+    // Tiêu diệt nốt p2 (Dã Tâm) -> Còn p0 và p1 (2 người <= 2) -> Phe Lạc đại thắng đồng đội!
+    CombatRules.handleDeath(state, 2, 0);
+    expect(state.gameOver).toBe(true);
+    expect(state.winner).toEqual([0, 1]);
+  });
 });

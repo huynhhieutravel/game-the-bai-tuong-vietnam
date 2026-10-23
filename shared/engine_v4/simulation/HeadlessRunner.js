@@ -222,6 +222,121 @@ export class HeadlessRunner {
           }
         } else if (frame.type === 'ASK_BANH_CHUNG') {
           state.priorityStack.pop();
+          if (state.currentPhase === PHASES.BEGIN && state.priorityStack.isEmpty()) {
+            stateMachine._completeBeginPhase();
+          }
+        } else if (frame.type === 'ASK_DA_TRACH') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          p.temporaryFlags = p.temporaryFlags || {};
+          p.temporaryFlags.skipDrawPhase = true;
+          const enemies = state.getAlivePlayers().filter(o => o.id !== actorId && o.hand && o.hand.length > 0);
+          for (const target of enemies.slice(0, 2)) {
+            p.hand.push(target.hand.pop());
+          }
+          if (state.currentPhase === PHASES.DRAW && state.priorityStack.isEmpty()) {
+            stateMachine._completeDrawPhase();
+          }
+        } else if (frame.type === 'ASK_KHOI_NGHIA') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          p.temporaryFlags = p.temporaryFlags || {};
+          p.temporaryFlags.drawCardCount = 1;
+          p.temporaryFlags.bonusDamage = 1;
+          if (state.currentPhase === PHASES.DRAW && state.priorityStack.isEmpty()) {
+            stateMachine._completeDrawPhase();
+          }
+        } else if (frame.type === 'ASK_DUONG_QUAN_1') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          const targets = (frame.context?.validTargets || []).filter(tid => {
+            const t = state.getPlayer(tid);
+            return t && t.isAlive && (!globalHeroRegistry.hasSkill(t, 'dam_bac', false) || (t.hand && t.hand.length > 0));
+          });
+          if (targets.length > 0 && Math.random() < 0.5) {
+            CombatRules.playSlash(state, actorId, targets[0], { name: 'Chém', virtual: true, infiniteRange: true }, { infiniteRange: true });
+            if (state.currentPhase === PHASES.BEGIN && state.priorityStack.isEmpty()) {
+              stateMachine._runPhaseAction();
+            }
+          } else {
+            if (state.currentPhase === PHASES.BEGIN && state.priorityStack.isEmpty()) {
+              stateMachine._completeBeginPhase();
+            }
+          }
+        } else if (frame.type === 'ASK_DUONG_QUAN_3') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          const targets = (frame.context?.validTargets || []).filter(tid => {
+            const t = state.getPlayer(tid);
+            return t && t.isAlive && (!globalHeroRegistry.hasSkill(t, 'dam_bac', false) || (t.hand && t.hand.length > 0));
+          });
+          const excess = (p?.hand?.length || 0) - (p?.hp || 0);
+          if (targets.length > 0 && excess >= 2 && p?.isFaceUp) {
+            p.isFaceUp = false;
+            CombatRules.playSlash(state, actorId, targets[0], { name: 'Chém', virtual: true, infiniteRange: true }, { infiniteRange: true });
+            if (state.currentPhase === PHASES.DISCARD && state.priorityStack.isEmpty()) {
+              stateMachine._runPhaseEnd();
+            }
+          } else {
+            if (state.currentPhase === PHASES.DISCARD && state.priorityStack.isEmpty()) {
+              stateMachine._checkDiscardLimit(p);
+            }
+          }
+        } else if (frame.type === 'ASK_XA_THAN') {
+          const p = state.getPlayer(actorId);
+          const validTargets = frame.context?.validTargets || [];
+          if (p && p.hand && p.hand.length > 0 && validTargets.length > 0) {
+            CombatRules.respondXaThan(state, actorId, p.hand[0], validTargets[0]);
+          } else {
+            CombatRules.respondXaThan(state, actorId, null, null);
+          }
+        } else if (frame.type === 'ASK_VAN_DON') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          const target = state.getPlayer(frame.targetId);
+          if (p && target && p.hand?.length > 0 && target.hand?.length > 0) {
+            const myCard = p.hand.pop();
+            const oppCard = target.hand.pop();
+            state.discardPile.push(myCard);
+            state.discardPile.push(oppCard);
+
+            const rankToNum = (r) => {
+              if (typeof r === 'number') return r;
+              if (!r) return 1;
+              const s = String(r).trim().toUpperCase();
+              if (s === 'A') return 1;
+              if (s === 'J') return 11;
+              if (s === 'Q') return 12;
+              if (s === 'K') return 13;
+              const n = parseInt(s, 10);
+              return isNaN(n) ? 1 : n;
+            };
+
+            const myRank = rankToNum(myCard.rank);
+            const oppRank = rankToNum(oppCard.rank);
+
+            p.temporaryFlags = p.temporaryFlags || {};
+            if (myRank > oppRank) {
+              p.temporaryFlags.vanDonWin = true;
+            } else {
+              p.temporaryFlags.vanDonLose = true;
+            }
+          }
+        } else if (frame.type === 'ASK_DUYEN_THO') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          const validTargets = frame.context?.validTargets || [];
+          if (p && p.hand && p.hand.length >= 2 && validTargets.length > 0) {
+            state.discardFromHand(actorId, [p.hand[0].id, p.hand[1].id]);
+            if (p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + 1);
+            const target = state.getPlayer(validTargets[0]);
+            if (target && target.isAlive && target.hp < target.maxHp) {
+              target.hp = Math.min(target.maxHp, target.hp + 1);
+            }
+            p.skillUsage = p.skillUsage || {};
+            p.skillUsage.duyen_tho = p.skillUsage.duyen_tho || {};
+            p.skillUsage.duyen_tho.usedThisTurn = true;
+          }
         } else {
           // Bỏ qua các frame khác bằng cách pop
           if (frame.context?.judgeCard) state.discardPile.push(frame.context.judgeCard);

@@ -1,7 +1,0 @@
-export const SKILL_TYPES = {
-  ACTIVE: 'ACTIVE',
-  PASSIVE: 'PASSIVE',
-  LOCK: 'LOCK',
-  LIMITED: 'LIMITED',
-  TRANSFORM: 'TRANSFORM',
-};
