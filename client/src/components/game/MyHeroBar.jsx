@@ -46,7 +46,45 @@ export default function MyHeroBar(props) {
            
            {/* ZONE 1: HERO DOCK CONTAINER (Góc dưới trái) */}
            <div className="my-hero-dock-container">
-               {/* 1. Header trên cùng: Phe badge, Ẩn badge, HP Hearts 4/4 */}
+               {/* 1. Khung trang bị: 4 ô trang bị dàn ngang 1 hàng TRÊN CÙNG (trên thanh HP) */}
+               <div className="my-hero-equipment-area my-hero-equipment-row">
+                 {[
+                   { type: CARD_SUBTYPES.EQUIP_WEAPON, icon: <WeaponIcon size={18} />, title: 'Vũ khí' },
+                   { type: CARD_SUBTYPES.EQUIP_ARMOR, icon: <ArmorIcon size={18} />, title: 'Phòng cụ' },
+                   { type: CARD_SUBTYPES.EQUIP_MOUNT_ATK, icon: <MountAtkIcon size={18} />, title: 'Ngựa công (-1)' },
+                   { type: CARD_SUBTYPES.EQUIP_MOUNT_DEF, icon: <MountDefIcon size={18} />, title: 'Ngựa thủ (+1)' }
+                 ].map((slot, i) => {
+                   const eqCard = me.equipment?.find(c => getCardSubType(c) === slot.type);
+                   const bgImage = eqCard ? getCardBg(eqCard.name) : null;
+                   return (
+                     <div 
+                       key={i} 
+                       className={`my-hero-equip-slot ${eqCard ? 'equipped' : 'empty'}`} 
+                       title={eqCard ? `${eqCard.name}: ${eqCard.desc} (Nhấn để phóng to)` : slot.title} 
+                       style={{ ...(bgImage ? { backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1.5px solid var(--color-gold)' } : {}) }} 
+                       onClick={(e) => { e.stopPropagation(); if (eqCard) setCardPopup(eqCard); }}
+                     >
+                       {eqCard ? (
+                         <>
+                           <div className={`my-hero-equip-badge ${eqCard.color === 'red' ? 'red' : ''} ${bgImage ? 'has-bg' : ''}`}>
+                             {getSuitEmoji(eqCard.suit)}{eqCard.rank}
+                           </div>
+                           {!bgImage && (
+                             <>
+                               <div className="my-hero-equip-emoji">{eqCard.emoji}</div>
+                               <div className="my-hero-equip-name">{eqCard.name}</div>
+                             </>
+                           )}
+                         </>
+                       ) : (
+                         <span className="my-hero-equip-icon-empty">{slot.icon}</span>
+                       )}
+                     </div>
+                   );
+                 })}
+               </div>
+
+               {/* 2. Thanh HP & Phe: Nằm ở giữa, dưới Khung trang bị và trên Khung thẻ tướng */}
                <div className="my-hero-dock-header">
                    <div className="my-hero-dock-badges">
                        <div className={`my-hero-faction-tag ${me.isDaTam ? 'datam' : (getPlayerFaction(me) === 'Lạc' ? 'lac' : getPlayerFaction(me) === 'Sơn' ? 'son' : getPlayerFaction(me) === 'Hà' ? 'ha' : 'default')}`}>
@@ -72,7 +110,7 @@ export default function MyHeroBar(props) {
                    </div>
                </div>
 
-               {/* 2. Khung thẻ Tướng bự hơn */}
+               {/* 3. Khung thẻ Tướng: Nằm ở dưới cùng */}
                <div className="my-hero-dock">
                    <div className="my-hero-dock-body">
                        {/* Avatars */}
@@ -138,47 +176,9 @@ export default function MyHeroBar(props) {
                </div>
            </div>
 
-           {/* ZONE 2: HAND FAN + EQUIPMENT (Chính giữa đáy) */}
+           {/* ZONE 2: HAND FAN (Chính giữa đáy) */}
            <div className="my-hero-hand-zone">
                <div className="my-hero-hand-wrapper">
-                   {/* 4 ô trang bị dàn ngang 1 hàng bên trên thẻ bài */}
-                   <div className="my-hero-equipment-area my-hero-equipment-row">
-                     {[
-                       { type: CARD_SUBTYPES.EQUIP_WEAPON, icon: <WeaponIcon size={20} />, title: 'Vũ khí' },
-                       { type: CARD_SUBTYPES.EQUIP_ARMOR, icon: <ArmorIcon size={20} />, title: 'Phòng cụ' },
-                       { type: CARD_SUBTYPES.EQUIP_MOUNT_ATK, icon: <MountAtkIcon size={20} />, title: 'Ngựa công (-1)' },
-                       { type: CARD_SUBTYPES.EQUIP_MOUNT_DEF, icon: <MountDefIcon size={20} />, title: 'Ngựa thủ (+1)' }
-                     ].map((slot, i) => {
-                       const eqCard = me.equipment?.find(c => getCardSubType(c) === slot.type);
-                       const bgImage = eqCard ? getCardBg(eqCard.name) : null;
-                       return (
-                         <div 
-                           key={i} 
-                           className={`my-hero-equip-slot ${eqCard ? 'equipped' : 'empty'}`} 
-                           title={eqCard ? `${eqCard.name}: ${eqCard.desc} (Nhấn để phóng to)` : slot.title} 
-                           style={{ ...(bgImage ? { backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1.5px solid var(--color-gold)' } : {}) }} 
-                           onClick={(e) => { e.stopPropagation(); if (eqCard) setCardPopup(eqCard); }}
-                         >
-                           {eqCard ? (
-                             <>
-                               <div className={`my-hero-equip-badge ${eqCard.color === 'red' ? 'red' : ''} ${bgImage ? 'has-bg' : ''}`}>
-                                 {getSuitEmoji(eqCard.suit)}{eqCard.rank}
-                               </div>
-                               {!bgImage && (
-                                 <>
-                                   <div className="my-hero-equip-emoji">{eqCard.emoji}</div>
-                                   <div className="my-hero-equip-name">{eqCard.name}</div>
-                                 </>
-                               )}
-                             </>
-                           ) : (
-                             <span className="my-hero-equip-icon-empty">{slot.icon}</span>
-                           )}
-                         </div>
-                       );
-                     })}
-                   </div>
-
                    {playerHand}
                </div>
            </div>

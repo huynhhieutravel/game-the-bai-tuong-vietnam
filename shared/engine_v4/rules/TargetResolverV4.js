@@ -44,6 +44,7 @@ export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCa
   }
 
   // 2. Tra cứu card name / slug
+  const isVirtual = Boolean(cardNameOrId && physicalCard && cardNameOrId !== physicalCard.id);
   let actualCardName = cardNameOrId;
   if (physicalCard && cardNameOrId === physicalCard.id) {
     actualCardName = physicalCard.name;

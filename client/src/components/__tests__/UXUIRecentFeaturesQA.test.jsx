@@ -590,17 +590,41 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
       expect(dockBody).not.toBeNull();
       expect(dockBody.querySelector('.my-hero-avatars')).not.toBeNull();
 
-      // 4 ô trang bị dàn ngang 1 hàng bên trên thẻ bài (trong my-hero-hand-wrapper)
-      const handWrapper = container.querySelector('.my-hero-hand-wrapper');
-      expect(handWrapper).not.toBeNull();
-      const equipArea = handWrapper.querySelector('.my-hero-equipment-row');
+      // 4 ô trang bị dàn ngang 1 hàng ở trên cùng của dock container (trên thanh HP)
+      const equipArea = dockContainer.querySelector('.my-hero-equipment-row');
       expect(equipArea).not.toBeNull();
       expect(equipArea.querySelectorAll('.my-hero-equip-slot').length).toBe(4);
+
+      // my-hero-hand-wrapper chỉ chứa bài trên tay, không bị ô trang bị che
+      const handWrapper = container.querySelector('.my-hero-hand-wrapper');
+      expect(handWrapper).not.toBeNull();
+      expect(handWrapper.querySelector('.my-hero-equipment-row')).toBeNull();
 
       // Stats box should NOT be inside action-hub
       const actionHub = container.querySelector('.my-hero-action-hub');
       expect(actionHub).not.toBeNull();
       expect(actionHub.querySelector('.my-hero-stats-box')).toBeNull();
+    });
+
+    it('getTargetingDefinition không bị lỗi ReferenceError: isVirtual khi kích hoạt kỹ năng chuyển bài (Thần Hỏa/Linh Giám/Tiên Duyên)', async () => {
+      const { getTargetingDefinition } = await import('shared/engine_v4/rules/TargetResolverV4');
+      const state = {
+        getPlayer: (id) => ({
+          id,
+          skills: ['than_hoa', 'linh_giam'],
+          revealedHeroes: [true, true],
+          heroes: [{ id: 'rua_vang', skills: ['than_hoa', 'linh_giam'] }]
+        }),
+        getAlivePlayers: () => [
+          { id: 0, isAlive: true },
+          { id: 1, isAlive: true }
+        ]
+      };
+      const physicalCard = { id: 'c1', name: 'Đào', color: 'red', suit: 'heart' };
+      // Gọi getTargetingDefinition với virtual card conversion
+      const def = getTargetingDefinition(state, 0, 'Hỏa Công', physicalCard);
+      expect(def).toBeDefined();
+      expect(def.type).toBe('single');
     });
 
     it('Hero reveal overlay hiển thị nút Lật và nút Xem bên dưới để xem tướng an toàn không nhấn nhầm', async () => {
