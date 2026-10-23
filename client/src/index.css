@@ -1430,18 +1430,18 @@ body {
     flex-wrap: nowrap !important;
     justify-content: center !important;
     align-items: center !important;
-    gap: 10px !important;
+    gap: 12px !important;
     width: 100% !important;
     max-width: 100% !important;
-    margin: 0 auto !important;
+    margin: 4px auto !important;
   }
 
   .draft-hero-card {
-    width: clamp(105px, 15vw, 138px) !important;
-    max-width: 140px !important;
-    height: clamp(155px, 48vh, 205px) !important;
+    width: clamp(124px, 17vw, 168px) !important;
+    max-width: 172px !important;
+    height: clamp(200px, 62vh, 260px) !important;
     flex: 0 0 auto !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
   }
 
   .draft-confirm-btn {
@@ -1452,6 +1452,25 @@ body {
 
   .mobile-log-ticker {
     display: none !important; /* Hide full-screen floating ticker in landscape to preserve board view */
+  }
+
+  /* Log Container Full Screen on Mobile Landscape */
+  .game-log-container.mobile-open {
+    display: flex !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    z-index: 1100 !important;
+    background: rgba(11, 17, 32, 0.98) !important;
+    backdrop-filter: blur(20px) !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 
   .game-top-bar {

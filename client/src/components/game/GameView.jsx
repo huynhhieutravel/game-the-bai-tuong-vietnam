@@ -63,6 +63,7 @@ export default function GameView() {
 
   const [logTab, setLogTab] = useState('all');
   const [showMobileLog, setShowMobileLog] = useState(false);
+  const [showGameMenu, setShowGameMenu] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.innerWidth <= 768 || window.innerHeight <= 520;
@@ -314,6 +315,26 @@ export default function GameView() {
           >
              📜 Log {gameState.logs?.length > 0 && <span className="mobile-log-count">{gameState.logs.length}</span>}
           </button>
+          <button 
+             className="game-menu-btn"
+             onClick={() => setShowGameMenu(true)}
+             title="Tùy chọn & Menu trận đấu"
+             style={{
+               background: 'rgba(212, 168, 67, 0.2)',
+               border: '1px solid var(--color-gold)',
+               color: 'var(--color-gold)',
+               padding: '3px 10px',
+               borderRadius: '6px',
+               fontSize: '0.8rem',
+               fontWeight: 'bold',
+               cursor: 'pointer',
+               display: 'inline-flex',
+               alignItems: 'center',
+               gap: '3px'
+             }}
+          >
+             ⚙️ Menu
+          </button>
         </div>
       </div>
       
@@ -504,15 +525,37 @@ export default function GameView() {
       )}
 
       <div className={`game-log-container ${showMobileLog ? 'mobile-open' : ''}`}>
-        <div className="game-log-header">
-           <span className="game-log-title">📜 Nhật Ký Trận Đấu</span>
-           <button className="mobile-log-close-btn" onClick={() => setShowMobileLog(false)} title="Đóng">✕</button>
+        <div className="game-log-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+           <span className="game-log-title" style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--color-gold)' }}>
+             📜 Nhật Ký Trận Đấu {gameState.logs?.length > 0 && `(${gameState.logs.length})`}
+           </span>
+           <button 
+             className="mobile-log-close-btn" 
+             onClick={() => setShowMobileLog(false)} 
+             title="Thoát nhật ký"
+             style={{ 
+               background: '#ef4444', 
+               color: 'white', 
+               border: 'none', 
+               borderRadius: '8px', 
+               padding: '6px 14px', 
+               fontSize: '0.85rem', 
+               fontWeight: 'bold', 
+               display: 'flex', 
+               alignItems: 'center', 
+               gap: '4px', 
+               cursor: 'pointer',
+               boxShadow: '0 2px 6px rgba(239, 68, 68, 0.4)'
+             }}
+           >
+             ✕ Thoát
+           </button>
         </div>
-        <div className="game-log-tabs">
-           <div className={`game-log-tab ${logTab === 'all' ? 'active' : ''}`} onClick={() => setLogTab('all')}>Tất cả</div>
-           <div className={`game-log-tab ${logTab === 'personal' ? 'active' : ''}`} onClick={() => setLogTab('personal')}>Cá nhân</div>
+        <div className="game-log-tabs" style={{ display: 'flex', gap: '8px', padding: '8px 16px', background: 'rgba(0,0,0,0.3)' }}>
+           <div className={`game-log-tab ${logTab === 'all' ? 'active' : ''}`} onClick={() => setLogTab('all')} style={{ padding: '4px 14px', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: logTab === 'all' ? 'bold' : 'normal', background: logTab === 'all' ? 'var(--color-gold)' : 'rgba(255,255,255,0.06)', color: logTab === 'all' ? '#111827' : '#94a3b8' }}>Tất cả</div>
+           <div className={`game-log-tab ${logTab === 'personal' ? 'active' : ''}`} onClick={() => setLogTab('personal')} style={{ padding: '4px 14px', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: logTab === 'personal' ? 'bold' : 'normal', background: logTab === 'personal' ? 'var(--color-gold)' : 'rgba(255,255,255,0.06)', color: logTab === 'personal' ? '#111827' : '#94a3b8' }}>Cá nhân</div>
         </div>
-        <div className="game-log" ref={logRef}>
+        <div className="game-log" ref={logRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {gameState.logs?.filter(log => {
              const text = log.text || log.message || '';
              if (logTab === 'all') return true;
@@ -521,22 +564,93 @@ export default function GameView() {
           }).map((log, i) => {
             const text = log.text || log.message || '';
             return (
-              <div key={i} className={`log-entry ${log.important ? 'important' : ''} ${text.includes("mất") ? 'damage' : ''}`}>
-                 <span style={{opacity: 0.5}}>
+              <div key={i} className={`log-entry ${log.important ? 'important' : ''} ${text.includes("mất") ? 'damage' : ''}`} style={{ fontSize: '0.9rem', lineHeight: '1.45' }}>
+                 <span style={{ opacity: 0.5, marginRight: '6px', fontSize: '0.8rem' }}>
                    [{new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}]
                  </span> {renderLogText(text)}
               </div>
             );
           })}
         </div>
+        <div className="game-log-footer" style={{ padding: '8px 16px', background: 'rgba(15, 23, 42, 0.95)', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <button 
+            onClick={() => setShowMobileLog(false)} 
+            style={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              border: '1px solid rgba(255, 255, 255, 0.25)', 
+              color: '#f8fafc', 
+              padding: '6px 24px', 
+              borderRadius: '8px', 
+              fontSize: '0.85rem', 
+              fontWeight: 'bold', 
+              cursor: 'pointer' 
+            }}
+          >
+            ✕ Đóng Nhật Ký
+          </button>
+        </div>
       </div>
 
       <ModalContainer mainPlayerId={mainPlayerId} />
 
-
+      {/* HERO DETAIL MODAL (Zoom Võ Tướng) */}
       {heroPopup && (
-         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.88)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(12px)', padding: '16px', boxSizing: 'border-box' }} onClick={() => setHeroPopup(null)}>
-            <div style={{ display: 'flex', gap: '24px', maxWidth: '920px', maxHeight: '94vh', overflowY: 'auto', padding: '12px', alignItems: 'flex-start', justifyContent: 'center', flexWrap: 'wrap' }}>
+         <div 
+           style={{ 
+             position: 'fixed', 
+             top: 0, 
+             left: 0, 
+             width: '100%', 
+             height: '100%', 
+             background: 'rgba(0,0,0,0.92)', 
+             zIndex: 1200, 
+             display: 'flex', 
+             flexDirection: 'column', 
+             alignItems: 'center', 
+             justifyContent: 'center', 
+             backdropFilter: 'blur(14px)', 
+             padding: '8px', 
+             boxSizing: 'border-box' 
+           }} 
+           onClick={() => setHeroPopup(null)}
+         >
+            {/* Nút thoát nổi góc trên bên phải */}
+            <button 
+              onClick={() => setHeroPopup(null)} 
+              title="Thoát xem tướng"
+              style={{ 
+                position: 'absolute', 
+                top: '10px', 
+                right: '14px', 
+                zIndex: 1220, 
+                background: '#ef4444', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '8px', 
+                padding: '6px 14px', 
+                fontSize: '0.85rem', 
+                fontWeight: 'bold', 
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)'
+              }}
+            >
+              ✕ Thoát
+            </button>
+
+            <div 
+              style={{ 
+                display: 'flex', 
+                gap: '16px', 
+                maxWidth: '96vw', 
+                maxHeight: '88vh', 
+                overflowY: 'auto', 
+                overflowX: 'auto', 
+                padding: '4px', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                flexWrap: 'nowrap' 
+              }}
+            >
               {(heroPopup.heroes || []).map((hero, idx) => {
                 const isSelf = heroPopup.id === mainPlayerId;
                 const isRevealed = Boolean(heroPopup.revealedHeroes?.[idx] ?? hero?.isRevealed);
@@ -549,84 +663,236 @@ export default function GameView() {
                       key={idx} 
                       style={{ 
                         background: 'linear-gradient(180deg, #161e2e 0%, #0d121d 100%)', 
-                        borderRadius: '16px', 
-                        overflow: 'hidden', 
+                        borderRadius: '12px', 
                         border: '2px dashed #4b5563', 
-                        width: 'clamp(280px, 42vw, 340px)', 
-                        boxShadow: '0 10px 40px rgba(0,0,0,0.85)',
+                        height: 'clamp(240px, 80vh, 340px)', 
+                        aspectRatio: '1086 / 1448',
+                        boxShadow: '0 8px 30px rgba(0,0,0,0.85)',
                         display: 'flex',
-                        flexDirection: 'column'
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '16px',
+                        boxSizing: 'border-box'
                       }} 
                       onClick={e => e.stopPropagation()}
                     >
-                      <div style={{ padding: '12px 12px 6px 12px', background: '#090d16', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                        <div style={{ width: '100%', aspectRatio: '1086 / 1448', background: '#1f2937', borderRadius: '4px', border: '1px dashed #4b5563', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ fontSize: '70px', filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.5))' }}>🕵️</div>
-                          <div style={{ color: '#9ca3af', fontWeight: 'bold', fontSize: '1rem', letterSpacing: '2px', marginTop: '8px' }}>TƯỚNG ẨN</div>
-                          <div style={{ color: '#6b7280', fontSize: '0.8rem', marginTop: '2px' }}>Chưa lộ diện</div>
-                        </div>
-                      </div>
-                      <div style={{ padding: '16px 18px 20px 18px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                        <h2 style={{ margin: '0 0 6px 0', color: '#9ca3af', fontSize: '1.35rem', textAlign: 'center' }}>Tướng Ẩn (???)</h2>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '12px' }}>
-                          <span style={{ fontSize: '0.75rem', padding: '3px 12px', borderRadius: '12px', background: '#4b5563', color: 'white', fontWeight: 'bold' }}>🕵️ HỆ ẨN</span>
-                        </div>
-                        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px dashed #4b5563', textAlign: 'center', color: '#9ca3af', fontSize: '0.85rem', fontStyle: 'italic', lineHeight: '1.5' }}>
-                          Võ tướng này đang trong trạng thái ẩn danh. Danh tính và kỹ năng sẽ được hiển lộ khi người chơi phát động kỹ năng hoặc lật tướng!
-                        </div>
-                      </div>
+                      <div style={{ fontSize: '50px' }}>🕵️</div>
+                      <div style={{ color: '#9ca3af', fontWeight: 'bold', fontSize: '1rem', marginTop: '8px' }}>TƯỚNG ẨN</div>
+                      <div style={{ color: '#6b7280', fontSize: '0.8rem', marginTop: '4px' }}>Chưa lộ diện</div>
                     </div>
                   );
                 }
 
                 const heroFaction = hero?.faction || heroPopup.faction || 'none';
                 const factionColor = heroPopup.isDaTam ? '#9ca3af' : (heroFaction === 'Lạc' ? '#10b981' : heroFaction === 'Sơn' ? '#b45309' : heroFaction === 'Hà' ? '#3b82f6' : '#ef4444');
-                const factionLabel = heroPopup.isDaTam ? '🐺 DÃ TÂM' : `PHE ${heroFaction.toUpperCase()}`;
 
                 return (
-                  <div key={idx} style={{ background: 'linear-gradient(180deg, #161e2e 0%, #0d121d 100%)', borderRadius: '16px', overflow: 'hidden', border: `2px solid ${factionColor}`, width: 'clamp(280px, 42vw, 340px)', boxShadow: '0 10px 40px rgba(0,0,0,0.85), 0 0 20px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-                    <div style={{ padding: '12px 12px 6px 12px', background: '#090d16', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                      {hero?.image ? (
-                        <div style={{ width: '100%', aspectRatio: '1086 / 1448', borderRadius: '4px', overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
-                          <img src={`/images/heroes/${hero.image}`} alt={hero.name} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
-                        </div>
-                      ) : (
-                        <div style={{ width: '100%', aspectRatio: '1086 / 1448', background: '#1f2937', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '80px' }}>
-                          {hero?.emoji || '🎴'}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ padding: '16px 18px 20px 18px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                      <h2 style={{ margin: '0 0 6px 0', color: 'var(--color-gold)', fontSize: '1.35rem', textAlign: 'center', fontWeight: 'bold' }}>{hero?.name}</h2>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '12px' }}>
-                        <span style={{ fontSize: '0.75rem', padding: '3px 14px', borderRadius: '12px', background: factionColor, color: 'white', fontWeight: 'bold', letterSpacing: '0.8px' }}>{factionLabel}</span>
+                  <div 
+                    key={idx} 
+                    style={{ 
+                      background: 'linear-gradient(180deg, #161e2e 0%, #0d121d 100%)', 
+                      borderRadius: '12px', 
+                      border: `2px solid ${factionColor}`, 
+                      height: 'clamp(240px, 82vh, 350px)', 
+                      aspectRatio: '1086 / 1448',
+                      boxShadow: '0 8px 30px rgba(0,0,0,0.85)', 
+                      display: 'flex', 
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      position: 'relative'
+                    }} 
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {hero?.image ? (
+                      <img 
+                        src={`/images/heroes/${hero.image}`} 
+                        alt={hero.name} 
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'contain', 
+                          display: 'block' 
+                        }} 
+                      />
+                    ) : (
+                      <div style={{ padding: '20px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '60px' }}>{hero?.emoji || '🎴'}</div>
+                        <h3 style={{ color: 'var(--color-gold)', margin: '8px 0 4px 0' }}>{hero?.name}</h3>
+                        <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '8px', background: factionColor, color: 'white' }}>{heroFaction}</span>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {hero?.skills?.map((skill, sIdx) => (
-                          <div key={sIdx} style={{ fontSize: '0.85rem', lineHeight: '1.45', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                            <strong style={{ color: 'var(--color-gold-light)', display: 'block', marginBottom: '2px', fontSize: '0.9rem' }}>{skill.name}:</strong>
-                            <span style={{ color: '#d1d5db' }}>{skill.desc}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}
             </div>
+
+            <button 
+              onClick={() => setHeroPopup(null)} 
+              style={{ 
+                marginTop: '10px', 
+                background: 'rgba(255, 255, 255, 0.1)', 
+                border: '1px solid rgba(255, 255, 255, 0.25)', 
+                color: '#f8fafc', 
+                padding: '6px 20px', 
+                borderRadius: '8px', 
+                fontSize: '0.85rem', 
+                fontWeight: 'bold', 
+                cursor: 'pointer' 
+              }}
+            >
+              ✕ Đóng
+            </button>
          </div>
       )}
 
+      {/* CARD DETAIL POPUP */}
       {cardPopup && (
-         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(10px)' }} onClick={() => setCardPopup(null)}>
-            <div style={{ background: '#111827', borderRadius: '16px', padding: '30px', border: '2px solid var(--color-gold)', maxWidth: '400px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-               <div style={{ fontSize: '4rem', marginBottom: '10px' }}>{cardPopup.emoji}</div>
-               <h2 style={{ color: cardPopup.color === 'red' ? '#ef4444' : 'white', margin: '0 0 5px 0' }}>{cardPopup.name}</h2>
-               <div style={{ fontSize: '1.2rem', marginBottom: '15px', fontWeight: 'bold' }}>{getSuitEmoji(cardPopup.suit)} {cardPopup.rank}</div>
-               <div style={{ fontSize: '1rem', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>{cardPopup.desc}</div>
-               <button className="btn-action primary" style={{ marginTop: '20px' }} onClick={() => setCardPopup(null)}>Đóng</button>
+         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.88)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(10px)', padding: '16px', boxSizing: 'border-box' }} onClick={() => setCardPopup(null)}>
+            <div style={{ background: '#111827', borderRadius: '16px', padding: '20px 24px', border: '2px solid var(--color-gold)', maxWidth: '380px', width: '90%', maxHeight: '88vh', overflowY: 'auto', textAlign: 'center', position: 'relative' }} onClick={e => e.stopPropagation()}>
+               <button onClick={() => setCardPopup(null)} style={{ position: 'absolute', top: '10px', right: '12px', background: 'none', border: 'none', color: '#9ca3af', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+               {getCardBg(cardPopup.name) ? (
+                  <div style={{ width: '110px', height: '150px', margin: '0 auto 10px auto', backgroundImage: `url(${getCardBg(cardPopup.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)' }} />
+               ) : (
+                  <div style={{ fontSize: '3.5rem', marginBottom: '6px' }}>{cardPopup.emoji}</div>
+               )}
+               <h2 style={{ color: cardPopup.color === 'red' ? '#ef4444' : 'var(--color-gold)', margin: '0 0 4px 0', fontSize: '1.2rem' }}>{cardPopup.name}</h2>
+               <div style={{ fontSize: '0.95rem', marginBottom: '10px', fontWeight: 'bold', color: cardPopup.color === 'red' ? '#ef4444' : '#f8fafc' }}>{getSuitEmoji(cardPopup.suit)} {cardPopup.rank}</div>
+               <div style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)', lineHeight: '1.45', background: 'rgba(255,255,255,0.05)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>{cardPopup.desc}</div>
+               <button className="btn-action primary" style={{ marginTop: '14px', padding: '6px 24px', fontSize: '0.88rem' }} onClick={() => setCardPopup(null)}>Đóng</button>
             </div>
          </div>
+      )}
+
+      {/* IN-GAME MENU MODAL (Tùy Chọn & Thoát Về Sảnh) */}
+      {showGameMenu && (
+        <div 
+          style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            width: '100%', 
+            height: '100%', 
+            background: 'rgba(0,0,0,0.85)', 
+            zIndex: 1500, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            backdropFilter: 'blur(12px)',
+            padding: '16px',
+            boxSizing: 'border-box'
+          }}
+          onClick={() => setShowGameMenu(false)}
+        >
+          <div 
+            style={{ 
+              background: 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)', 
+              border: '2px solid var(--color-gold)', 
+              borderRadius: '16px', 
+              padding: '20px 24px', 
+              maxWidth: '360px', 
+              width: '90%', 
+              boxShadow: '0 10px 40px rgba(0,0,0,0.9)',
+              textAlign: 'center',
+              position: 'relative'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => setShowGameMenu(false)}
+              style={{ position: 'absolute', top: '10px', right: '12px', background: 'none', border: 'none', color: '#9ca3af', fontSize: '1.2rem', cursor: 'pointer' }}
+            >
+              ✕
+            </button>
+
+            <h3 style={{ margin: '0 0 4px 0', color: 'var(--color-gold)', fontSize: '1.25rem', fontWeight: 'bold' }}>
+              ⚙️ TÙY CHỌN TRẬN ĐẤU
+            </h3>
+            <p style={{ margin: '0 0 16px 0', color: '#94a3b8', fontSize: '0.8rem' }}>
+              Quốc Chiến • Lượt {gameState.turnCount || 1} • {gameState.phase}
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button 
+                onClick={() => setShowGameMenu(false)}
+                style={{ 
+                  background: 'linear-gradient(to right, #fbbf24, #d97706)', 
+                  color: '#111827', 
+                  fontWeight: 'bold', 
+                  padding: '10px', 
+                  borderRadius: '10px', 
+                  border: 'none', 
+                  fontSize: '0.95rem',
+                  cursor: 'pointer'
+                }}
+              >
+                ▶️ Tiếp Tục Trận Đấu
+              </button>
+
+              <button 
+                onClick={sfx.toggleMute}
+                style={{ 
+                  background: 'rgba(255,255,255,0.08)', 
+                  color: '#f8fafc', 
+                  fontWeight: 'bold', 
+                  padding: '9px', 
+                  borderRadius: '10px', 
+                  border: '1px solid rgba(255,255,255,0.2)', 
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                {sfx.isMuted ? '🔇 Âm Thanh: Đang Tắt' : '🔊 Âm Thanh: Đang Bật'}
+              </button>
+
+              <button 
+                onClick={() => {
+                  if (window.confirm("Bạn có chắc chắn muốn khởi động lại ván đấu mới không?")) {
+                    window.location.reload();
+                  }
+                }}
+                style={{ 
+                  background: 'rgba(59, 130, 246, 0.15)', 
+                  color: '#60a5fa', 
+                  fontWeight: 'bold', 
+                  padding: '9px', 
+                  borderRadius: '10px', 
+                  border: '1px solid #3b82f6', 
+                  fontSize: '0.88rem',
+                  cursor: 'pointer'
+                }}
+              >
+                🔄 Khởi Động Lại Ván Đấu
+              </button>
+
+              <button 
+                onClick={() => {
+                  if (window.confirm("Bạn có chắc chắn muốn thoát ván đấu hiện tại về sảnh chính không?")) {
+                    navigate('/');
+                  }
+                }}
+                style={{ 
+                  background: 'rgba(239, 68, 68, 0.15)', 
+                  color: '#f87171', 
+                  fontWeight: 'bold', 
+                  padding: '9px', 
+                  borderRadius: '10px', 
+                  border: '1px solid #ef4444', 
+                  fontSize: '0.88rem',
+                  cursor: 'pointer'
+                }}
+              >
+                🏠 Thoát Về Sảnh Chính
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <ChatWidget style={{ position: 'absolute', top: '100px', left: '20px', zIndex: 90, height: '300px', width: '280px' }} />

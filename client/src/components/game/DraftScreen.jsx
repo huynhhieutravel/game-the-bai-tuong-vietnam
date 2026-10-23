@@ -153,13 +153,63 @@ export function DraftScreen(props) {
                     overflow: 'hidden'
                 }}
                 >
-                {isSelected && (
-                    <div style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '1.4rem', zIndex: 4, background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: '2px' }}>✅</div>
-                )}
                 {/* Huy hiệu phe */}
-                <div style={{ position: 'absolute', top: '8px', left: '8px', zIndex: 4, background: factionColor, color: 'white', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                <div style={{ position: 'absolute', top: '8px', left: '8px', zIndex: 4, background: factionColor, color: 'white', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
                     {hero.faction}
                 </div>
+
+                {/* Nút soi cố định ở góc trên bên phải - Kích thước luôn chuẩn xác đồng nhất */}
+                <button 
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setInspectedHero(hero);
+                    }}
+                    style={{ 
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        zIndex: 5,
+                        background: 'rgba(15, 23, 42, 0.88)', 
+                        border: '1px solid var(--color-gold)', 
+                        color: 'var(--color-gold)', 
+                        borderRadius: '12px', 
+                        padding: '3px 8px', 
+                        fontSize: '0.72rem', 
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
+                        backdropFilter: 'blur(4px)'
+                    }}
+                    title="Xem chi tiết kỹ năng"
+                >
+                    🔍 Soi
+                </button>
+
+                {/* Biểu tượng đã chọn */}
+                {isSelected && (
+                    <div style={{ 
+                        position: 'absolute', 
+                        top: '8px', 
+                        right: '62px', 
+                        fontSize: '1rem', 
+                        zIndex: 6, 
+                        background: 'rgba(16, 185, 129, 0.95)', 
+                        color: 'white',
+                        borderRadius: '50%', 
+                        width: '22px',
+                        height: '22px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 'bold',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.6)'
+                    }}>
+                        ✓
+                    </div>
+                )}
 
                 {hero.image ? (
                     <img src={`/images/heroes/${hero.image}`} alt={hero.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -170,41 +220,29 @@ export function DraftScreen(props) {
                     </div>
                 )}
                 
-                {/* Thanh tên tướng và nút soi chi tiết */}
+                {/* Thanh tên tướng dàn rộng toàn bộ chân thẻ - Không bị nút Soi chèn ép */}
                 <div style={{ 
                     position: 'absolute', 
                     bottom: 0, 
                     left: 0, 
                     right: 0, 
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 70%, transparent 100%)',
-                    padding: '6px 8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.75) 75%, transparent 100%)',
+                    padding: '8px 4px 5px 4px',
+                    textAlign: 'center',
                     zIndex: 3
                 }}>
-                    <span style={{ color: '#f8fafc', fontSize: '0.8rem', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {hero.name}
+                    <span style={{ 
+                        color: '#f8fafc', 
+                        fontSize: (hero.name || '').length > 10 ? '0.78rem' : '0.86rem', 
+                        fontWeight: 'bold', 
+                        display: 'block',
+                        whiteSpace: 'nowrap', 
+                        overflow: 'hidden', 
+                        textOverflow: 'ellipsis',
+                        textShadow: '0 1px 3px rgba(0,0,0,0.9)'
+                    }}>
+                        {hero.name || `Tướng ${hero.id}`}
                     </span>
-                    <button 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setInspectedHero(hero);
-                        }}
-                        style={{ 
-                            background: 'rgba(212, 168, 67, 0.25)', 
-                            border: '1px solid var(--color-gold)', 
-                            color: 'var(--color-gold)', 
-                            borderRadius: '6px', 
-                            padding: '2px 6px', 
-                            fontSize: '0.7rem', 
-                            cursor: 'pointer',
-                            fontWeight: 'bold'
-                        }}
-                        title="Xem chi tiết kỹ năng"
-                    >
-                        🔍 Soi
-                    </button>
                 </div>
                 </div>
             )}) : (
@@ -314,31 +352,31 @@ export function DraftScreen(props) {
                         style={{
                             background: 'rgba(15, 23, 42, 0.98)',
                             border: `2px solid ${inspectedHero.faction === 'Lạc' ? '#10b981' : inspectedHero.faction === 'Sơn' ? '#b45309' : inspectedHero.faction === 'Hà' ? '#3b82f6' : '#ef4444'}`,
-                            borderRadius: '20px',
-                            maxWidth: '720px',
-                            width: '92vw',
-                            maxHeight: '90vh',
+                            borderRadius: '16px',
+                            maxWidth: '740px',
+                            width: '94vw',
+                            maxHeight: '94vh',
                             display: 'flex',
                             flexDirection: 'row',
-                            gap: '20px',
-                            padding: '20px',
+                            gap: '16px',
+                            padding: '12px 16px',
                             boxShadow: '0 20px 60px rgba(0,0,0,0.9)',
                             position: 'relative'
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* ẢNH TƯỚNG LỚN */}
-                        <div style={{ flex: '0 0 35%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div style={{ flex: '0 0 32%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                             {inspectedHero.image ? (
                                 <img 
                                     src={`/images/heroes/${inspectedHero.image}`} 
                                     alt={inspectedHero.name} 
-                                    style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)' }} 
+                                    style={{ width: '100%', maxHeight: '68vh', objectFit: 'contain', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.2)' }} 
                                 />
                             ) : (
-                                <div style={{ fontSize: '5rem', padding: '40px' }}>{inspectedHero.emoji || '❓'}</div>
+                                <div style={{ fontSize: '4rem', padding: '20px' }}>{inspectedHero.emoji || '❓'}</div>
                             )}
-                            <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+                            <div style={{ marginTop: '8px', display: 'flex', gap: '6px' }}>
                                 <span style={{ padding: '3px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', background: inspectedHero.faction === 'Lạc' ? '#10b981' : inspectedHero.faction === 'Sơn' ? '#b45309' : inspectedHero.faction === 'Hà' ? '#3b82f6' : '#ef4444', color: 'white' }}>
                                     Phe {inspectedHero.faction}
                                 </span>
