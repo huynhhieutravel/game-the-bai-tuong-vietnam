@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { getHeroNameStr } from '../../utils/playerHelpers';
+import { getHeroNameStr } from 'shared/utils/playerHelpers';
+import { CARD_SUBTYPES } from 'shared/constants/cardTypes';
+import { getCardSubType } from 'shared/data/gameData';
 
 export function TienPhongModal({ req, gameState, onConfirm }) {
   const [costType, setCostType] = useState(null); // 'hp' or 'weapon'
   
-  const me = gameState.players[req.sourceId];
-  const target = gameState.players[req.targetId];
+  const me = gameState.players.find(p => p.id === req.sourceId);
+  const target = gameState.players.find(p => p.id === req.targetId);
   
-  const hasWeapon = me.equipment.some(eq => eq !== null && (eq.subType === 'equip_weapon' || eq.type === 'equip_weapon' || eq.type === 'Vũ khí' || eq.subType === 'Vũ khí'));
+  const hasWeapon = me.equipment.some(eq => eq !== null && getCardSubType(eq) === CARD_SUBTYPES.EQUIP_WEAPON);
   const canPayHp = me.hp > 1;
 
   const handleConfirm = () => {
-     onConfirm({ doUse: true, costType });
+     onConfirm({ doUse: true, costType, targetId: req.targetId });
   };
 
   return (

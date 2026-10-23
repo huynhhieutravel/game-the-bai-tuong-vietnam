@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
 
 
 export function ChuongDuongMoveModal({ req, gameState, onConfirm }) {
@@ -53,7 +53,7 @@ export function ChuongDuongMoveModal({ req, gameState, onConfirm }) {
                      onClick={() => handleSelectCard(c)}
                      style={{ fontSize: '0.8rem', padding: '5px' }}
                    >
-                     {getFullPlayerName(gameState.players[c.ownerId], req.sourceId)}: {c.name} ({c.zone === 'equip' ? 'Trang Bị' : 'Phán Xét'})
+                     {getFullPlayerName(gameState.players.find(p => p.id === c.ownerId), req.sourceId)}: {c.name} ({c.zone === 'equip' ? 'Trang Bị' : 'Phán Xét'})
                    </button>
                 ))}
              </div>

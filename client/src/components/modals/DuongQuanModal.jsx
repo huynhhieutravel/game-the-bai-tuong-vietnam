@@ -1,8 +1,9 @@
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr } from 'shared/utils/playerHelpers';
 
 export function DuongQuanModal({ req, gameState, onConfirm }) {
-  const me = gameState.players[req.sourceId];
+  const me = gameState.players.find(p => p.id === req.sourceId);
   const validTargets = gameState.players.filter(p => p.id !== me.id && p.isAlive);
   
   // Equipments that can be discarded for Option 2
@@ -70,7 +71,7 @@ export function DuongQuanModal({ req, gameState, onConfirm }) {
               <div style={{ marginTop: '10px', paddingLeft: '25px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   <select value={opt2Equip} onChange={e => setOpt2Equip(e.target.value)} style={{ padding: '5px', width: '100%', background: '#1f2937', color: 'white', border: '1px solid #374151' }}>
                       <option value="">-- Chọn Trang Bị để bỏ --</option>
-                      {myEquips.map(eq => <option key={eq.id} value={eq.id}>{eq.name} ({eq.suit}{eq.rank})</option>)}
+                      {myEquips.map(eq => <option key={eq.id} value={eq.id}>{eq.name} ({getSuitEmoji(eq.suit)}{eq.rank})</option>)}
                   </select>
                   <select value={opt2Target} onChange={e => setOpt2Target(e.target.value)} style={{ padding: '5px', width: '100%', background: '#1f2937', color: 'white', border: '1px solid #374151' }}>
                       <option value="">-- Chọn mục tiêu [Chém] --</option>

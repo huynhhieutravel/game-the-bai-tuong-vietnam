@@ -1,5 +1,6 @@
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
 
 
 export function BanhChungModal({ req, onConfirm }) {
@@ -49,7 +50,7 @@ export function BanhChungModal({ req, onConfirm }) {
           <div style={{ fontSize: '0.75rem', color: 'gray', marginBottom: '4px' }}>(Lá trên cùng sẽ được rút đầu tiên)</div>
           {topCards.map((c, idx) => (
              <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-card)', padding: '6px', marginBottom: '4px', borderRadius: '4px', border: `1px solid ${c.color === 'red' ? 'var(--color-red-light)' : 'var(--color-text-primary)'}` }}>
-               <span style={{ fontSize: '0.8rem', color: c.color === 'red' ? 'var(--color-red-light)' : 'white' }}>{c.suit} {c.rank} {c.name}</span>
+               <span style={{ fontSize: '0.8rem', color: c.color === 'red' ? 'var(--color-red-light)' : 'white' }}>{getSuitEmoji(c.suit)} {c.rank} {c.name}</span>
                <div style={{ display: 'flex', gap: '4px' }}>
                  <button onClick={() => moveUp(idx)} disabled={idx===0} style={{ padding: '2px 6px', fontSize: '0.7rem' }}>↑</button>
                  <button onClick={() => moveDown(idx)} disabled={idx===topCards.length-1} style={{ padding: '2px 6px', fontSize: '0.7rem' }}>↓</button>
@@ -64,7 +65,7 @@ export function BanhChungModal({ req, onConfirm }) {
           <h4 style={{ margin: '0 0 10px 0', color: 'gray', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '4px' }}>Bỏ Xuống Đáy</h4>
           {bottomCards.map((c, idx) => (
              <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-card)', padding: '6px', marginBottom: '4px', borderRadius: '4px', border: `1px dashed ${c.color === 'red' ? 'var(--color-red-light)' : 'var(--color-text-primary)'}` }}>
-               <span style={{ fontSize: '0.8rem', color: c.color === 'red' ? 'var(--color-red-light)' : 'white', opacity: 0.7 }}>{c.suit} {c.rank} {c.name}</span>
+               <span style={{ fontSize: '0.8rem', color: c.color === 'red' ? 'var(--color-red-light)' : 'white', opacity: 0.7 }}>{getSuitEmoji(c.suit)} {c.rank} {c.name}</span>
                <button onClick={() => moveToTop(c, idx)} style={{ padding: '2px 6px', fontSize: '0.7rem', background: '#10b981', color: 'white', border: 'none' }}>⬆ Lên Đầu</button>
              </div>
           ))}

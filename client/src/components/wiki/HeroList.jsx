@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HEROES } from '../../data/gameData';
-import { EXPANSION_HEROES } from '../../data/expansionHeroes';
+import { HEROES } from 'shared/data/gameData';
+import { EXPANSION_HEROES } from 'shared/data/expansionHeroes';
 
 export default function HeroList() {
   const [activeTab, setActiveTab] = useState('lac');

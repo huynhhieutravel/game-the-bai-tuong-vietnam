@@ -6,7 +6,7 @@ import React from 'react';
 import GameView from '../game/GameView';
 import * as GameProvider from '../../contexts/GameProvider';
 import * as SelectionProvider from '../../contexts/SelectionProvider';
-import { PHASES } from '../../data/gameData';
+import { PHASES } from 'shared/data/gameData';
 
 vi.mock('../../contexts/GameProvider', () => ({
   useGameState: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock('../../contexts/SelectionProvider', () => ({
 
 describe('GameView Component', () => {
   const mockPlayers = [
-    { id: 0, isAlive: true, name: 'Player 0', hand: [{ idx: 0, name: 'Chém', suit: '♠', color: 'black' }], hp: 3, maxHp: 3, equipment: [], draftHeroes: [{id: 1, faction: 'Lạc'}], hasDrafted: false },
+    { id: 0, isAlive: true, name: 'Player 0', hand: [{ idx: 0, name: 'Chém', suit: 'spade', color: 'black' }], hp: 3, maxHp: 3, equipment: [], draftHeroes: [{id: 1, faction: 'Lạc'}], hasDrafted: false },
     { id: 1, isAlive: true, name: 'Player 1', hand: [], hp: 3, maxHp: 3, equipment: [], draftHeroes: [], hasDrafted: false },
   ];
 

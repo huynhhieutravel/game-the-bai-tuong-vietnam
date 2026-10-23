@@ -1,18 +1,20 @@
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
+import { hasSkill } from 'shared/engine/gameState';
 
 
 export function ThuyToModal({ req, gameState, onConfirm }) {
   const [selectedAlly, setSelectedAlly] = useState(null);
   const [selectedCards, setSelectedCards] = useState([]);
   
-  const me = gameState.players[0];
+  const me = gameState.players.find(p => p.id === req.responderId);
   const maxCards = req.maxCards;
   
   // Lọc ra đồng minh đã lộ diện (hoặc đồng minh Dã Tâm nếu mình là Dã Tâm)
   const myFaction = me.isDaTam ? 'DaTam' : (me.heroes?.[0]?.faction || me.hero?.faction);
   const allies = gameState.players.filter(p => {
-     if (p.id === 0) return false;
+     if (p.id === me.id) return false;
      if (!p.isAlive) return false;
      if (req.targetsUsed?.includes(p.id)) return false; // Đã giao bài trong lượt này rồi
      
@@ -73,7 +75,7 @@ export function ThuyToModal({ req, gameState, onConfirm }) {
                  opacity: (!isSelected && selectedCards.length >= maxCards) ? 0.5 : 1
                }}
              >
-               <div style={{ fontSize: '0.7rem', color: c.color === 'red' ? '#ef4444' : 'white' }}>{c.suit} {c.rank}</div>
+               <div style={{ fontSize: '0.7rem', color: c.color === 'red' ? '#ef4444' : 'white' }}>{getSuitEmoji(c.suit)} {c.rank}</div>
                <div style={{ fontSize: '0.85rem' }}>{c.name}</div>
              </div>
            );
@@ -85,7 +87,7 @@ export function ThuyToModal({ req, gameState, onConfirm }) {
         <button 
            className="btn-action danger" 
            style={{ flex: 1 }} 
-           onClick={() => onConfirm({ canceled: true })}
+           onClick={() => onConfirm({ responseType: 'cancel', canceled: true })}
         >
           Hủy bỏ
         </button>
@@ -93,7 +95,7 @@ export function ThuyToModal({ req, gameState, onConfirm }) {
            className="btn-action success" 
            style={{ flex: 1 }} 
            disabled={selectedAlly === null || selectedCards.length === 0}
-           onClick={() => onConfirm({ selectedAlly, selectedCards })}
+           onClick={() => onConfirm({ selectedAlly, selectedCards, selectedCardIds: selectedCards.map(idx => me.hand[idx].id) })}
         >
           Giao Bài
         </button>

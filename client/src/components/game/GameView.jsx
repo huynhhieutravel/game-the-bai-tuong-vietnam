@@ -1,21 +1,25 @@
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 // @ts-check
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from "react-router-dom";
 import { useGameState, useGameAPI, useGameController } from '../../contexts/GameProvider';
 import { ModalContainer } from '../modals/ModalContainer';
 import { VipHeroSelectorModal } from '../modals/VipHeroSelectorModal';
-import { PHASES } from '../../data/gameData';
+import { PHASES } from 'shared/data/gameData';
 import "../../index.css";
 
 import { useTargeting } from './hooks/useTargeting';
 import { useSkillInteraction } from './hooks/useSkillInteraction';
 import { useCardInteraction } from './hooks/useCardInteraction';
+import { usePlayerAnimations } from './hooks/usePlayerAnimations';
+import { useAudioSFX } from './hooks/useAudioSFX';
 
 import { DraftScreen } from './DraftScreen';
 import { PlayerBoard } from './PlayerBoard';
 import MyHeroBar from "./MyHeroBar";
 import { PlayerHand } from './PlayerHand';
 import { ActionBar } from './ActionBar';
+import { ChatWidget } from './ChatWidget';
 
 const getHeroNameStr = (p) => {
    if (!p || !p.heroes) return `(Tướng Ẩn ${p ? p.id + 1 : ''})`;
@@ -56,6 +60,8 @@ export default function GameView() {
   const gameState = useGameState();
   const isActionPending = useRef(false);
 
+  const [logTab, setLogTab] = useState('all');
+
   const startNewGame = useCallback(() => {
     gameController.restart(4);
   }, [gameController]);
@@ -66,9 +72,9 @@ export default function GameView() {
   const [heroPopup, setHeroPopup] = useState(null);
   const [cardPopup, setCardPopup] = useState(null);
 
-  const [prevHp, setPrevHp] = useState(null);
-  const [damageFlash, setDamageFlash] = useState(false);
-  const mainPlayerId = 0; // Tạm thời hardcode, sau này lấy từ Auth/Context
+  const mainPlayerId = typeof window !== 'undefined' && window.playerId !== undefined ? window.playerId : 0; 
+  const playerAnimations = usePlayerAnimations(gameState);
+  const sfx = useAudioSFX();
   
   const logRef = useRef(null);
 
@@ -94,14 +100,14 @@ export default function GameView() {
       mainPlayerId
   });
 
-  const { handleCardClick, handleDiscardToggle, confirmDiscard, selectedDiscards, setSelectedDiscards } = useCardInteraction({
+  const { handleCardClick, handleDiscardToggle, confirmDiscard, selectedDiscards, setSelectedDiscards, handleUnplayableClick } = useCardInteraction({
       gameState,
       gameAPI,
       activeSkill,
       targetSession,
       setTargetSession,
       cancelTargeting,
-      mainPlayerId: gameState?.players?.[0]?.id ?? mainPlayerId
+      mainPlayerId
   });
 
   const handleResponseAction = useCallback((payload) => {
@@ -130,39 +136,72 @@ export default function GameView() {
     setTimeout(() => setPhaseBanner(null), 2000);
   };
 
+  const processedLogsCount = useRef(0);
   useEffect(() => {
-    if (gameState && gameState.players && gameState.players.length > 0) {
-      const myHp = gameState.players[0].hp;
-      if (prevHp !== null && myHp < prevHp) {
-        setDamageFlash(true);
-        setTimeout(() => setDamageFlash(false), 800);
-        
-        const dmgLog = gameState.logs.slice(-3).find(l => l?.text?.includes("mất") && l?.text?.includes("Sinh Lực"));
-        if (dmgLog) showPhaseBanner(dmgLog.text);
-      }
-      setPrevHp(myHp);
+    if (!gameState || !gameState.logs) return;
+    const currentLogs = gameState.logs;
+    const newLogsCount = currentLogs.length - processedLogsCount.current;
+    
+    if (newLogsCount > 0 && processedLogsCount.current > 0) { // Đừng kêu loạn xạ khi mới load game
+        // Xử lý tất cả các log mới
+        for (let i = processedLogsCount.current; i < currentLogs.length; i++) {
+            const log = currentLogs[i];
+            const logText = log?.text || log?.message || (typeof log === 'string' ? log : '');
+            if (logText) {
+                const text = logText.toLowerCase();
+                if (text.includes("mất") && text.includes("sinh lực")) {
+                    sfx.playDamage();
+                    showPhaseBanner(logText);
+                } else if (text.includes("hồi") && text.includes("sinh lực")) {
+                    sfx.playHeal();
+                } else if (text.includes("dùng [sát]") || text.includes("dùng [chém]")) {
+                    sfx.playSlash();
+                } else if (text.includes("dùng [né]")) {
+                    sfx.playDodge();
+                } else if (text.includes("rút") && text.includes("lá bài")) {
+                    sfx.playDrawCard();
+                } else if (text.includes("bắt đầu lượt")) {
+                    sfx.playTurnStart();
+                } else if (text.includes("lộ diện tướng") || text.includes("hiển lộ tướng")) {
+                    showPhaseBanner(logText);
+                } else if (text.includes("khu phán xét")) {
+                    showPhaseBanner(logText);
+                }
+            }
+        }
     }
-  }, [gameState, prevHp]);
+    processedLogsCount.current = currentLogs.length;
+  }, [gameState?.logs, sfx]);
 
   /** @returns {import('react').CSSProperties} */
   const getOpponentStyle = (index, totalOpponents) => {
-    // Nếu chỉ có 1 đối thủ (2 người chơi), cho ở giữa trên cùng
-    const angleDeg = totalOpponents === 1 ? 90 : 180 - (180 / (totalOpponents - 1)) * index;
+    let angleDeg = 90;
+    if (totalOpponents > 1) {
+       // Mở rộng vòng cung nếu có đông người (8 người chơi = 7 đối thủ)
+       const startAngle = totalOpponents > 4 ? 210 : 180;
+       const endAngle = totalOpponents > 4 ? -30 : 0;
+       const span = startAngle - endAngle;
+       angleDeg = startAngle - (span / (totalOpponents - 1)) * index;
+    }
     const angleRad = (angleDeg * Math.PI) / 180;
     
-    // Ellipse parameters
-    const rx = 24; // Bán kính ngang (vw) - Giữ ở mức 24 để không đè log chat
-    const ry = 28; // Bán kính dọc (phần trăm) - Giảm xuống 28 để người chơi 3 không bị tràn màn hình trên khi base là 45%
+    // Tăng bán kính elip khi có nhiều người để trải đều
+    const rx = totalOpponents > 4 ? 36 : 28; // vw
+    const ry = totalOpponents > 4 ? 35 : 28; // %
+    const baseY = totalOpponents > 4 ? 40 : 45; // Trọng tâm Y
     
-    // Adjusted center: left is 50% - 160px, top is 45% (moved up to avoid overlapping MyHeroBar)
+    // Tính toán vị trí tâm (Lùi sang trái 160px để nhường chỗ cho History Sidebar)
     const leftCss = `calc(50% - 160px + ${rx * Math.cos(angleRad)}vw)`;
-    const topCss = `${45 - ry * Math.sin(angleRad)}%`; // Trả về tâm 45%
+    const topCss = `${baseY - ry * Math.sin(angleRad)}%`; 
+    
+    // Thu nhỏ thẻ người chơi khi có >= 6 người để không bị đè nhau
+    const scale = totalOpponents >= 6 ? 0.7 : (totalOpponents >= 4 ? 0.8 : 0.85);
     
     return {
       position: 'absolute',
       left: leftCss,
       top: topCss,
-      transform: 'translate(-50%, -50%) scale(0.85)',
+      transform: `translate(-50%, -50%) scale(${scale})`,
       zIndex: 10
     };
   };
@@ -180,17 +219,22 @@ export default function GameView() {
     );
   }
   
+  const me = gameState.players.find(p => p.id === mainPlayerId) || gameState.players[0];
+  
   if (gameState.phase === PHASES.DRAFT) {
-    return <DraftScreen gameState={gameState} me={gameState.players[0]} gameController={gameController} />;
+    return <DraftScreen gameState={gameState} me={me} gameController={gameController} />;
   }
 
-  const me = gameState.players[0];
-  const opponents = gameState.players.slice(1);
-  const isMyTurn = gameState.currentPlayerIndex === 0;
-  const needsDiscard = gameState.phase === PHASES.DISCARD && isMyTurn && me.hand.length > me.hp && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'discard_phase');
+
+  const opponents = gameState.players.filter(p => p.id !== me.id);
+  const isMyTurn = gameState.currentPlayerIndex === me.id;
+  const needsDiscard = gameState.waitingForResponse?.type === 'discard_phase' && gameState.waitingForResponse?.responderId === me.id;
+  const discardAmount = needsDiscard ? gameState.waitingForResponse.amount : 0;
   
+  const myAnimationClass = playerAnimations[me.id] || '';
+
   return (
-    <div className={`game-board ${damageFlash ? 'damage-flash' : ''}`}>
+    <div className={`game-board ${myAnimationClass === 'anim-damage' ? 'damage-flash' : ''}`}>
       {/* Background Image Container with blur filter */}
       <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1, overflow: 'hidden' }}>
          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundImage: `url('/images/bgs/${me.heroes?.[0]?.image || me.hero?.image || 'default.jpg'}')`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(25px) brightness(0.25) saturate(1.2)', transform: 'scale(1.1)' }} />
@@ -198,9 +242,16 @@ export default function GameView() {
 
       <div className="game-top-bar">
         <div className="game-title">Việt Sát</div>
-        <div className="game-status">
+        <div className="game-status" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <button 
+             onClick={sfx.toggleMute} 
+             style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', opacity: 0.7 }}
+             title={sfx.isMuted ? "Bật âm thanh" : "Tắt âm thanh"}
+          >
+             {sfx.isMuted ? '🔇' : '🔊'}
+          </button>
           <div className="turn-indicator">
-            {gameState.currentPlayerIndex === 0 ? '▶ Lượt của bạn' : `⏳ Chờ người chơi ${gameState.currentPlayerIndex + 1}`}
+            {gameState.currentPlayerIndex === me.id ? '▶ Lượt của bạn' : `⏳ Chờ người chơi ${gameState.currentPlayerIndex + 1}`}
             <span style={{ marginLeft: '10px', color: 'var(--color-gold)' }}>{gameState.phase}</span>
           </div>
         </div>
@@ -228,6 +279,7 @@ export default function GameView() {
               setHeroPopup={setHeroPopup}
               setCardPopup={setCardPopup}
               style={getOpponentStyle(index, opponents.length)}
+              animationClass={playerAnimations[player.id] || ''}
             />
           );
         })}
@@ -260,7 +312,7 @@ export default function GameView() {
                 onClick={() => setCardPopup(card)}
               >
                 <div className="card-suit-corner" style={{ position: 'absolute', top: '4px', left: '6px', fontSize: '0.75rem', color: card.color === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.85)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-                  {card.suit} {card.rank}
+                  {getSuitEmoji(card.suit)} {card.rank}
                 </div>
                 <div className="card-inner" style={{ paddingTop: '12px' }}>
                   <span className="card-icon">{card.emoji}</span>
@@ -279,9 +331,14 @@ export default function GameView() {
 
       <div style={{ flex: 1 }}></div>
 
-      <div className="player-hand-area">
+      <div className="player-hand-area" onClick={() => cancelTargeting()}>
         <MyHeroBar
             me={me}
+            isMyTurn={isMyTurn}
+            activeSkill={activeSkill}
+            setActiveSkill={setActiveSkill}
+            handleExecuteSkill={handleExecuteSkill}
+            animationClass={myAnimationClass}
             gameState={gameState}
             activePhase={gameState.phase}
             handleRevealClick={handleRevealClick}
@@ -300,6 +357,8 @@ export default function GameView() {
                   selectedDiscards={selectedDiscards}
                   handleDiscardToggle={handleDiscardToggle}
                   handleCardClick={handleCardClick}
+                  cancelTargeting={cancelTargeting}
+                  handleUnplayableClick={handleUnplayableClick}
               />
             }
             statusMessage={
@@ -313,10 +372,10 @@ export default function GameView() {
                 ) : needsDiscard ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{ color: '#ef4444', fontSize: '1.2rem', fontWeight: 'bold', background: 'rgba(0,0,0,0.5)', padding: '4px 12px', borderRadius: '4px' }}>
-                        ⚠️ BẠN CẦN BỎ {me.hand.length - me.hp} LÁ BÀI! (Đã chọn {selectedDiscards.length})
+                        ⚠️ BẠN CẦN BỎ {discardAmount} LÁ BÀI! (Đã chọn {selectedDiscards.length})
                       </span>
-                      {selectedDiscards.length === me.hand.length - me.hp && (
-                          <button className="btn-action" style={{ background: '#ef4444', color: 'white', border: '1px solid white' }} onClick={confirmDiscard}>
+                      {selectedDiscards.length === discardAmount && (
+                          <button className="btn-action" style={{ background: '#ef4444', color: 'white', border: '1px solid white' }} onClick={(e) => { e.stopPropagation(); confirmDiscard(); }}>
                               🗑️ Xác nhận Vứt
                           </button>
                       )}
@@ -355,14 +414,24 @@ export default function GameView() {
         />
       </div>
 
-      <div className="game-log" ref={logRef}>
-        {gameState.logs?.map((log, i) => (
-          <div key={i} className={`log-entry ${log.important ? 'important' : ''} ${log.text?.includes("mất") ? 'damage' : ''}`}>
-             <span style={{opacity: 0.5}}>
-               [{new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}]
-             </span> {renderLogText(log.text)}
-          </div>
-        ))}
+      <div className="game-log-container">
+        <div className="game-log-tabs">
+           <div className={`game-log-tab ${logTab === 'all' ? 'active' : ''}`} onClick={() => setLogTab('all')}>Tất cả</div>
+           <div className={`game-log-tab ${logTab === 'personal' ? 'active' : ''}`} onClick={() => setLogTab('personal')}>Cá nhân</div>
+        </div>
+        <div className="game-log" ref={logRef}>
+          {gameState.logs?.filter(log => {
+             if (logTab === 'all') return true;
+             const playerName = `Người chơi ${mainPlayerId + 1}`;
+             return log.text?.includes("Bạn") || log.text?.includes(playerName);
+          }).map((log, i) => (
+            <div key={i} className={`log-entry ${log.important ? 'important' : ''} ${log.text?.includes("mất") ? 'damage' : ''}`}>
+               <span style={{opacity: 0.5}}>
+                 [{new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}]
+               </span> {renderLogText(log.text)}
+            </div>
+          ))}
+        </div>
       </div>
 
       <ModalContainer mainPlayerId={mainPlayerId} />
@@ -413,12 +482,14 @@ export default function GameView() {
             <div style={{ background: '#111827', borderRadius: '16px', padding: '30px', border: '2px solid var(--color-gold)', maxWidth: '400px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                <div style={{ fontSize: '4rem', marginBottom: '10px' }}>{cardPopup.emoji}</div>
                <h2 style={{ color: cardPopup.color === 'red' ? '#ef4444' : 'white', margin: '0 0 5px 0' }}>{cardPopup.name}</h2>
-               <div style={{ fontSize: '1.2rem', marginBottom: '15px', fontWeight: 'bold' }}>{cardPopup.suit} {cardPopup.rank}</div>
+               <div style={{ fontSize: '1.2rem', marginBottom: '15px', fontWeight: 'bold' }}>{getSuitEmoji(cardPopup.suit)} {cardPopup.rank}</div>
                <div style={{ fontSize: '1rem', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>{cardPopup.desc}</div>
                <button className="btn-action primary" style={{ marginTop: '20px' }} onClick={() => setCardPopup(null)}>Đóng</button>
             </div>
          </div>
       )}
+
+      <ChatWidget style={{ position: 'absolute', top: '100px', left: '20px', zIndex: 90, height: '300px', width: '280px' }} />
     </div>
   );
 }

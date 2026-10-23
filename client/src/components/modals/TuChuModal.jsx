@@ -1,12 +1,13 @@
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
 
 
 export function TuChuModal({ req, gameState, onConfirm }) {
   const [selectedTarget, setSelectedTarget] = useState(null);
   const [selectedCardIdx, setSelectedCardIdx] = useState(null);
   
-  const me = gameState.players[req.sourceId];
+  const me = gameState.players.find(p => p.id === req.sourceId);
   const validTargets = gameState.players.filter(p => p.id !== me.id && p.isAlive && p.hp > me.hp && p.hand.length > 0);
 
   return (
@@ -48,7 +49,7 @@ export function TuChuModal({ req, gameState, onConfirm }) {
                cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', flexDirection: 'column', alignItems: 'center'
              }}
            >
-             <div style={{ fontSize: '0.75rem', color: c.color === 'red' ? '#ef4444' : '#f1f5f9' }}>{c.suit}{c.rank}</div>
+             <div style={{ fontSize: '0.75rem', color: c.color === 'red' ? '#ef4444' : '#f1f5f9' }}>{getSuitEmoji(c.suit)}{c.rank}</div>
              <div style={{ fontSize: '0.85rem' }}>{c.name}</div>
            </div>
         ))}
@@ -61,7 +62,7 @@ export function TuChuModal({ req, gameState, onConfirm }) {
         <button 
            className="btn-action success" style={{ flex: 1 }} 
            disabled={selectedTarget === null || selectedCardIdx === null}
-           onClick={() => onConfirm({ doUse: true, targetId: selectedTarget, cardIdx: selectedCardIdx })}
+           onClick={() => onConfirm({ doUse: true, targetId: selectedTarget, cardIdx: selectedCardIdx, cardId: me.hand[selectedCardIdx].id })}
         >
           Bắt Đầu Đấu Điểm
         </button>

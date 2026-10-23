@@ -1,7 +1,10 @@
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { PHASES, CARD_TYPES } from '../../data/gameData';
-import { getCardBg } from '../../utils/cardStyles';
+import { PHASES } from 'shared/constants/phases';
+import { CARD_TYPES } from 'shared/constants/cardTypes';
+import { CARD_TYPE_LABELS } from '../../i18n/vi/cardLabels';
+import { getCardBg } from 'shared/utils/cardStyles';
 
 // Helper for card badge colors
 function getBadgeColor(card) {
@@ -46,7 +49,9 @@ export function PlayerHand(props) {
         targetSession,
         selectedDiscards,
         handleDiscardToggle,
-        handleCardClick
+        handleCardClick,
+        handleUnplayableClick,
+        cancelTargeting
     } = props;
 
     const [isExpanded, setIsExpanded] = useState(false);
@@ -71,10 +76,21 @@ export function PlayerHand(props) {
                         // If there is an active skill, check if the skill makes it playable visually
                         if (activeSkill === 'Dời Núi' && (card.name === 'Né' || card.name === 'Chém')) {
                             isPlayable = true;
-                        } else if (activeSkill === 'Khai Thiên' && card.color === 'red') {
+                        } else if (activeSkill === 'Khai Thiên' && card.type === CARD_TYPES.EQUIP) {
                             isPlayable = true;
                         } else if (activeSkill === 'Kỳ Tập' && card.color === 'black') {
                             isPlayable = true;
+                        } else if (activeSkill === 'Tiên Duyên' && card.suit === 'club') {
+                            isPlayable = true;
+                        } else if (activeSkill === 'Thần Hỏa' && card.color === 'red') {
+                            isPlayable = true;
+                        } else if (activeSkill === 'Định Quốc' && (card.name === 'Né' || card.name === 'Sấm Sét')) {
+                            isPlayable = true;
+                        } else if (activeSkill === 'Phá Thành') {
+                            // Cần kiểm tra phaThanhColor của me
+                            if (me.phaThanhColor && card.color !== me.phaThanhColor) {
+                                isPlayable = true;
+                            }
                         } else {
                             isPlayable = card.isPlayable;
                         }
@@ -85,21 +101,28 @@ export function PlayerHand(props) {
                         key={`${card.id}-${originalIndex}-inline`}
                         className={`card ${card.type} ${targetSession?.cardIndex === originalIndex ? 'selected' : ''} ${selectedDiscards.includes(originalIndex) ? 'selected' : ''} ${!isPlayable ? 'unplayable' : ''}`}
                         style={getCardBg(card.name) ? { backgroundImage: `url(${getCardBg(card.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', opacity: !isPlayable ? 0.4 : 1, cursor: !isPlayable ? 'not-allowed' : 'pointer' } : { opacity: !isPlayable ? 0.4 : 1, cursor: !isPlayable ? 'not-allowed' : 'pointer' }}
-                        onClick={() => {
+                        onClick={(e) => {
+                            e.stopPropagation();
                             if (needsDiscard) {
                                 handleDiscardToggle(originalIndex);
                             } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
                                 if (isPlayable || activeSkill) { // Allow click if activeSkill is converting it
                                     handleCardClick(originalIndex);
-                                } else if (targetSession) {
-                                    cancelTargeting();
+                                } else {
+                                    if (handleUnplayableClick) handleUnplayableClick(originalIndex);
+                                    if (targetSession) cancelTargeting();
                                 }
+                            } else if (gameState.waitingForResponse) {
+                                // Nếu có event response thì cứ click, hook kia sẽ lo
+                                handleCardClick(originalIndex);
+                            } else if (!isPlayable && handleUnplayableClick) {
+                                handleUnplayableClick(originalIndex);
                             }
                         }}
                         title={`${card.name}: ${card.desc}`}
                     >
                         <div className="card-suit-corner" style={{ position: 'absolute', top: '4px', left: '6px', fontSize: '0.75rem', color: card.color === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.85)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-                        {card.suit} {card.rank}
+                        {getSuitEmoji(card.suit)} {card.rank}
                         </div>
                         {getCardBg(card.name) && (
                         <div style={{ position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)', background: getBadgeColor(card), color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 'bold', whiteSpace: 'nowrap', border: '1px solid rgba(255,255,255,0.4)', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
@@ -117,8 +140,7 @@ export function PlayerHand(props) {
                                 card.name === 'Đào' ? 'Hồi phục' :
                                 card.name === 'Rượu' ? 'Cường hóa' : 'Cơ bản'
                             ) :
-                                card.type === CARD_TYPES.TRICK ? 'Cẩm nang' :
-                                card.type === CARD_TYPES.EQUIP ? 'Trang bị' : 'Khác'}
+                                CARD_TYPE_LABELS[card.type] || 'Khác'}
                             </span>
                         </div>
                         )}
@@ -130,7 +152,7 @@ export function PlayerHand(props) {
                 {!isExpanded && hiddenCount > 0 && (
                     <div 
                         className="card trick" 
-                        onClick={() => setIsExpanded(true)} 
+                        onClick={(e) => { e.stopPropagation(); setIsExpanded(true); }} 
                         style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', cursor: 'pointer', border: '2px dashed var(--color-gold)', opacity: 0.9 }}
                         title="Bấm để xem toàn bộ bài trên tay"
                     >
@@ -183,10 +205,20 @@ export function PlayerHand(props) {
                             } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
                                 if (activeSkill === 'Dời Núi' && (card.name === 'Né' || card.name === 'Chém')) {
                                     isPlayable = true;
-                                } else if (activeSkill === 'Khai Thiên' && card.color === 'red') {
+                                } else if (activeSkill === 'Khai Thiên' && card.type === CARD_TYPES.EQUIP) {
                                     isPlayable = true;
                                 } else if (activeSkill === 'Kỳ Tập' && card.color === 'black') {
                                     isPlayable = true;
+                                } else if (activeSkill === 'Tiên Duyên' && card.suit === 'club') {
+                                    isPlayable = true;
+                                } else if (activeSkill === 'Thần Hỏa' && card.color === 'red') {
+                                    isPlayable = true;
+                                } else if (activeSkill === 'Định Quốc' && (card.name === 'Né' || card.name === 'Sấm Sét')) {
+                                    isPlayable = true;
+                                } else if (activeSkill === 'Phá Thành') {
+                                    if (me.phaThanhColor && card.color !== me.phaThanhColor) {
+                                        isPlayable = true;
+                                    }
                                 } else {
                                     isPlayable = card.isPlayable;
                                 }
@@ -197,20 +229,29 @@ export function PlayerHand(props) {
                                 key={`${card.id}-${originalIndex}-popup`}
                                 className={`card ${card.type} ${targetSession?.cardIndex === originalIndex ? 'selected' : ''} ${selectedDiscards.includes(originalIndex) ? 'selected' : ''} ${!isPlayable ? 'unplayable' : ''}`}
                                 style={getCardBg(card.name) ? { backgroundImage: `url(${getCardBg(card.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', opacity: !isPlayable ? 0.4 : 1, cursor: !isPlayable ? 'not-allowed' : 'pointer' } : { opacity: !isPlayable ? 0.4 : 1, cursor: !isPlayable ? 'not-allowed' : 'pointer' }}
-                                onClick={() => {
+                                onClick={(e) => {
+                                    e.stopPropagation();
                                     if (needsDiscard) {
                                         handleDiscardToggle(originalIndex);
                                     } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
-                                        if (isPlayable || activeSkill) { 
+                                        if (isPlayable || activeSkill) {
                                             handleCardClick(originalIndex);
-                                            setIsExpanded(false); // Auto close on play
+                                            setIsExpanded(false);
+                                        } else {
+                                            if (handleUnplayableClick) handleUnplayableClick(originalIndex);
+                                            if (targetSession) cancelTargeting();
                                         }
+                                    } else if (gameState.waitingForResponse) {
+                                        handleCardClick(originalIndex);
+                                        setIsExpanded(false);
+                                    } else if (!isPlayable && handleUnplayableClick) {
+                                        handleUnplayableClick(originalIndex);
                                     }
                                 }}
                                 title={`${card.name}: ${card.desc}`}
                             >
                                 <div className="card-suit-corner" style={{ position: 'absolute', top: '4px', left: '6px', fontSize: '0.75rem', color: card.color === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.85)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-                                {card.suit} {card.rank}
+                                {getSuitEmoji(card.suit)} {card.rank}
                                 </div>
                                 {getCardBg(card.name) && (
                                 <div style={{ position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)', background: getBadgeColor(card), color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 'bold', whiteSpace: 'nowrap', border: '1px solid rgba(255,255,255,0.4)', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
@@ -228,8 +269,7 @@ export function PlayerHand(props) {
                                         card.name === 'Đào' ? 'Hồi phục' :
                                         card.name === 'Rượu' ? 'Cường hóa' : 'Cơ bản'
                                     ) :
-                                        card.type === CARD_TYPES.TRICK ? 'Cẩm nang' :
-                                        card.type === CARD_TYPES.EQUIP ? 'Trang bị' : 'Khác'}
+                                        CARD_TYPE_LABELS[card.type] || 'Khác'}
                                     </span>
                                 </div>
                                 )}

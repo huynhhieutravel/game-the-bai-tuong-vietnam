@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr } from 'shared/utils/playerHelpers';
 
 export function ChuongDuongModal({ req, gameState, onConfirm }) {
   const [selectedReceiver, setSelectedReceiver] = useState('');
   const [selectedCardId, setSelectedCardId] = useState('');
   
-  const me = gameState.players[req.sourceId];
-  const target = gameState.players[req.targetId];
+  const me = gameState.players.find(p => p.id === req.sourceId);
+  const target = gameState.players.find(p => p.id === req.targetId);
   
   // Lấy các mục tiêu hợp lệ để nhận bài (có thể là bất kỳ ai, kể cả Trần Quang Khải, trừ target)
   const validReceivers = gameState.players.filter(p => p.id !== target.id && p.isAlive);
@@ -53,7 +53,7 @@ export function ChuongDuongModal({ req, gameState, onConfirm }) {
         <button className="btn-action danger" style={{ flex: 1 }} onClick={() => onConfirm({ doUse: false })}>
           Bỏ Qua
         </button>
-        <button className="btn-action success" style={{ flex: 1 }} disabled={!selectedCardId || !selectedReceiver} onClick={handleConfirm}>
+        <button className="btn-action success" style={{ flex: 1 }} disabled={selectedCardId === null || selectedReceiver === null} onClick={handleConfirm}>
           Xác Nhận
         </button>
       </div>

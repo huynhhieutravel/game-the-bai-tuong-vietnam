@@ -1,3 +1,4 @@
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 // @ts-check
 import React, { useState } from 'react';
 
@@ -18,6 +19,13 @@ export function CardSelector(props) {
   const { validCards, onSelect, onCancel, confirmText, cancelText, extraButtons } = props;
   const [selectedIdx, setSelectedIdx] = useState(null);
   
+  // Xóa selectedIdx nếu danh sách validCards thay đổi (tránh lỗi stale index gây crash)
+  React.useEffect(() => {
+     if (selectedIdx !== null && !validCards.some(c => c.idx === selectedIdx)) {
+         setSelectedIdx(null);
+     }
+  }, [validCards, selectedIdx]);
+  
   return (
     <>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '20px' }}>
@@ -35,7 +43,7 @@ export function CardSelector(props) {
                     cursor: 'pointer',
                  }}
               >
-                 <div style={{ fontSize: '0.7rem', color: c.color === 'red' ? '#ef4444' : 'white' }}>{c.suit} {c.rank}</div>
+                 <div style={{ fontSize: '0.7rem', color: c.color === 'red' ? '#ef4444' : 'white' }}>{getSuitEmoji(c.suit)} {c.rank}</div>
                  <div style={{ fontSize: '0.85rem' }}>
                     {c.name}
                     {c.virtualReason && <span style={{fontSize: '0.6rem', color: 'gold'}}><br/>({c.virtualReason})</span>}

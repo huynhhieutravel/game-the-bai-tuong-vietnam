@@ -1,12 +1,13 @@
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
+import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine/gameState';
 
 
 export function AskWeaponSkillModal({ req, gameState, onConfirm }) {
   const [selectedCards, setSelectedCards] = useState([]);
   const [selectedEquips, setSelectedEquips] = useState([]);
-  
-  const me = gameState.players[0];
+  const me = gameState.players.find(p => p.id === (typeof window !== 'undefined' ? window.playerId : 0)) || gameState.players[0];
   const weaponName = req.weapon;
   const isTarget = weaponName === 'Song Kiếm'; // For Song Kiem, the actor is the target who must discard
   
@@ -47,8 +48,8 @@ export function AskWeaponSkillModal({ req, gameState, onConfirm }) {
      else if (selectedCards.length + selectedEquips.length < requiredCount) setSelectedEquips([...selectedEquips, idx]);
   };
 
-  const hasDoiNui = me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'doi-nui'));
-  const hasKhaiThien = me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'khai-thien'));
+  const hasDoiNui = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'doi-nui');
+  const hasKhaiThien = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'khai-thien');
 
   const validHandCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => {
      if (weaponName === 'Thanh Long Đao') {
@@ -59,7 +60,6 @@ export function AskWeaponSkillModal({ req, gameState, onConfirm }) {
      }
      return true;
   }).map(c => {
-      // Map virtual names for display if needed
       if (weaponName === 'Thanh Long Đao' && c.name !== 'Chém') {
           return { ...c, virtualReason: hasDoiNui && c.name === 'Né' ? 'Dời Núi' : 'Khai Thiên', originalName: c.name, name: 'Chém' };
       }
@@ -94,7 +94,7 @@ export function AskWeaponSkillModal({ req, gameState, onConfirm }) {
                  opacity: (!isSelected && selectedCards.length + selectedEquips.length >= requiredCount) ? 0.5 : 1
                }}
              >
-               <div style={{ fontSize: '0.7rem', color: c.color === 'red' ? '#ef4444' : 'white' }}>{c.suit} {c.rank}</div>
+               <div style={{ fontSize: '0.7rem', color: c.color === 'red' ? '#ef4444' : 'white' }}>{getSuitEmoji(c.suit)} {c.rank}</div>
                <div style={{ fontSize: '0.85rem' }}>{c.name}</div>
              </div>
            );
@@ -124,14 +124,26 @@ export function AskWeaponSkillModal({ req, gameState, onConfirm }) {
            className="btn-action primary" 
            style={{ flex: 1 }} 
            disabled={selectedCards.length + selectedEquips.length < requiredCount}
-           onClick={() => onConfirm({ doUse: true, cardIndexes: selectedCards, equipIndexes: selectedEquips })}
+           onClick={() => {
+              const card = validHandCards.find(c => c.idx === selectedCards[0]);
+              if (card && card.originalName) {
+                  const activeSkill = card.originalName === 'Né' && hasDoiNui ? 'doi-nui' : 'khai-thien';
+                  onConfirm({ doUse: true, virtualCardName: 'Chém', activeSkill, cardIndexSelected: card.idx, cardId: card.id });
+              } else {
+                  const handCardIds = selectedCards.map(idx => validHandCards.find(c => c.idx === idx)?.id).filter(Boolean);
+                  const eqIds = selectedEquips.map(idx => validEquips.find(c => c.idx === idx)?.id).filter(Boolean);
+                  onConfirm({ doUse: true, cardIndexes: selectedCards, equipIndexes: selectedEquips, cardIds: handCardIds, equipIds: eqIds });
+              }
+           }}
         >
-          ✅ {btnText}
+          {`✅ ${btnText}`}
         </button>
         <button 
            className="btn-action danger" 
            style={{ flex: 1 }} 
-           onClick={() => onConfirm({ doUse: false })}
+           onClick={() => {
+              onConfirm({ doUse: false });
+           }}
         >
           Bỏ qua
         </button>

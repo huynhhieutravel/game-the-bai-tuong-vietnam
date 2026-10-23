@@ -1,6 +1,6 @@
 import React from 'react';
-import { CARDS, TRICK_CARDS_INFO, EQUIP_CARDS_INFO } from '../../data/gameData';
-import { getCardBg } from '../../utils/cardStyles';
+import { CARDS, TRICK_CARDS_INFO, EQUIP_CARDS_INFO } from 'shared/data/gameData';
+import { getCardBg } from 'shared/utils/cardStyles';
 
 const renderIcon = (name, emoji) => {
   const bg = getCardBg(name);

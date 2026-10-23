@@ -32,7 +32,17 @@ export default function MainMenu() {
           style={{ fontSize: '1.5rem', padding: '20px', borderRadius: '15px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px' }}
           onClick={() => navigate(`/game?players=${playerCount}`)}
         >
-          ▶️ VÀO TRẬN
+          ▶️ ĐẤU MÁY (OFFLINE)
+        </button>
+        <button 
+          className="btn-action primary" 
+          style={{ fontSize: '1.2rem', padding: '15px', borderRadius: '15px', textTransform: 'uppercase', fontWeight: 'bold', background: 'var(--color-primary-dark)' }}
+          onClick={() => {
+             const name = prompt("Nhập tên của bạn:");
+             if (name) navigate(`/online?name=${encodeURIComponent(name)}`);
+          }}
+        >
+          🌐 CHƠI ONLINE (TẠO/VÀO PHÒNG)
         </button>
         <button 
           className="btn-action secondary" 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useSearchParams } from 'react-router-dom';
 import { GameProvider } from './contexts/GameProvider';
 import { SelectionProvider } from './contexts/SelectionProvider';
 import GameView from './components/game/GameView';
@@ -17,19 +17,40 @@ import FixedCards from './components/wiki/FixedCards';
 import FixedSystems from './components/wiki/FixedSystems';
 import Changelog from './components/wiki/Changelog';
 import MainMenu from './components/MainMenu';
+import { MultiplayerProvider } from './contexts/MultiplayerProvider';
 import './index.css';
+
+function GameRouteWrapper() {
+  const [searchParams] = useSearchParams();
+  const players = parseInt(searchParams.get('players'), 10) || 4;
+  return (
+    <GameProvider playerCount={players}>
+      <SelectionProvider>
+        <GameView />
+      </SelectionProvider>
+    </GameProvider>
+  );
+}
+
+function MultiplayerRouteWrapper() {
+  const [searchParams] = useSearchParams();
+  const roomId = searchParams.get('room');
+  const playerName = searchParams.get('name') || "Khách_" + Math.floor(Math.random() * 1000);
+  return (
+    <MultiplayerProvider roomId={roomId} playerName={playerName}>
+      <SelectionProvider>
+        <GameView />
+      </SelectionProvider>
+    </MultiplayerProvider>
+  );
+}
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<MainMenu />} />
-      <Route path="/game" element={
-        <GameProvider playerCount={4}>
-          <SelectionProvider>
-            <GameView />
-          </SelectionProvider>
-        </GameProvider>
-      } />
+      <Route path="/game" element={<GameRouteWrapper />} />
+      <Route path="/online" element={<MultiplayerRouteWrapper />} />
       
       <Route path="/wiki" element={<WikiLayout />}>
         <Route index element={<MainMenu />} />

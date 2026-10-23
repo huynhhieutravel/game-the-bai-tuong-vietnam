@@ -7,7 +7,42 @@ const FIXED_HEROES_DATA = [
     faction: "Lạc",
     image: "/images/heroes/lac_lac-long-quan.png",
     issue: "Đại tu toàn diện Logic Kỹ Năng & AI Bot & Khắc phục Màn hình Đỏ",
-    fix: "- **Logic Kỹ Năng [Bọc Trăm Trứng]**: Cập nhật hàm `canUse` để chặn lỗi người chơi dùng chủ động vô hạn lần sau khi đã hết lượt đánh [Chém].\n- **Logic Kỹ Năng [Thủy Tổ]**: Xử lý triệt để Bot AI biết tự động bỏ bài để hồi máu/cứu đồng minh phe Lạc, đồng thời biết tự dùng Đào/Chém khi được kích hoạt năng lực chọn bài.\n- **Lỗi Mismatch Dữ liệu [Bọc Trăm Trứng]**: Đồng bộ payload UI gửi lên (`cardId` thay vì `cardIndexSelected`) để Engine nhận diện lá bài được dùng để đánh giùm.\n- **Khắc phục Màn hình Đỏ**: Bổ sung Modal `AskBocTramTrungDodgeModal` còn thiếu. Dùng Optional Chaining `gameState?.players?.[0]` để triệt tiêu lỗi trắng màn hình lúc khởi tạo GameView.\n- **Lỗi Spam Click Queue**: Fix lỗi người chơi bấm nhiều lần nút kỹ năng [Bọc Trăm Trứng] khiến Bot phải đánh giùm liên tiếp 3 lá bài liền nhau, bằng cách chặn đứng ở hàm xác thực Engine."
+    fix: "- **Logic Kỹ Năng [Bọc Trăm Trứng]**: Cập nhật hàm `canUse` để chặn lỗi người chơi dùng chủ động vô hạn lần sau khi đã hết lượt đánh [Chém].\n- **Logic Kỹ Năng [Thủy Tổ]**: Xử lý triệt để Bot AI biết tự động bỏ bài để hồi máu/cứu đồng minh phe Lạc, đồng thời biết tự dùng Đào/Chém khi được kích hoạt năng lực chọn bài.\n- **Lỗi Mismatch Dữ liệu [Bọc Trăm Trứng]**: Đồng bộ payload UI gửi lên (`cardId` thay vì `cardIndexSelected`) để Engine nhận diện lá bài được dùng để đánh giùm.\n- **Khắc phục Màn hình Đỏ**: Bổ sung Modal `AskBocTramTrungDodgeModal` còn thiếu. Dùng Optional Chaining `gameState?.players?.[0]` để triệt tiêu lỗi trắng màn hình lúc khởi tạo GameView.\n- **Lỗi Spam Click Queue**: Fix lỗi người chơi bấm nhiều lần nút kỹ năng [Bọc Trăm Trứng] khiến Bot phải đánh giùm liên tiếp 3 lá bài liền nhau, bằng cách chặn đứng ở hàm xác thực Engine.\n- **Nâng cấp Modals Kỹ năng chéo (Cross-skill Interaction)**: Hỗ trợ đồng minh Thần Trụ Trời dùng bài Đỏ làm Chém (Khai Thiên), Sơn Tinh dùng Né làm Chém (Dời Núi), và Nguyễn Bặc dùng bài Đỏ làm Né (Nam Dược) ngay trên giao diện Bọc Trăm Trứng."
+  },
+  {
+    name: "Thánh Gióng",
+    faction: "Lạc",
+    image: "/images/heroes/lac_thanh-giong.png",
+    issue: "Sửa lỗi Engine lọt bypass isSkip & Hoàn thiện logic Tre Ngà, Thiết Mã",
+    fix: "- **Lỗi Bypass isSkip [Tre Ngà]**: Khắc phục lỗi cực kỳ hiểm hóc khiến kỹ năng Tre Ngà không gây mất máu khi mục tiêu bấm Hủy (không có thẻ bài/không muốn bỏ bài). Lý do là event 'ask_tre_nga_discard' lọt vào bypass isSkip trong Dispatcher, khiến luồng xử lý bị return sớm thay vì ép buộc nhận sát thương.\n- **Truyền Reference Payload [Tre Ngà]**: Sửa logic để gán cờ `unavoidable = true` trên cùng một payload object với sự kiện gốc `EVENT_DO_ASK_DODGE`. Việc truyền reference này buộc `CombatHandler` hiểu rằng nạn nhân đã bị khóa Né, phải trực tiếp nhảy vào trừ máu mà không yêu cầu đánh bài Né nữa.\n- **Tầm Đánh [Thiết Mã]**: Đảm bảo kỹ năng Thiết Mã tự động -1 khoảng cách tấn công trong Core hệ thống `rangeSystem.js`.\n- **Unit Tests**: Toàn bộ Unit test của Thánh Gióng nay đã pass 100%."
+  },
+  {
+    name: "Đinh Bộ Lĩnh",
+    faction: "Sơn",
+    image: "/images/heroes/son_dinh-bo-linh.png",
+    issue: "Sửa lỗi tịt ngòi kỹ năng Uy Chấn do mất cờ nhận diện",
+    fix: "- **Lỗi Payload [Uy Chấn]**: Khắc phục lỗi kỹ năng Uy Chấn không thể kích hoạt khi bị mất máu bởi lá [Chém] từ người dùng [Mượn Đao Giết Người]. Nguyên nhân do luồng của `borrow_sword` trong Dispatcher đã quên gán cờ `reason: 'chem'` cho `EVENT_DAMAGE`.\n- **Chuẩn Hóa Event Payload**: Cập nhật cả `EVENT_DAMAGE` và `EVENT_ASK_DODGE` để đảm bảo tương thích 100% với trigger `POST_DAMAGE` của Uy Chấn.\n- **Verification**: Đã review kỹ Modal UI và Bot AI, mọi logic giao tiếp đều hoàn hảo."
+  },
+  {
+    name: "Nguyễn Bặc",
+    faction: "Sơn",
+    image: "/images/heroes/son_nguyen-bac.png",
+    issue: "Sửa lỗ hổng bảo mật kỹ năng Bình Loạn và dạy Bot AI",
+    fix: "- **Bịt Lỗ Hổng [Bình Loạn]**: Sửa lỗi Core Engine không xác thực (validate) 2 lá bài do client gửi lên. Giờ đây Engine đã kiểm tra nghiêm ngặt bắt buộc 2 lá bài dùng để Bình Loạn phải hoàn toàn \"cùng chất\" (same suit), tránh các hacker tấn công bằng payload giả.\n- **Dạy Bot AI [Bình Loạn]**: Lập trình thêm não cho Bot, giúp Bot biết dùng `Bình Loạn` để bắn Loạn Tiễn bằng cách ghép bài trên tay. Bot cũng thông minh đánh giá rủi ro `shouldPlayAoE` để không lỡ tay thảm sát đồng đội phe Sơn."
+  },
+  {
+    name: "Đinh Điền",
+    faction: "Sơn",
+    image: "/images/heroes/son_dinh-dien.png",
+    issue: "Chuẩn hóa kỹ năng Định Quốc và nâng cấp AI Phạt Tội",
+    fix: "- **Dạy Bot AI [Phạt Tội]**: Bot Đinh Điền giờ đây đã biết chớp thời cơ dùng Phạt Tội (giật sét) lên đối thủ mỗi khi né thành công.\n- **Chuẩn hóa [Định Quốc]**: Khắc phục lỗi mâu thuẫn giữa mô tả kỹ năng và code. Engine và UI giờ đây chỉ cho phép đồng đội ném đúng lá [Né] hoặc [Sấm Sét] cho Đinh Điền (thay vì thẻ rác bất kỳ), và loại bỏ hiệu ứng hồi máu sai lệch so với bản gốc."
+  },
+  {
+    name: "Nguyễn Xí",
+    faction: "Sơn",
+    image: "/images/heroes/son_nguyen-xi.png",
+    issue: "Kiểm tra toàn diện kỹ năng Phá Quân",
+    fix: "- **UI Phản Ứng**: Đã cập nhật giao diện (UI) để hỗ trợ hiển thị bộ đếm số lượng bài yêu cầu (reqDodges và reqSlashes) một cách tường minh cho người chơi khi bị Nguyễn Xí nhắm mục tiêu.\n- **Bot AI (Native Support)**: Đã kiểm tra và xác nhận Bot AI có khả năng tự động xử lý và cống nạp 2 lá Né hoặc 2 lá Chém liên tiếp khi bị ép, không xảy ra tình trạng kẹt game."
   }
 ];
 

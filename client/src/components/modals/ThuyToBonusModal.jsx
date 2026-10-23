@@ -1,16 +1,16 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
 
 
 export function ThuyToBonusModal({ req, gameState, onConfirm }) {
    const [selectedAction, setSelectedAction] = useState('Chém');
    const [targetId, setTargetId] = useState('');
    
-   const me = gameState.players[0];
+   const me = gameState.players.find(p => p.id === req.responderId);
    
    // Dùng try-catch để an toàn khi canAttack chưa load đúng
-   let allOtherPlayers = gameState.players.filter(p => p.id !== 0 && p.isAlive);
+   let allOtherPlayers = gameState.players.filter(p => p.id !== me.id && p.isAlive);
    if (selectedAction === 'Chém') {
        allOtherPlayers = allOtherPlayers.filter(p => {
            try {

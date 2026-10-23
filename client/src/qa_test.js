@@ -22,7 +22,7 @@ let ticks = 0;
 const dispatcher = new Dispatcher(state);
 
 try {
-    while (ticks < 1000 && state.isGameOver !== true) {
+    while (ticks < 1000 && state.gameOver !== true) {
         // Find if someone needs to react
         let activeActorId = null;
         const req = state.waitingForResponse;

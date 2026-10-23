@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { getAvailableTargets } from '../../../engine/rules/TargetResolver';
+import { getAvailableTargets } from 'shared/engine/rules/TargetResolver';
 
 export function useTargeting({ 
     gameState, 
@@ -60,6 +60,17 @@ export function useTargeting({
                gameAPI.dispatcher.dispatchAction({
                    type: 'ACTION_USE_SKILL',
                    payload: { playerId: mainPlayerId, skillId: 'boc-tram-trung', targets: newSelectedTargets }
+               });
+           } else if (['Tâm Công', 'Vân Đồn', 'Duyên Thơ', 'Tiên Phong'].includes(activeSkill)) {
+               const skillMap = {
+                   'Tâm Công': 'tam-cong',
+                   'Vân Đồn': 'van-don',
+                   'Duyên Thơ': 'duyen-tho',
+                   'Tiên Phong': 'tien-phong'
+               };
+               gameAPI.dispatcher.dispatchAction({
+                   type: 'ACTION_USE_SKILL',
+                   payload: { playerId: mainPlayerId, skillId: skillMap[activeSkill], targets: newSelectedTargets }
                });
            }
            cancelTargeting();

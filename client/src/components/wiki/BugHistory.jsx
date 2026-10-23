@@ -100,9 +100,53 @@ const BUG_DATA = [
     cause: "1. Toàn bộ `ModalContainer.jsx` bị hardcode sai lầm kiểm tra `req.responderId === 0` thay vì ID thực tế của người chơi (`me.id`), và thiết lập sai điều kiện `!req.reason` khiến lệnh Đòi Né từ Chém bị chặn lại.\n2. Thiếu gán `req.lastNegaterId` vào Dispatcher. Modal Hóa Giải bị kích hoạt bởi kỹ năng ẩn nhưng không có text giải thích.",
     fix: "- **Khắc phục Khủng hoảng Modal**: Càn quét thay thế hàng loạt lệnh `req.responderId === 0` thành `req.responderId === me.id` trong `ModalContainer.jsx`. Nới lỏng điều kiện `ask_dodge` để chấp nhận `req.reason === 'chem'`.\n- **Sửa Modal Hóa Giải**: Thêm dòng chữ giải thích kỹ năng ẩn (như Linh Giám) vào Modal. Gán `req.lastNegaterId` vào Dispatcher.",
     status: "Fixed"
+  },
+  {
+    id: 12,
+    title: "Khủng Hoảng Mất Đồng Bộ Giao Diện & Engine (Lỗi Ngầm Quân Cơ, Khai Quốc, Thất Trảm Sớ)",
+    labels: ["Lỗi Engine", "Lỗi UI", "Critical", "Deadlock"],
+    symptom: "Game bị 'nuốt lệnh' (Deadlock) ở các tình huống sau:\n1. Đinh Điền bấm chọn bài đen để đổi Phán xét [Quân Cơ] nhưng game lờ đi, phán xét diễn ra bình thường.\n2. Nguyễn Bặc rút xong 2 thẻ từ [Khai Quốc], chọn bài đưa cho đồng minh nhưng thẻ bài không di chuyển, hệ thống kẹt.\n3. Chu Văn An mất máu chọn Phán xét [Thất Trảm Sớ], game không hiện ra phán xét mà bắt kẻ thù tự gánh hình phạt, thậm chí kẻ thù cũng không bấm nút hình phạt được.\n4. Nguyễn Nộn [Đoạt Sáo] chọn thẻ bỏ đi nhưng giao diện truyền sai ID.",
+    cause: "Dữ liệu (Payload) truyền từ React Component (`ModalContainer.jsx`) không khớp với dữ liệu Engine (`SkillRegistry`) kỳ vọng. \n- **Quân Cơ**: UI truyền `cardIndexSelected`, nhưng Engine đòi `cardId`.\n- **Khai Quốc**: Truyền đủ data, nhưng Engine **bị quên chưa viết hàm `onReact`** để xử lý.\n- **Thất Trảm Sớ**: Code Engine bị viết sai logic (Bỏ qua bước Phán xét, nhảy thẳng vào bước Trừng phạt). Hơn nữa, Payload của UI truyền key `option`, trong khi Engine đòi key `discardCards`.",
+    fix: "1. Cập nhật `ModalContainer.jsx` và thiết kế các Modal riêng biệt (như `KhaiQuocModal.jsx`) để ghim chặt `cardId` và `targetId` vào Payload trả về.\n2. Bổ sung hàm `onReact` cho Khai Quốc trong `reaction.js` để thực thi lệnh chuyển bài `MoveCardEffect`.\n3. Đập đi xây lại toàn bộ cấu trúc Logic của Thất Trảm Sớ trong `combat.js`: Chẻ làm 2 bước rõ rệt (Rút Phán Xét -> Nếu khác Cơ mới đẩy Modal Trừng Phạt).",
+    status: "Fixed"
+  },
+  {
+    id: 13,
+    title: "Khủng Hoảng Truyền Sai ID Tiếng Việt & Đứt Gãy Logic Gọi Hội (Bọc Trăm Trứng, Tiên Phát, Hộ Giá)",
+    labels: ["Lỗi Engine", "Lỗi UI", "Critical"],
+    symptom: "Người chơi chịu sát thương oan uổng dù ĐÃ bấm kích hoạt các kỹ năng gọi đồng minh đỡ đòn thay (Bọc Trăm Trứng, Tiên Phát, Hộ Giá). Giao diện báo đồng minh đã giúp đỡ thành công (tốn bài), nhưng luồng xử lý chính vẫn đè đầu Chủ công ra trừ máu.",
+    cause: "Lỗi bao gồm 3 tầng:\n1. Core Dispatcher vô ý ném các cờ đặc biệt (`callBocTramTrung`, `doTienPhat`) vào thùng rác vì tưởng lầm người chơi bấm Bỏ qua (isSkip) trong chuỗi các event Native (ask_slash, ask_dodge).\n2. Giao diện (Modal) truyền một loạt các ID dạng chuỗi tiếng Việt có dấu (`activeSkill: 'Tiên Phát'`, `'Hộ Giá'`, `'Kỳ Tập'`, `'Chương Dương'`, `'Dời Núi'`) thay vì chuỗi chuẩn `slug`.\n3. Kỹ năng Tiên Phát & Hộ Giá gọi nhầm hàm `dispatchAction({ type: 'ACTION_SKILL_RESPONSE' })` (Đẩy một Event trống vào Hàng đợi) thay vì gọi `resolveEvent({ type: 'EVENT_ACTION_REACT' })` (Trả lời trực tiếp cho Event đang chờ). Việc này khiến Engine tảng lờ thao tác của đồng minh.",
+    fix: "Đã càn quét toàn bộ mã nguồn để loại bỏ hoàn toàn các chuỗi ID tiếng Việt (thay bằng `tien-phat`, `ho-gia`, `chuong-duong`...). Tái cấu trúc lại luồng xử lý của `EVENT_ACTION_REACT` trong Dispatcher để ưu tiên bẻ lái sang SkillRegistry khi bắt gặp các cờ gọi hội, trước khi chúng bị khối Native chặn lại. Thay thế hàm `dispatchAction` bằng `resolveEvent` tại các kỹ năng hỗ trợ.",
+    status: "Fixed"
+  },
+  {
+    id: 14,
+    title: "Lỗi Đứt Gãy Kiến Trúc Engine Khiến Hàng Loạt Kỹ Năng Bị Tê Liệt (Thiết Mã, Tiên Duyên...)",
+    labels: ["Lỗi Engine", "Lỗi Kiến Trúc", "Critical", "Lỗi Logic"],
+    symptom: "Rất nhiều Kỹ năng nội tại (Passive Skills) của các tướng như Thiết Mã, Nghệ An Kế, Nỏ Thần, Tiên Duyên, Nhiếp Chính... hoàn toàn không có tác dụng trong game. Ví dụ: Bọc Trăm Trứng không nhận diện được tầm đánh Thiết Mã của Thánh Gióng; Bot AI không dùng Tiên Duyên.",
+    cause: "Đây là một lỗi thiết kế kiến trúc ngầm rất lớn. Ở phía Engine Backend (State.js), thuộc tính `player.heroes` chưa bao giờ được khởi tạo và luôn là `undefined`. Trong khi đó, toàn bộ các file xử lý logic trong Engine (rangeSystem, turnSystem, botLogic...) lại đang kiểm tra kỹ năng bằng Optional Chaining: `player.heroes?.some(...)`. Vì Optional Chaining âm thầm nuốt lỗi và trả về `undefined`, mọi lượt kiểm tra Kỹ năng đều thất bại (false) mà không hề có bất kỳ cảnh báo lỗi Crash nào trên Console.",
+    fix: "Đã tạo một helper `hasSkill(player, skillId)` dùng chung trong `gameState.js`. Helper này truy xuất trực tiếp vào `HeroRegistry` thông qua `mainHeroId` và `subHeroId`. Sau đó, thực hiện quét và Replace hàng loạt lệnh `player.heroes?.some` trên 6 file logic cốt lõi của Engine để sử dụng `hasSkill` mới. Khôi phục hoàn toàn sức mạnh của các Tướng.",
+    status: "Fixed"
+  },
+  {
+    id: 15,
+    title: "Lỗi Hóa Giải Không Hiệu Lực Trên Quyết Đấu (Và Hóa Giải Khác)",
+    labels: ["Lỗi UI", "Lỗi Logic", "Critical"],
+    symptom: "Người chơi bị đối phương dùng Quyết Đấu hoặc Hóa Giải, người chơi rút bài Hóa Giải ra để chống lại, nhưng sau khi bấm Xác nhận, bài Hóa Giải mất đi mà sát thương vẫn nhận, như thể không hề có chuyện gì xảy ra.",
+    cause: "Giao diện UI (`ModalContainer.jsx`) khi gửi tín hiệu phản hồi Hóa Giải về Engine đã truyền sai key `negateCardIndex` thay vì `cardId`. Engine Dispatcher lại dùng điều kiện khắt khe: nếu thiếu `data.cardId` và `data.virtualCardName`, nó sẽ mặc định gán cờ `isSkip = true` (Bỏ qua). Do đó, thao tác Hóa Giải của người chơi bị Engine coi như một cú bấm nút 'Bỏ qua'.",
+    fix: "Lần trước sửa ModalContainer bị sót (chưa thực sự đẩy cardId). Đã sửa triệt để ở ModalContainer.jsx dòng 1079: Hóa Giải luôn gửi đầy đủ `cardId`, `negateCardId`, `negateCardIndex` (cho tay) và `equipId`, `negateEquipIndex` (cho trang bị), đồng thời gửi `virtualCardName: 'Hóa Giải'`. Phía Engine Dispatcher (dòng 693) cũng đã được cập nhật để đọc `equipId` và discard bài chính xác khi Hóa Giải thành công.",
+    status: "Fixed"
+  },
+  {
+    id: 16,
+    title: "Lỗi 'Bấm nhưng không có tác dụng' - Tê Liệt Hàng Loạt Kỹ Năng Do Thiếu `skillId` & `cardId`",
+    labels: ["Lỗi Engine", "Lỗi UI", "Critical"],
+    symptom: "Rất nhiều Kỹ Năng Chủ Động (Tự Chủ, Tiên Phong, Binh Loạn...) và Phản Ứng (Uy Chấn, An Bang, Đoạt Sao, Bánh Chưng...) bị 'tê liệt'. Người chơi hoặc Bot bấm kích hoạt, giao diện đóng lại bình thường, nhưng sau đó không có bất cứ hiệu ứng (mất máu, rút bài, vứt bài) nào xảy ra. Ngoài ra, việc dùng Dời Núi / Thỉnh Chinh để Né cũng bị 'nuốt lệnh' tương tự.",
+    cause: "Lỗi đứt gãy kết nối payload giữa UI và Engine. \n1. Ở phía Engine: Dispatcher đẩy sự kiện `EVENT_TRIGGER_SKILL_ASK` lên cho UI nhưng **quên đính kèm `skillId`** (cho gần 40 kỹ năng). Khi UI gửi lựa chọn về, Dispatcher không biết phản hồi này thuộc về kỹ năng nào nên đã tự động DROP (Bỏ qua).\n2. Ở phía UI: Các Modal (DodgeModal, BorrowSwordModal) khi gửi xác nhận Đánh bài ảo đã truyền thiếu `cardId` (chỉ truyền `cardIndexSelected`), khiến Dispatcher tưởng người chơi chọn 'Bỏ qua'.",
+    fix: "Đã rà soát toàn bộ UI và hệ thống Engine:\n- **Phía Engine**: Thêm `skillId` vào tất cả các `payload: { request: { ... } }` bị thiếu trong `combat.js`, `reaction.js`, `PhaseHandler.js`, `turnSystem.js` và `system.js`.\n- **Phía UI**: Cập nhật `DodgeModal.jsx`, `BorrowSwordModal.jsx` đảm bảo gửi đầy đủ `cardId` về Engine. Hệ thống hiện đã thông suốt 100% từ Frontend xuống Backend.",
+    status: "Fixed"
   }
 ];
-
 export default function BugHistory() {
   const [filter, setFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");

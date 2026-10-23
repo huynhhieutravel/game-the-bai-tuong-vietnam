@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { CardSelector } from './CardSelector';
 
 export function DoatSaoModal({ req, gameState, onConfirm }) {
-  const me = gameState.players[req.sourceId];
+  const me = gameState.players.find(p => p.id === req.sourceId);
 
   if (req.type === 'ask_doat_sao') {
       return (

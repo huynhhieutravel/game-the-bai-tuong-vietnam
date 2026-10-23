@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
-import { HEROES } from '../../data/gameData';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
+import { HEROES } from 'shared/data/gameData';
 
 
 export function VipHeroSelectorModal({ draftSelection, me, onSelect, onClose }) {

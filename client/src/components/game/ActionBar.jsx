@@ -1,7 +1,7 @@
 // @ts-check
 import React from 'react';
-import { PHASES } from '../../data/gameData';
-
+import { PHASES } from 'shared/data/gameData';
+import { hasSkill } from 'shared/engine/gameState';
 /**
  * @typedef {import('../../engine/types/view/PlayerViewModel').PlayerViewModel} PlayerViewModel
  * @typedef {import('../../engine/types/view/GameViewModel').GameViewModel} GameViewModel
@@ -38,43 +38,30 @@ export function ActionBar(props) {
         cancelTargeting
     } = props;
     return (
-        <div className="action-buttons">
+        <div className="action-buttons" onClick={(e) => e.stopPropagation()}>
             {isMyTurn && gameState.phase === PHASES.DRAW && (
               <>
                 <button className="btn-action primary" onClick={() => handleDraw()}>
                   🃏 Rút Bài
                 </button>
-                {me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'nhiep-chinh')) && (
-                  <button className="btn-action danger" style={{ marginLeft: '10px' }} onClick={() => handleDraw(true, false)}>
-                    👑 Dùng Nhiếp Chính (Bỏ Rút Bài)
-                  </button>
-                )}
-                {me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'binh-ngo')) && me.hp < me.maxHp && (
-                  <button className="btn-action success" style={{ marginLeft: '10px' }} onClick={() => handleDraw(false, true, false)}>
-                    🛡️ Dùng Bình Ngô (Rút 3 lá)
-                  </button>
-                )}
-                {me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'khai-quoc')) && (
-                  <button className="btn-action primary" style={{ marginLeft: '10px' }} onClick={() => handleDraw(false, false, true)}>
-                    👑 Dùng Khai Quốc (Rút 4, Đưa 1)
-                  </button>
-                )}
+
+                {/* Bình Ngô is now automatically applied by the engine if the hero is revealed. */}
               </>
             )}
             {isMyTurn && gameState.phase === PHASES.ACTION && !targetSession && (
               <>
                 { (() => {
-                    let skills = me.heroes ? me.heroes.flatMap((h, i) => {
-                        return (h.skills || []).map(s => ({ ...s, heroIndex: i, isRevealed: me.revealedHeroes && me.revealedHeroes[i] }));
+                    let skills = me.heroes ? me.heroes.filter(Boolean).flatMap((h, i) => {
+                        return ((h && h.skills) || []).map(s => ({ ...s, heroIndex: i, isRevealed: me.revealedHeroes && me.revealedHeroes[i] }));
                     }).filter(s => s.type === 'ACTIVE' || s.type === 'ACTIVE_DEFENSIVE') : [];
                     
                     const myFaction = me.faction;
                     if (myFaction === 'sơn') {
-                        const hasDinhQuocUser = gameState.players.some(p => p.id !== me.id && p.isAlive && p.heroes?.some((h, i) => p.revealedHeroes[i] && h.skills?.some(s => s.id === 'dinh-quoc')));
+                        const hasDinhQuocUser = gameState.players.some(p => p.id !== me.id && p.isAlive && p.revealedHeroes.some(Boolean) && hasSkill(p, 'dinh-quoc'));
                         // Đảm bảo không bị trùng nếu chính mình là Đinh Điền
                         const iHaveDinhQuoc = skills.some(s => s.id === 'dinh-quoc' && s.isRevealed);
                         if (hasDinhQuocUser && !iHaveDinhQuoc) {
-                            skills.push({ name: 'Định Quốc', desc: 'Đưa 1 lá bài cho tướng Định Quốc để họ hồi máu', isRevealed: true, isUsable: true });
+                            skills.push({ name: 'Định Quốc', desc: 'Đưa 1 lá [Né] hoặc [Sấm Sét] cho tướng có kỹ năng Định Quốc', isRevealed: true, isUsable: !me.dinhQuocUsedThisTurn && me.hand.length > 0 });
                         }
                     }
                     return skills.map(s => {
@@ -84,10 +71,8 @@ export function ActionBar(props) {
                             key={s.name + '_hidden'} 
                             className="btn-action warning" 
                             onClick={() => {
-                               if (window.confirm(`Bạn phải lật tướng để sử dụng kỹ năng [${s.name}]. Lật ngay?`)) {
-                                  handleRevealClick(s.heroIndex);
-                                  setTimeout(() => alert(`Đã lật tướng. Vui lòng bấm lại kỹ năng [${s.name}]!`), 100);
-                               }
+                               handleRevealClick(s.heroIndex);
+                               handleExecuteSkill(s.name);
                             }}
                             title="Tướng đang ẩn. Nhấn để lật tướng."
                             disabled={me.isSilenced}
@@ -122,29 +107,44 @@ export function ActionBar(props) {
             )}
             {targetSession && (
               <>
-                {targetSession.targetingDef?.type === 'multiple' && (
-                  <button
-                    className="btn-action primary"
-                    onClick={() => {
-                       if (isActionPending.current) return;
-                       isActionPending.current = true;
-                       if (activeSkill === 'Tiên Duyên') {
-                           gameAPI.dispatcher.dispatchAction({
-                               type: 'ACTION_USE_SKILL',
-                               payload: { playerId: me.id, skillId: 'tien-duyen-active', targets: targetSession.selectedTargets, options: { cardIds: [targetSession.card.id] } }
-                           });
-                       } else {
-                           gameAPI.playCard(me.id, targetSession.card.id, targetSession.selectedTargets, { 
-                               virtualCardName: targetSession.virtualCardName,
-                               isReforge: targetSession.selectedTargets.length === 0
-                           });
-                       }
-                       cancelTargeting();
-                    }}
-                  >
-                    {targetSession.selectedTargets.length === 0 ? '⛓️ Rèn Lại (Bỏ 1 Rút 1)' : '🔗 Xác Nhận Xích'}
-                  </button>
-                )}
+                {targetSession.targetingDef?.type === 'multiple' && (() => {
+                  const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
+                  const minTargets = targetSession.targetingDef.min !== undefined ? targetSession.targetingDef.min : 1;
+                  const hasEnoughTargets = targetSession.selectedTargets.length >= minTargets;
+                  const isReforge = isXiengXich && targetSession.selectedTargets.length === 0;
+                  const canSubmit = isReforge || hasEnoughTargets;
+                  
+                  let label = `✅ Xác nhận Dùng ${targetSession.virtualCardName || targetSession.card?.name || activeSkill}`;
+                  if (isXiengXich) {
+                     label = isReforge ? '⛓️ Rèn Lại (Bỏ 1 Rút 1)' : '🔗 Xác Nhận Xích';
+                  }
+
+                  return (
+                    <button
+                      className="btn-action primary"
+                      disabled={!canSubmit}
+                      style={{ opacity: canSubmit ? 1 : 0.5, filter: canSubmit ? 'none' : 'grayscale(1)' }}
+                      onClick={() => {
+                         if (isActionPending.current) return;
+                         isActionPending.current = true;
+                         if (activeSkill === 'Tiên Duyên') {
+                             gameAPI.dispatcher.dispatchAction({
+                                 type: 'ACTION_USE_SKILL',
+                                 payload: { playerId: me.id, skillId: 'tien-duyen-active', targets: targetSession.selectedTargets, options: { cardIds: [targetSession.card.id] } }
+                             });
+                         } else {
+                             gameAPI.playCard(me.id, targetSession.card.id, targetSession.selectedTargets, { 
+                                 virtualCardName: targetSession.virtualCardName,
+                                 isReforge: isReforge
+                             });
+                         }
+                         cancelTargeting();
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })()}
                 {['none', 'aoe', 'self'].includes(targetSession.targetingDef?.type) && (
                   <button
                     className="btn-action primary"

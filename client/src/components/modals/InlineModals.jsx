@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getFullPlayerName } from '../../utils/playerHelpers';
+import { getFullPlayerName } from 'shared/utils/playerHelpers';
 import { CardSelector } from './CardSelector';
 
 

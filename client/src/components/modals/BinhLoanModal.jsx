@@ -1,10 +1,11 @@
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
 
 
 export function BinhLoanModal({ req, gameState, onConfirm }) {
   const [selectedCards, setSelectedCards] = useState([]);
-  const me = gameState.players[req.sourceId];
+  const me = gameState.players.find(p => p.id === req.sourceId);
 
   const handleCardClick = (idx) => {
       if (selectedCards.includes(idx)) {
@@ -40,7 +41,7 @@ export function BinhLoanModal({ req, gameState, onConfirm }) {
                cursor: 'pointer', whiteSpace: 'nowrap'
              }}
            >
-             <div style={{ fontSize: '0.75rem', color: c.color === 'red' ? '#ef4444' : '#f1f5f9' }}>{c.suit}{c.rank}</div>
+             <div style={{ fontSize: '0.75rem', color: c.color === 'red' ? '#ef4444' : '#f1f5f9' }}>{getSuitEmoji(c.suit)}{c.rank}</div>
              <div>{c.name}</div>
            </div>
         ))}

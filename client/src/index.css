@@ -649,8 +649,20 @@ body {
   flex-shrink: 0;
   z-index: var(--z-hand);
   padding: var(--space-sm) var(--space-md) var(--space-md);
+  position: relative;
+}
+
+.player-hand-area::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 280px;
   background: linear-gradient(to top, rgba(17, 24, 39, 0.95) 0%, rgba(17, 24, 39, 0.5) 80%, transparent 100%);
   backdrop-filter: blur(8px);
+  z-index: -1;
+  pointer-events: none;
 }
 
 /* Own hero info bar */
@@ -838,24 +850,59 @@ body {
 /* ============================================
    Game Log / Activity Feed
    ============================================ */
-.game-log {
+.game-log-container {
   position: absolute;
   top: 60px;
   right: var(--space-md);
   width: 350px;
   bottom: 350px;
-  overflow-y: auto;
   z-index: var(--z-cards);
+  display: flex;
+  flex-direction: column;
+  background: rgba(17, 24, 39, 0.85);
+  border: 1px solid rgba(212, 168, 67, 0.3);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.game-log-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(212, 168, 67, 0.3);
+}
+
+.game-log-tab {
+  flex: 1;
+  text-align: center;
+  padding: 8px 0;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  background: rgba(0,0,0,0.2);
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.game-log-tab:hover {
+  background: rgba(212, 168, 67, 0.1);
+  color: var(--color-text);
+}
+
+.game-log-tab.active {
+  background: transparent;
+  color: var(--color-gold);
+  border-bottom: 2px solid var(--color-gold);
+}
+
+.game-log {
+  flex: 1;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
   scrollbar-width: thin;
   scrollbar-color: var(--color-border) transparent;
-  background: rgba(17, 24, 39, 0.85);
-  border: 1px solid rgba(212, 168, 67, 0.3);
-  border-radius: var(--radius-md);
   padding: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 .log-entry {
@@ -993,6 +1040,11 @@ body {
     font-size: 0.6rem;
   }
   
+  .game-log-container {
+    width: 280px;
+    bottom: 250px;
+  }
+  
   .card {
     width: 60px;
     height: 85px;
@@ -1006,7 +1058,7 @@ body {
     font-size: 0.5rem;
   }
   
-  .game-log {
+  .game-log-container {
     width: 160px;
   }
   
@@ -1092,3 +1144,28 @@ body {
   transition: opacity 0.1s ease-in;
 }
 
+/* --- New Player Animations --- */
+.anim-damage {
+  animation: damageShake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.8) !important;
+  border-color: rgba(220, 38, 38, 0.9) !important;
+}
+
+.anim-heal {
+  animation: healPulse 0.8s ease-out both;
+  box-shadow: 0 0 20px rgba(52, 211, 153, 0.8) !important;
+  border-color: rgba(52, 211, 153, 0.9) !important;
+}
+
+@keyframes damageShake {
+  10%, 90% { transform: translate3d(-2px, 0, 0); }
+  20%, 80% { transform: translate3d(4px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-8px, 0, 0); }
+  40%, 60% { transform: translate3d(8px, 0, 0); }
+}
+
+@keyframes healPulse {
+  0% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.05); filter: brightness(1.5); }
+  100% { transform: scale(1); filter: brightness(1); }
+}

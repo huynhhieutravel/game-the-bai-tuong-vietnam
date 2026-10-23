@@ -1,10 +1,11 @@
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
 
 
 export function BachDangModal({ req, gameState, onConfirm }) {
   const [selectedCards, setSelectedCards] = useState([]);
-  const me = gameState.players[0];
+  const me = gameState.players.find(p => p.id === (typeof window !== 'undefined' ? window.playerId : 0)) || gameState.players[0];
 
   const toggleCard = (idx) => {
      if (selectedCards.includes(idx)) {
@@ -31,7 +32,7 @@ export function BachDangModal({ req, gameState, onConfirm }) {
                  background: isSelected ? 'rgba(239, 68, 68, 0.2)' : '#1f2937', cursor: 'pointer'
                }}
              >
-               <div style={{ fontSize: '0.7rem', color: c.color === 'red' ? '#ef4444' : 'white' }}>{c.suit} {c.rank}</div>
+               <div style={{ fontSize: '0.7rem', color: c.color === 'red' ? '#ef4444' : 'white' }}>{getSuitEmoji(c.suit)} {c.rank}</div>
                <div style={{ fontSize: '0.85rem', color: 'white' }}>{c.name}</div>
              </div>
            );

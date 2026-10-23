@@ -35,10 +35,15 @@ describe('Game Hooks', () => {
     describe('useCardInteraction', () => {
         it('should track selected discards', () => {
             const { result } = renderHook(() => useCardInteraction({
+                gameState: {
+                    players: [{ id: 0, hp: 3, hand: ['card1', 'card2', 'card3', 'card4'] }],
+                    waitingForResponse: { type: 'discard_phase', amount: 2 }
+                },
                 gameAPI: {},
                 targetSession: null,
                 setTargetSession: vi.fn(),
                 cancelTargeting: vi.fn(),
+                mainPlayerId: 0
             }));
 
             // Chọn 1 lá

@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
-import { canUseSkill } from '../../../engine/rules/SkillRules';
-import { PHASES } from "../../../data/gameData";
+import { canUseSkill } from 'shared/engine/rules/SkillRules';
+import { PHASES } from 'shared/data/gameData';
+import { canAttack } from 'shared/engine/rangeSystem';
+import { getPlayerGender } from 'shared/engine/gameState';
 
 export function useSkillInteraction({
     gameState,
@@ -43,10 +45,10 @@ export function useSkillInteraction({
               setTargetSession({
                  card: null,
                  virtualCardName: null,
-                 targetingDef: { type: 'single', filter: (state, player) => state.players.filter(p => p.id !== player.id && p.isAlive && p.distanceFromMe <= player.attackRange) },
+                 targetingDef: { type: 'single', filter: (state, player) => state.players.filter(p => p.id !== player.id && p.isAlive && canAttack(state, player.id, p.id, null)) },
                  step: 0,
                  selectedTargets: [],
-                 validTargets: gameState.players.filter(p => p.id !== mainPlayerId && p.isAlive && p.distanceFromMe <= (gameState.players.find(x => x.id === mainPlayerId)?.attackRange || 1)).map(p => p.id),
+                 validTargets: gameState.players.filter(p => p.id !== mainPlayerId && p.isAlive && canAttack(gameState, mainPlayerId, p.id, null)).map(p => p.id),
                  message: '🎯 Đã kích hoạt Bọc Trăm Trứng! Hãy nhấp chọn 1 KẺ ĐỊCH để đồng minh Lạc chém giúp bạn!'
               });
            }
@@ -66,6 +68,71 @@ export function useSkillInteraction({
                    selectedTargets: [],
                    validTargets: [],
                    message: '✨ Hãy nhấp chọn 1 lá bài ♣ trên tay.'
+               });
+           }
+           return;
+        }
+        
+        if (skillId === 'Phá Thành') {
+           if (activeSkill === skillId) {
+               cancelTargeting();
+           } else {
+               setActiveSkill(skillId);
+               setTargetSession({
+                   card: null,
+                   virtualCardName: null,
+                   targetingDef: { type: 'single', filter: (state, player) => [], optional: true },
+                   step: 0,
+                   selectedTargets: [],
+                   validTargets: [],
+                   message: '💥 Hãy nhấp chọn 1 lá bài trên tay khác màu với lá phán xét để dùng như Quyết Đấu.'
+               });
+           }
+           return;
+        }
+
+        if (skillId === 'Thần Hỏa') {
+           if (activeSkill === skillId) {
+               cancelTargeting();
+           } else {
+                setActiveSkill(skillId);
+                setTargetSession({
+                    card: null,
+                    virtualCardName: null,
+                    targetingDef: { type: 'single', filter: (state, player) => state.players.filter(p => p.isAlive && p.hand.length > 0) },
+                    step: 0,
+                    selectedTargets: [],
+                    validTargets: gameState.players.filter(p => p.isAlive && p.hand.length > 0).map(p => p.id),
+                    message: '🔥 Hãy nhấp chọn 1 lá bài ĐỎ trên tay để ném Hỏa Công.'
+                });
+           }
+           return;
+        }
+
+        if (['Tâm Công', 'Vân Đồn', 'Duyên Thơ', 'Tiên Phong'].includes(skillId)) {
+           if (activeSkill === skillId) {
+               cancelTargeting();
+           } else {
+               setActiveSkill(skillId);
+               setTargetSession({
+                   card: null,
+                   virtualCardName: null,
+                   targetingDef: { type: 'single', filter: (state, player) => {
+                       if (skillId === 'Duyên Thơ') {
+                           return state.players.filter(p => p.id !== player.id && p.isAlive && p.hp < p.maxHp && (getPlayerGender(p) === 'Nam' || getPlayerGender(p) === 'Male'));
+                       }
+                       return state.players.filter(p => p.id !== player.id && p.isAlive);
+                   } },
+                   step: 0,
+                   selectedTargets: [],
+                   validTargets: gameState.players.filter(p => {
+                       if (p.id === mainPlayerId || !p.isAlive) return false;
+                       if (skillId === 'Duyên Thơ') {
+                           return p.hp < p.maxHp && (getPlayerGender(p) === 'Nam' || getPlayerGender(p) === 'Male');
+                       }
+                       return true;
+                   }).map(p => p.id),
+                   message: `🎯 Bạn đang dùng [${skillId}]. Hãy nhấp chọn 1 MỤC TIÊU.`
                });
            }
            return;
@@ -97,9 +164,10 @@ export function useSkillInteraction({
         } else {
            // Toggle active skill selection
            setActiveSkill(prev => prev === skillId ? null : skillId);
-           cancelTargeting();
+           setTargetSession(null);
+           if (isActionPending.current) isActionPending.current = false;
         }
-    }, [gameState, gameAPI, activeSkill, cancelTargeting, setActiveSkill, setTargetSession, isActionPending]);
+    }, [gameState, gameAPI, activeSkill, cancelTargeting, setActiveSkill, setTargetSession, isActionPending, mainPlayerId]);
 
     return {
         handleExecuteSkill

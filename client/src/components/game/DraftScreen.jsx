@@ -1,7 +1,8 @@
 // @ts-check
 import React, { useState, useEffect } from 'react';
 import { VipHeroSelectorModal } from '../modals/VipHeroSelectorModal';
-import { HEROES } from '../../data/gameData';
+import { HEROES } from 'shared/data/gameData';
+import { ChatWidget } from './ChatWidget';
 
 /**
  * @typedef {import('../../engine/types/view/PlayerViewModel').PlayerViewModel} PlayerViewModel
@@ -119,7 +120,7 @@ export function DraftScreen(props) {
     };
 
     return (
-        <div className="draft-board" style={{ padding: '20px 40px', maxWidth: '100%', margin: '0 auto', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', overflowY: 'auto' }}>
+        <div className="draft-board" style={{ position: 'relative', padding: '20px 40px', maxWidth: '100%', margin: '0 auto', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', overflowY: 'auto' }}>
             <h2 style={{ color: 'var(--color-gold)', fontSize: '2rem', marginBottom: '10px', textShadow: '0 0 10px rgba(212, 168, 67, 0.5)' }}>⏳ Chọn 2 Tướng Cùng Phe ({draftTimer}s)</h2>
             <p style={{ color: 'var(--color-text-muted)', fontSize: '1.2rem', marginBottom: '40px' }}>Chế độ Quốc Chiến: Chọn 2 tướng cùng màu để xác định phe của bạn.</p>
             
@@ -255,6 +256,8 @@ export function DraftScreen(props) {
                 onClose={() => setShowVipModal(false)}
                 />
             )}
+
+            <ChatWidget style={{ position: 'absolute', bottom: '20px', left: '20px', zIndex: 100 }} />
         </div>
     );
 }

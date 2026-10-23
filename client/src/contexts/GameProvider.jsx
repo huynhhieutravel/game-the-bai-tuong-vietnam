@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Dispatcher } from '../engine/core/Dispatcher';
-import { GameAPI } from '../engine/application/GameAPI';
-import { BotRunner } from '../engine/application/BotRunner';
-import { createGameState, selectDraftHeroes as legacySelectDraftHeroes } from '../engine';
-import { toViewModel } from '../engine/application/GameViewMapper';
+import {
+  Dispatcher,
+  GameAPI,
+  BotRunner,
+  createGameState,
+  selectDraftHeroes as legacySelectDraftHeroes,
+  toViewModel
+} from 'shared/engine_v4/application/index.js';
 
 // 1. GameState Context: Dành cho UI render dữ liệu
 export const GameStateContext = createContext(null);
@@ -114,12 +117,48 @@ export function useGameState() {
   return ctx;
 }
 
+// Biến cờ toàn cục ở cấp độ module để quản lý chung cho mọi lời gọi API
+let isSubmittingGlobal = false;
+
 export function useGameAPI() {
   const ctx = useContext(GameAPIContext);
   if (ctx === undefined) throw new Error('useGameAPI must be used within a GameProvider');
-  // Trả về proxy: gọi method nào thì forward sang gameAPIRef.current
-  // Nếu chưa có API (đang draft) thì trả null-safe proxy
-  return ctx.getAPI();
+  
+  const api = ctx.getAPI();
+  
+  // Dùng useMemo để trả về Proxy reference ổn định
+  return useMemo(() => {
+    if (!api) return null;
+    
+    return new Proxy(api, {
+      get(target, propKey, receiver) {
+        const origMethod = target[propKey];
+        if (typeof origMethod === 'function') {
+          return (...args) => {
+            // Bypass cờ _isAuto (các lệnh từ useEffect tự động gửi)
+            const isAuto = args[0] && args[0]._isAuto === true;
+
+            // Chống lỗi click đúp / spam nút cho mọi hành động gửi lên server
+            if (!isAuto && isSubmittingGlobal) {
+               console.warn(`[Global API Throttle] Đã chặn lệnh gọi trùng lặp tới gameAPI.${String(propKey)}()`);
+               return;
+            }
+            
+            if (!isAuto) {
+               isSubmittingGlobal = true;
+               // Khóa an toàn 400ms, đủ dài để ngăn click đúp, đủ ngắn để không gây lag thao tác bình thường
+               setTimeout(() => {
+                  isSubmittingGlobal = false;
+               }, 400);
+            }
+            
+            return origMethod.apply(target, args);
+          };
+        }
+        return Reflect.get(target, propKey, receiver);
+      }
+    });
+  }, [api]);
 }
 
 export function useGameController() {

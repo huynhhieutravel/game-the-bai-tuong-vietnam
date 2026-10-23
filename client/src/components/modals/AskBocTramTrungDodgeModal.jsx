@@ -1,12 +1,31 @@
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
+import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine/gameState';
 
 export function AskBocTramTrungDodgeModal({ req, gameState, onConfirm }) {
-   const me = gameState.players[0];
-   const llq = gameState.players[req.sourceId];
+   const me = gameState.players.find(p => p.id === (typeof window !== 'undefined' ? window.playerId : 0)) || gameState.players[0];
+   const llq = gameState.players.find(p => p.id === req.sourceId);
    
    const [selectedCardIdx, setSelectedCardIdx] = useState(null);
-   const dodges = me.hand.map((c, i) => ({...c, index: i})).filter(c => c.name === 'Né');
+   
+   const hasDoiNui = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'doi-nui');
+   const hasThinhChinh = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'thinh-chinh');
+   const isQuyetDau = req.originalReq?.reason === 'quyet-dau';
+   const expectedCard = 'Né';
+   
+   const dodges = me.hand.map((c, i) => ({...c, index: i})).filter(c => {
+       if (c.name === 'Né') return true;
+       if (hasDoiNui && c.name === 'Chém') return true;
+       if (hasThinhChinh && c.color === 'black' && c.name !== 'Né') return true;
+       return false;
+   }).map(c => ({
+      ...c,
+      virtualReason: c.name !== expectedCard ? (
+         (hasDoiNui && c.name === 'Chém') ? 'Dời Núi' :
+         (hasThinhChinh && c.color === 'black' && c.name !== 'Né') ? 'Nhiếp Chính' : null
+      ) : null
+   }));
    
    return (
     <div style={{ textAlign: 'center', minWidth: '350px' }}>
@@ -28,7 +47,7 @@ export function AskBocTramTrungDodgeModal({ req, gameState, onConfirm }) {
            >
              <option value="" disabled>-- Chọn lá Né --</option>
              {dodges.map(c => (
-                <option key={c.index} value={c.index}>{c.name} {c.suit}{c.rank}</option>
+                <option key={c.index} value={c.index}>{c.name} {getSuitEmoji(c.suit)}{c.rank} {c.virtualReason ? `(${c.virtualReason})` : ''}</option>
              ))}
            </select>
          </div>
@@ -46,7 +65,17 @@ export function AskBocTramTrungDodgeModal({ req, gameState, onConfirm }) {
            className="btn-action success" 
            style={{ flex: 1 }} 
            disabled={selectedCardIdx === null}
-           onClick={() => onConfirm({ doProvide: true, cardId: me.hand[selectedCardIdx].id })}
+           onClick={() => {
+              const idx = selectedCardIdx;
+              const c = me.hand[idx];
+              if (c.name !== expectedCard) {
+                  let activeSkill = 'thinh-chinh';
+                  if (c.name === 'Chém' && isQuyetDau && hasDoiNui) activeSkill = 'doi-nui';
+                  onConfirm({ doProvide: true, virtualCardName: expectedCard, activeSkill, cardIndexSelected: idx, cardId: c.id });
+              } else {
+                  onConfirm({ doProvide: true, cardIndexSelected: idx, cardId: c.id });
+              }
+           }}
         >
           Giúp đỡ
         </button>

@@ -1,6 +1,7 @@
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React from 'react';
-import { CARD_SUBTYPES, getCardSubType } from '../../data/gameData';
-import { getCardBg } from '../../utils/cardStyles';
+import { CARD_SUBTYPES, getCardSubType } from 'shared/data/gameData';
+import { getCardBg } from 'shared/utils/cardStyles';
 
 // @ts-check
 /** 
@@ -18,6 +19,7 @@ import { getCardBg } from '../../utils/cardStyles';
  * @property {Function} setCardPopup
  * @property {string} [className]
  * @property {React.CSSProperties} [style]
+ * @property {string} [animationClass]
  * 
  * @param {PlayerBoardProps} props 
  */
@@ -31,14 +33,15 @@ export function PlayerBoard({
     setHeroPopup,
     setCardPopup,
     className,
-    style
+    style,
+    animationClass
 }) {
     const isTargetable = targetSession?.validTargets.includes(player.id);
     const isSelected = targetSession?.selectedTargets.includes(player.id);
 
     return (
         <div
-            className={`player-zone ${isCurrentTurn ? 'is-current-turn' : ''} ${!player.isAlive ? 'dead' : ''} ${className || ''}`}
+            className={`player-zone ${isCurrentTurn ? 'is-current-turn' : ''} ${!player.isAlive ? 'dead' : ''} ${className || ''} ${animationClass || ''}`}
             style={{
               ...style,
               cursor: isTargetable ? 'crosshair' : 'default',
@@ -101,12 +104,28 @@ export function PlayerBoard({
               )}
               
               {/* Judgement Area */}
-              <div className="judgement-area">
-                {player.judgementArea && player.judgementArea.map((card, i) => (
-                  <div key={i} className="judgement-item" title={card.name}>
-                    {card.emoji}
-                  </div>
-                ))}
+              <div className="judgement-area" style={{ display: 'flex', gap: '4px', position: 'absolute', top: '6px', left: '6px', zIndex: 15 }}>
+                {player.judgementArea && player.judgementArea.map((card, i) => {
+                  const icon = card.emoji || (card.name === 'Sấm Sét' ? '⚡' : card.name === 'Hỗn Loạn' ? '🌀' : '📜');
+                  return (
+                    <div 
+                      key={i} 
+                      className="judgement-item" 
+                      title={`${card.name}: Cẩm nang trì hoãn`}
+                      style={{
+                        background: 'rgba(0, 0, 0, 0.8)',
+                        border: '1px solid #f59e0b',
+                        borderRadius: '4px',
+                        padding: '2px 5px',
+                        fontSize: '0.85rem',
+                        boxShadow: '0 0 6px rgba(245, 158, 11, 0.7)',
+                        cursor: 'help'
+                      }}
+                    >
+                      {icon}
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="hero-portrait" style={{ display: 'flex', width: '100%' }}>
@@ -203,7 +222,7 @@ export function PlayerBoard({
                       {eqCard ? (
                         <>
                           <div style={{ fontSize: '0.5rem', color: eqCard.color === 'red' ? '#ef4444' : '#f1f5f9', textShadow: '0 0 4px rgba(0,0,0,1)', background: bgImage ? 'rgba(0,0,0,0.5)' : 'transparent', borderRadius: '2px', padding: '1px 3px', position: 'absolute', top: '2px', left: '2px', fontWeight: 'bold' }}>
-                            {eqCard.suit}{eqCard.rank}
+                            {getSuitEmoji(eqCard.suit)}{eqCard.rank}
                           </div>
                           {!bgImage && (
                             <div style={{ fontSize: '0.55rem', textAlign: 'center', color: '#f1f5f9', marginTop: '10px' }}>{eqCard.name}</div>

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { useGameState, useGameAPI } from '../../contexts/GameProvider';
-import { getFullPlayerName, getPlayerFaction } from "../../utils/playerHelpers";
+import { getFullPlayerName, getPlayerFaction } from "shared/utils/playerHelpers";
 import { CardSelector } from './CardSelector';
 
 import { AskBocTramTrungSlashModal } from './AskBocTramTrungSlashModal';
@@ -18,6 +18,9 @@ import { DodgeModal } from './DodgeModal';
 import { DuongQuanModal } from './DuongQuanModal';
 import { HoGiaModal } from './HoGiaModal';
 import { HoaThanModal } from './HoaThanModal';
+import { HoaThanAnTuModal } from './HoaThanAnTuModal';
+import { HienHauModal } from './HienHauModal';
+import { XaThanModal } from './XaThanModal';
 import { KhoanDanModal } from './KhoanDanModal';
 import { KhoiNghiaModal } from './KhoiNghiaModal';
 import { NamQuocSonHaModal } from './NamQuocSonHaModal';
@@ -251,13 +254,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         if (req.type === 'ask_hien_hau' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
-              <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#ec4899', fontWeight: 'bold' }}>🌸 HIỀN HẬU</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '15px' }}>Bỏ 1 lá ♥ để ngăn sát thương và chọn hiệu ứng lên tướng ngẫu nhiên:</div>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                  <button className="btn-action success" onClick={() => handleResponseAction({ doUse: true, targetId: gameState.players.find(p=>p.id!==0 && p.isAlive)?.id || 1, cardIdx: me.hand.findIndex(c=>c.suit==='♥' || c.suit==='♠'), option: 1 })}>Tướng khác nhận 1 ST & Rút bài</button>
-                  <button className="btn-action success" onClick={() => handleResponseAction({ doUse: true, targetId: gameState.players.find(p=>p.id!==0 && p.isAlive)?.id || 1, cardIdx: me.hand.findIndex(c=>c.suit==='♥' || c.suit==='♠'), option: 2 })}>Tướng khác mất 1 HP & Thu bài bỏ</button>
-                  <button className="btn-action secondary" onClick={() => handleResponseAction({ doUse: false })}>Bỏ qua</button>
-              </div>
+              <HienHauModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
             </div>
           );
         }
@@ -341,16 +338,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         }
 
         if (req.type === 'ask_xa_than' && req.responderId === me.id) {
-          return (
-            <div style={modalStyle}>
-              <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#ec4899', fontWeight: 'bold' }}>🌸 XẢ THÂN</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '15px' }}>Bỏ 1 lá bài chuyển [Chém] sang người khác?</div>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                  <button className="btn-action success" onClick={() => handleResponseAction({ doUse: true, targetId: gameState.players.find(p=>p.id!==0 && p.isAlive)?.id || 1, cardIdx: 0 })}>Chuyển Chém</button>
-                  <button className="btn-action secondary" onClick={() => handleResponseAction({ doUse: false })}>Bỏ qua</button>
-              </div>
-            </div>
-          );
+          return <XaThanModal req={req} gameState={gameState} onConfirm={handleResponseAction} />;
         }
 
         if (req.type === 'ask_xuan_huong' && req.responderId === me.id) {

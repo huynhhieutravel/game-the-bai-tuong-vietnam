@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { HEROES } from '../../data/gameData';
+import { HEROES } from 'shared/data/gameData';
 import '../WikiPage.css'; // Reuse CSS
 
 export default function HeroDetail() {

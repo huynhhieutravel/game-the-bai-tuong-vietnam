@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr } from 'shared/utils/playerHelpers';
 
 export function TuChuTargetModal({ req, gameState, onConfirm }) {
   const [selectedTarget, setSelectedTarget] = useState(null);
   
-  const duelTarget = gameState.players[req.duelTargetId];
+  const duelTarget = gameState.players.find(p => p.id === req.duelTargetId);
   
   // Các mục tiêu nằm trong tầm đánh của duelTarget (không bao gồm chính họ)
   const duelTargetAtkRange = duelTarget.attackRange;

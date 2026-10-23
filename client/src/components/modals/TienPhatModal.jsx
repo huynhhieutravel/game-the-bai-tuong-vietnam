@@ -1,12 +1,12 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
 
 import { CardSelector } from './CardSelector';
 
 export function TienPhatModal({ req, gameState, onConfirm }) {
-  const me = gameState.players[req.targetId];
-  const source = gameState.players[req.sourceId]; // Ly Thuong Kiet
+  const me = gameState.players.find(p => p.id === req.targetId);
+  const source = gameState.players.find(p => p.id === req.sourceId); // Ly Thuong Kiet
   
   const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => c.name === 'Né');
 
@@ -23,7 +23,7 @@ export function TienPhatModal({ req, gameState, onConfirm }) {
         validCards={validCards}
         confirmText="💨 Đánh Né giúp"
         cancelText="⏭️ Bỏ qua"
-        onSelect={(idx) => onConfirm({ doReact: true })}
+        onSelect={(idx) => onConfirm({ doReact: true, cardId: me.hand[idx].id })}
         onCancel={() => onConfirm({ doReact: false })}
       />
     </div>

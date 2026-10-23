@@ -1,0 +1,260 @@
+// ==========================================
+// Reducer - Thay đổi State (Pure Functions)
+// KHÔNG CÓ SIDE EFFECTS Ở ĐÂY (không setTimeout, không alert)
+// ==========================================
+import { SkillRegistry } from '../registries/SkillRegistry';
+import { SeededRNG } from './SeededRNG';
+
+function cloneState(state) {
+  return JSON.parse(JSON.stringify(state)); 
+}
+
+export function reduce(state, effect) {
+  const nextState = cloneState(state);
+
+  switch (effect.type) {
+    case 'DAMAGE': {
+      const target = nextState.players.find(p => p.id === effect.targetId);
+      if (target) {
+        target.hp = target.hp - effect.amount;
+        nextState.history.push({ text: `[DAMAGE] Người chơi ${effect.sourceId + 1} gây ${effect.amount} sát thương cho Người chơi ${effect.targetId + 1}`, type: 'damage', timestamp: Date.now() });
+      }
+      break;
+    }
+
+    case 'LOSE_HP': {
+      const target = nextState.players.find(p => p.id === effect.targetId);
+      if (target) {
+        target.hp = target.hp - effect.amount;
+        nextState.history.push({ text: `[LOSE_HP] Người chơi ${effect.targetId + 1} mất ${effect.amount} máu`, type: 'damage', timestamp: Date.now() });
+      }
+      break;
+    }
+
+    case 'RECOVER': {
+      const target = nextState.players.find(p => p.id === effect.targetId);
+      if (target && target.isAlive && target.hp < target.maxHp) {
+        target.hp = Math.min(target.maxHp, target.hp + effect.amount);
+        // We don't have getHeroName in Reducer, so we use a generic pretty log
+        nextState.history.push({ text: `💚 Người chơi ${effect.targetId + 1} hồi ${effect.amount} máu!`, type: 'heal', timestamp: Date.now() });
+      }
+      break;
+    }
+
+    case 'TURN_OVER': {
+      const target = nextState.players.find(p => p.id === effect.targetId);
+      if (target) {
+        target.isFlipped = !target.isFlipped;
+        nextState.history.push({ text: `[TURN_OVER] Người chơi ${effect.targetId + 1} lật mặt tướng (${target.isFlipped})`, type: 'important', timestamp: Date.now() });
+      }
+      break;
+    }
+
+    case 'TOGGLE_CHAIN': {
+      const target = nextState.players.find(p => p.id === effect.targetId);
+      if (target) {
+        if (effect.forceState !== undefined) {
+          target.isChained = effect.forceState;
+        } else {
+          target.isChained = !target.isChained;
+        }
+        nextState.history.push({ text: `[TOGGLE_CHAIN] Người chơi ${effect.targetId + 1} thay đổi trạng thái Xiềng Xích (${target.isChained})`, type: 'important', timestamp: Date.now() });
+      }
+      break;
+    }
+
+    case 'DRAW_CARD': {
+      const target = nextState.players.find(p => p.id === effect.targetId);
+      if (target) {
+        // Nếu hết bài, trộn lại từ mộ (cần random)
+        if (nextState.deck.length < effect.amount) {
+           const rng = new SeededRNG(nextState.seed);
+           // Shuffle discard pile and put them at the BOTTOM of the deck, keeping existing cards on TOP
+           nextState.deck = rng.shuffle(nextState.discardPile).concat(nextState.deck);
+           nextState.discardPile = [];
+           nextState.seed = rng.seed; // CỰC KỲ QUAN TRỌNG: Lưu lại trạng thái ngẫu nhiên mới
+        }
+        
+        const drawnCards = [];
+        for (let i = 0; i < effect.amount; i++) {
+           if (nextState.deck.length > 0) {
+               drawnCards.push(nextState.deck.pop());
+           }
+        }
+        target.hand.push(...drawnCards);
+        nextState.history.push({ text: `[DRAW] Người chơi ${effect.targetId + 1} rút ${drawnCards.length} lá bài`, type: 'normal', timestamp: Date.now() });
+      }
+      break;
+    }
+
+    case 'JUDGE': {
+      const target = nextState.players.find(p => p.id === effect.targetId);
+      if (target) {
+        if (nextState.deck.length === 0) {
+           const rng = new SeededRNG(nextState.seed);
+           nextState.deck = rng.shuffle(nextState.discardPile);
+           nextState.discardPile = [];
+           nextState.seed = rng.seed; // CỰC KỲ QUAN TRỌNG
+        }
+        const judgeCard = nextState.deck.pop();
+        // TODO: Chờ reaction đổi phán xét (như Ứng Biến, Quân Cơ)
+        nextState.history.push({ text: `[JUDGE] Người chơi ${target.id + 1} phán xét ra ${judgeCard.suit} ${judgeCard.rank}`, type: 'important', timestamp: Date.now() });
+      }
+      break;
+    }
+
+    case 'RESET_TURN_FLAGS': {
+      const target = nextState.players.find(p => p.id === effect.targetId);
+      if (target) {
+        target.attackCountThisTurn = 0;
+        target.drankWineThisTurn = false;
+        target.drankWine = false;
+        target.hasAttackedThisTurn = false;
+        target.hasPlayedSlashThisTurn = false;
+        target.isSilenced = false;
+        
+        Object.values(SkillRegistry).forEach(skill => {
+          if (skill.turnResetFlags) {
+            skill.turnResetFlags.forEach(flag => {
+              target[flag] = false;
+            });
+          }
+        });
+      }
+      
+      // Xóa các hiệu ứng khóa kỹ năng tạm thời cho tất cả người chơi khi kết thúc lượt
+      nextState.players.forEach(p => {
+         p.isSkillsSuppressed = false;
+      });
+      
+      break;
+    }
+
+    case 'MOVE_CARD': {
+
+      // Xóa bài khỏi nguồn
+      let movedCard = null;
+      if (effect.fromZone === 'hand') {
+         const player = nextState.players.find(p => p.id === effect.fromPlayerId);
+         if (player) {
+            const cardIndex = player.hand.findIndex(c => c.id === effect.cardId);
+            if (cardIndex !== -1) {
+               [movedCard] = player.hand.splice(cardIndex, 1);
+               console.log(`[DEBUG_REDUCER] Spliced ${effect.cardId} from hand of player ${player.id}. Hand size now: ${player.hand.length}`);
+            } else {
+               console.log(`[DEBUG_REDUCER] WARNING: ${effect.cardId} NOT FOUND in hand of player ${player.id}!`);
+            }
+         }
+      } else if (effect.fromZone === 'judgement' || effect.fromZone === 'judgementArea') {
+         const player = nextState.players.find(p => p.id === effect.fromPlayerId);
+         if (player) {
+            if (!player.judgementArea) player.judgementArea = [];
+            const cardIndex = player.judgementArea.findIndex(c => c.id === effect.cardId);
+            if (cardIndex !== -1) {
+               [movedCard] = player.judgementArea.splice(cardIndex, 1);
+            }
+         }
+      } else if (effect.fromZone === 'discardPile') {
+         const cardIndex = nextState.discardPile.findIndex(c => c.id === effect.cardId);
+         if (cardIndex !== -1) {
+            [movedCard] = nextState.discardPile.splice(cardIndex, 1);
+         }
+      } else if (effect.fromZone === 'equipment') {
+         const player = nextState.players.find(p => p.id === effect.fromPlayerId);
+         if (player) {
+            const cardIndex = player.equipment.findIndex(c => c.id === effect.cardId);
+            if (cardIndex !== -1) {
+               [movedCard] = player.equipment.splice(cardIndex, 1);
+            }
+         }
+      } else if (effect.fromZone === 'playedCards') {
+         if (nextState.playedCards) {
+             const cardIndex = nextState.playedCards.findIndex(c => c.id === effect.cardId);
+             if (cardIndex !== -1) {
+                [movedCard] = nextState.playedCards.splice(cardIndex, 1);
+             }
+         }
+      }
+
+      if (!movedCard) {
+
+          break;
+      }
+
+      // Nếu có virtualCardName, đóng dấu lên lá bài (để dùng cho các vùng tồn tại lâu dài)
+      if (effect.virtualCardName) {
+         movedCard.virtualName = effect.virtualCardName;
+      } else {
+         delete movedCard.virtualName; // Xóa dấu nếu di chuyển bình thường
+      }
+
+      // Thêm bài vào đích
+      if (effect.toZone === 'discardPile') {
+         nextState.discardPile.push(movedCard);
+      } else if (effect.toZone === 'judgement' || effect.toZone === 'judgementArea') {
+         const targetPlayer = nextState.players.find(p => p.id === effect.toPlayerId);
+         if (targetPlayer) {
+            if (!targetPlayer.judgementArea) targetPlayer.judgementArea = [];
+            targetPlayer.judgementArea.push(movedCard);
+         }
+      } else if (effect.toZone === 'hand') {
+         const targetPlayer = nextState.players.find(p => p.id === effect.toPlayerId);
+         if (targetPlayer) {
+            targetPlayer.hand.push(movedCard);
+         }
+      } else if (effect.toZone === 'equipment') {
+         const targetPlayer = nextState.players.find(p => p.id === effect.toPlayerId);
+         if (targetPlayer) {
+            targetPlayer.equipment.push(movedCard);
+         }
+      } else if (effect.toZone === 'playedCards') {
+         if (!nextState.playedCards) nextState.playedCards = [];
+         nextState.playedCards.push(movedCard);
+      }
+      
+      break;
+    }
+
+    case 'SET_FLAG': {
+      // Thay cho: player.xxxUsedThisTurn = true
+      // Usage: SetFlagEffect(playerId, 'tamCongUsedThisTurn', true)
+      if (effect.playerId !== undefined && effect.playerId !== null) {
+        const target = nextState.players.find(p => p.id === effect.playerId);
+        if (target) {
+          target[effect.flag] = effect.value;
+        }
+      } else {
+        // Global flag (không thuộc player nào)
+        nextState[effect.flag] = effect.value;
+      }
+      break;
+    }
+
+    case 'SET_WAITING': {
+      // Thay cho: dispatcher.state.waitingForResponse = { ... }
+      // Usage: SetWaitingEffect({ type: 'ask_xxx', sourceId: 0, ... })
+      // Hoặc: SetWaitingEffect(null) để clear
+      nextState.waitingForResponse = effect.value;
+      break;
+    }
+
+    case 'ADD_LOG': {
+      // Thay cho: dispatcher.addLog('...')
+      // Usage: AddLogEffect('message', 'type')
+      nextState.history.push({ text: effect.message, type: effect.logType || 'normal', timestamp: Date.now() });
+      break;
+    }
+
+    case 'PUSH_EVENT': {
+      // Thay cho: dispatcher.state.reactionStack.push({ ... })
+      // Usage: PushEventEffect({ type: 'EVENT_XXX', payload: { ... } })
+      nextState.reactionStack.push(effect.event);
+      break;
+    }
+
+    default:
+      console.warn('Unknown effect type:', effect.type);
+  }
+
+  return nextState;
+}

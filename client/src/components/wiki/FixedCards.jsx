@@ -7,6 +7,12 @@ const FIXED_CARDS_DATA = [
     type: 'Cẩm Nang',
     issue: 'Người chơi không thể tự click chọn bản thân để tháo/xích. Thông báo hiển thị "Hãy chọn 1 mục tiêu" gây nhầm lẫn (do Xiềng xích cho chọn 0-2 người). Viền đỏ báo hiệu mục tiêu hợp lệ bị mờ nhạt.',
     fix: 'Đã cập nhật lại MyHeroBar để khung Avatar nhận thao tác Target. Tối ưu câu thông báo linh hoạt dựa theo thông số của lá bài. Chỉnh viền đỏ thành nét đứt nổi bật (crosshair cursor).'
+  },
+  {
+    name: 'Dã Man',
+    type: 'Cẩm Nang',
+    issue: 'Khi kẻ thù dùng Dã Man, người chơi dù có đánh Né (hoặc kích hoạt tướng đánh Né thay) vẫn bị trừ máu oan uổng.',
+    fix: 'Do Dispatcher Engine ngầm gạt bỏ các phản hồi Né từ Kỹ năng (Bọc Trăm Trứng, Tiên Phát) vì dính lỗi sai Tên ID Tiếng Việt và sai luồng Event. Đã cấu trúc lại bộ định tuyến Event để đón nhận chính xác phản hồi từ Đồng minh và xử lý sát thương chuẩn xác.'
   }
 ];
 

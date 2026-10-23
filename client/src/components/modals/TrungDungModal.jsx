@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
 
 
 export function TrungDungModal({ req, gameState, onConfirm }) {
@@ -7,7 +7,7 @@ export function TrungDungModal({ req, gameState, onConfirm }) {
   const [virtualName, setVirtualName] = useState(null);
   const [targetId, setTargetId] = useState(null);
   
-  const me = gameState.players[req.sourceId];
+  const me = gameState.players.find(p => p.id === req.sourceId);
   const validTargets = gameState.players.filter(p => p.id !== me.id && p.isAlive);
   
   // Basic cards to bluff as

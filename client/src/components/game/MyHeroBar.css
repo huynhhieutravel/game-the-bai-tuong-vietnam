@@ -1,0 +1,382 @@
+/* ============================================
+   MyHeroBar Component Styles
+   DO NOT MODIFY THESE STYLES TO CHANGE GAME LOGIC
+   ============================================ */
+
+.my-hero-bar {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  width: 100%;
+}
+
+.my-hero-main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 15px;
+}
+
+.my-hero-top-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  background: var(--color-bg-glass);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 15px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+.my-hero-equipment-area {
+  display: flex;
+  gap: 15px;
+}
+
+.my-hero-equip-slot {
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.my-hero-equip-slot.empty {
+  cursor: default;
+}
+
+.my-hero-equip-slot.equipped {
+  cursor: pointer;
+}
+
+.my-hero-equip-icon-empty {
+  font-size: 1.6rem;
+}
+
+.my-hero-equip-badge {
+  font-size: 0.5rem;
+  color: #f1f5f9;
+  text-shadow: 0 0 4px rgba(0,0,0,1);
+  background: transparent;
+  border-radius: 2px;
+  padding: 1px 3px;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-weight: bold;
+}
+
+.my-hero-equip-badge.red {
+  color: #ef4444;
+}
+
+.my-hero-equip-badge.has-bg {
+  background: rgba(0,0,0,0.5);
+}
+
+.my-hero-equip-emoji {
+  font-size: 1.4rem;
+  margin-top: 2px;
+}
+
+.my-hero-equip-name {
+  font-size: 0.45rem;
+  margin-top: 1px;
+  text-align: center;
+  font-weight: bold;
+  line-height: 1.1;
+}
+
+.my-hero-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 1;
+}
+
+.my-hero-bottom-row {
+  display: flex;
+  width: 100%;
+  align-items: flex-end;
+  height: 200px;
+}
+
+.my-hero-avatars {
+  display: flex;
+  gap: 15px;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.my-hero-avatar-card {
+  position: relative;
+  width: 140px;
+  height: 200px;
+  background: rgba(0,0,0,0.5);
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-gold-dark);
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  outline-offset: 2px;
+  cursor: pointer;
+}
+
+.my-hero-avatar-card.targetable {
+  cursor: crosshair;
+  outline: 3px dashed #ef4444;
+}
+
+.my-hero-avatar-card.selected {
+  outline: 3px solid var(--color-gold);
+}
+
+.my-hero-avatar-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+}
+
+.my-hero-avatar-emoji {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+}
+
+.my-hero-judgement-area {
+  top: -10px;
+  left: -10px;
+  z-index: 20;
+}
+
+.my-hero-judgement-item {
+  width: 24px;
+  height: 24px;
+  font-size: 0.8rem;
+}
+
+.my-hero-silence-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2.5rem;
+  background: rgba(0,0,0,0.5);
+  padding: 10px;
+  border-radius: 50%;
+  z-index: 10;
+  filter: drop-shadow(0 0 10px rgba(0,0,0,0.8));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.my-hero-chain-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 12;
+  pointer-events: none;
+}
+
+.my-hero-chain-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 3.5rem;
+  filter: drop-shadow(0 0 5px rgba(0,0,0,1));
+  opacity: 0.9;
+}
+
+.my-hero-chain-icon.c1 { transform: translate(-50%, -50%) rotate(45deg); }
+.my-hero-chain-icon.c2 { transform: translate(-50%, -50%) rotate(-45deg); }
+
+.my-hero-reveal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.my-hero-reveal-btn {
+  padding: 8px 16px;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.my-hero-bottom-hand {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  margin-left: 30px;
+}
+
+.my-hero-hand-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.my-hero-right-details {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 350px;
+  flex-shrink: 0;
+  background: var(--color-bg-glass);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
+.my-hero-names-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.my-hero-name-text {
+  font-size: 1.3rem;
+  color: var(--color-gold);
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.my-hero-faction-tags {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+
+.my-hero-faction-tag {
+  font-size: 0.9rem;
+  padding: 5px 12px;
+  border-radius: 4px;
+  color: white;
+  font-weight: bold;
+}
+.my-hero-faction-tag.datam { background: #9ca3af; }
+.my-hero-faction-tag.lac { background: #10b981; }
+.my-hero-faction-tag.son { background: #b45309; }
+.my-hero-faction-tag.ha { background: #3b82f6; }
+.my-hero-faction-tag.default { background: #ef4444; }
+.my-hero-faction-tag.unrevealed { background: #4b5563; }
+
+.my-hero-hp-bar {
+  margin-top: 15px;
+  display: flex;
+  align-items: center;
+}
+
+.my-hero-hp-pip {
+  width: 20px;
+  height: 20px;
+  margin: 0 3px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 5px #ef4444;
+}
+
+.my-hero-hp-pip.lost {
+  background: #374151;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.my-hero-hp-text {
+  font-size: 1.1rem;
+  color: var(--color-text-muted);
+  margin-left: 10px;
+  font-weight: bold;
+}
+
+.my-hero-wine-status {
+  margin-left: 12px;
+  font-size: 1.2rem;
+  color: #ef4444;
+  font-weight: bold;
+  text-shadow: 0 0 5px red;
+}
+
+.my-hero-stats-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+  font-size: 1.05rem;
+  color: var(--color-text-secondary);
+  background: rgba(0,0,0,0.5);
+  padding: 15px 18px;
+  border-radius: 8px;
+}
+
+.my-hero-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.my-hero-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.my-hero-stat-label.atk { color: #ef4444; }
+.my-hero-stat-label.def { color: #3b82f6; }
+
+.my-hero-stat-value {
+  color: white;
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.my-hero-skills-box {
+  margin-top: 15px;
+  background: rgba(0,0,0,0.4);
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #d1d5db;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.my-hero-skills-title {
+  color: var(--color-gold);
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.my-hero-skill-row {
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.my-hero-skill-name {
+  color: #10b981;
+}

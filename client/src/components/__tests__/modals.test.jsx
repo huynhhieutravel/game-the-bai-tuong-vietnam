@@ -14,12 +14,12 @@ vi.mock('../../contexts/GameProvider', () => ({
 
 describe('ModalContainer and all sub-modals', () => {
   const mockPlayers = [
-    { id: 0, isAlive: true, name: 'Player 0', hand: [{ idx: 0, name: 'Chém', suit: '♠', color: 'black' }], hp: 3, maxHp: 3, equipment: [], draftHeroes: [{id: 1, faction: 'Lạc'}], attackRange: 1, distanceFromMe: 0, distances: {1: 1} },
+    { id: 0, isAlive: true, name: 'Player 0', hand: [{ idx: 0, name: 'Chém', suit: 'spade', color: 'black' }], hp: 3, maxHp: 3, equipment: [], draftHeroes: [{id: 1, faction: 'Lạc'}], attackRange: 1, distanceFromMe: 0, distances: {1: 1} },
     { id: 1, isAlive: true, name: 'Player 1', hand: [], hp: 3, maxHp: 3, equipment: [], draftHeroes: [], attackRange: 1, distanceFromMe: 1, distances: {0: 1} },
   ];
 
   const modalTypes = [
-    'ask_khai_quoc', 'ask_snatch', 'ask_dismantle', 'ask_quan_co', 'ask_quan_co_draw', 
+    'ask_khai_quoc', 'ask_snatch', 'ask_dismantle',
     'ask_banh_chung', 'ask_can_gian', 'ask_thong_ngon', 'ask_hau_vien', 'ask_tien_phat', 
     'ask_doat_sao', 'ask_hien_hau', 'ask_that_tram_so', 'ask_that_tram_so_punish', 
     'ask_doi_su', 'ask_hoa_nghi', 'ask_ho_chu', 'ask_xa_than', 'ask_xuan_huong', 
@@ -47,12 +47,15 @@ describe('ModalContainer and all sub-modals', () => {
 
   modalTypes.forEach(type => {
     it(`renders ModalContainer for request type: ${type} without crashing`, () => {
+      const isDodge = type === 'ask_dodge';
+      const isWeaponSkill = type === 'ask_weapon_skill';
+
       GameProvider.useGameState.mockReturnValue({
         players: mockPlayers,
         waitingForResponse: {
           type: type,
           responderId: 0,
-          sourceId: 1,
+          sourceId: isWeaponSkill ? 0 : 1,
           targetId: 1,
           duelTargetId: 1,
           dyingId: 1,
@@ -60,7 +63,9 @@ describe('ModalContainer and all sub-modals', () => {
           virtualCardName: 'Chém',
           skillName: 'TestSkill',
           judgeSuit: '♠',
-          reason: 'quyet-dau', 
+          reason: isDodge ? 'chem' : 'quyet-dau', 
+          skills: ['quan-co'],
+          targets: [1],
         },
         deck: [{ name: 'Né' }, { name: 'Chém' }]
       });

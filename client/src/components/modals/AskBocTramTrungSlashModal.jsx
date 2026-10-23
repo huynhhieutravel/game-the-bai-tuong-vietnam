@@ -1,14 +1,33 @@
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
+import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine/gameState';
 
 
 export function AskBocTramTrungSlashModal({ req, gameState, onConfirm }) {
-   const me = gameState.players[0];
-   const llq = gameState.players[req.sourceId];
-   const target = req.targetId ? gameState.players[req.targetId] : null;
+   const me = gameState.players.find(p => p.id === (typeof window !== 'undefined' ? window.playerId : 0)) || gameState.players[0];
+   const llq = gameState.players.find(p => p.id === req.sourceId);
+   const target = req.targetId ? gameState.players.find(p => p.id === req.targetId) : null;
    
    const [selectedCardIdx, setSelectedCardIdx] = useState(null);
-   const slashes = me.hand.map((c, i) => ({...c, index: i})).filter(c => c.name === 'Chém');
+   const expectedCard = 'Chém';
+   
+   const hasDoiNui = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'doi-nui');
+   const hasKhaiThien = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'khai-thien');
+   const isQuyetDau = req.originalReq?.reason === 'quyet-dau';
+   
+   const slashes = me.hand.map((c, i) => ({...c, index: i})).filter(c => {
+       if (c.name === 'Chém') return true;
+       if (hasDoiNui && c.name === 'Né') return true;
+       if (hasKhaiThien && c.color === 'red') return true;
+       return false;
+   }).map(c => ({
+      ...c,
+      virtualReason: c.name !== expectedCard ? (
+         (hasDoiNui && c.name === 'Né') ? 'Dời Núi' :
+         (hasKhaiThien && c.color === 'red') ? 'Khai Thiên' : null
+      ) : null
+   }));
    
    return (
     <div style={{ textAlign: 'center', minWidth: '350px' }}>
@@ -34,7 +53,7 @@ export function AskBocTramTrungSlashModal({ req, gameState, onConfirm }) {
            >
              <option value="" disabled>-- Chọn lá Chém --</option>
              {slashes.map(c => (
-                <option key={c.index} value={c.index}>{c.name} {c.suit}{c.rank}</option>
+                <option key={c.index} value={c.index}>{c.name} {getSuitEmoji(c.suit)}{c.rank} {c.virtualReason ? `(${c.virtualReason})` : ''}</option>
              ))}
            </select>
          </div>
@@ -52,7 +71,17 @@ export function AskBocTramTrungSlashModal({ req, gameState, onConfirm }) {
            className="btn-action success" 
            style={{ flex: 1 }} 
            disabled={selectedCardIdx === null}
-           onClick={() => onConfirm({ doProvide: true, cardId: me.hand[selectedCardIdx].id })}
+           onClick={() => {
+              const idx = selectedCardIdx;
+              const c = me.hand[idx];
+              if (c.name !== expectedCard) {
+                  let activeSkill = 'khai-thien';
+                  if (c.name === 'Né' && isQuyetDau && hasDoiNui) activeSkill = 'doi-nui';
+                  onConfirm({ doProvide: true, virtualCardName: expectedCard, activeSkill, cardIndexSelected: idx, cardId: c.id });
+              } else {
+                  onConfirm({ doProvide: true, cardIndexSelected: idx, cardId: c.id });
+              }
+           }}
         >
           Giúp đỡ
         </button>

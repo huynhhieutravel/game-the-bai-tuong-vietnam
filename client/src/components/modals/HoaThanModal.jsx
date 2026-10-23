@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr } from 'shared/utils/playerHelpers';
+import { getSuitEmoji } from 'shared/constants/cardTypes';
 
 export function HoaThanModal({ req, gameState, onConfirm }) {
   const [targetA, setTargetA] = useState(null);
   const [targetB, setTargetB] = useState(null);
   const [selectedCardIdx, setSelectedCardIdx] = useState(null);
   
-  const me = gameState.players[req.sourceId];
+  const me = gameState.players.find(p => p.id === req.sourceId);
   const validTargets = gameState.players.filter(p => p.id !== me.id && p.isAlive && (p.heroes?.[0]?.gender === 'Nam' || p.heroes?.[1]?.gender === 'Nam' || p.gender === 'Nam'));
 
   return (
@@ -27,10 +28,11 @@ export function HoaThanModal({ req, gameState, onConfirm }) {
              style={{ 
                padding: '5px 10px', border: selectedCardIdx === i ? '2px solid var(--color-gold)' : '1px solid #374151',
                borderRadius: '4px', background: selectedCardIdx === i ? 'rgba(212, 168, 67, 0.2)' : '#1f2937',
-               cursor: 'pointer', whiteSpace: 'nowrap'
+               cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', flexDirection: 'column', alignItems: 'center'
              }}
            >
-             {c.name}
+             <div style={{ fontSize: '0.75rem', color: c.color === 'red' ? '#ef4444' : '#f1f5f9' }}>{getSuitEmoji(c.suit)}{c.rank}</div>
+             <div style={{ fontSize: '0.85rem' }}>{c.name}</div>
            </div>
         ))}
       </div>

@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from '../../utils/playerHelpers';
+import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
 
 import { CardSelector } from './CardSelector';
+import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine/gameState';
 
 export function DodgeModal({ req, gameState, onConfirm }) {
-  const me = gameState.players[0];
-  const source = gameState.players[req.sourceId];
+  const me = gameState.players.find(p => p.id === (typeof window !== 'undefined' ? window.playerId : 0)) || gameState.players[0];
+  const source = gameState.players.find(p => p.id === req.sourceId);
   
-  const hasPassiveBagua = me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'than-giap')) && !me.equipment.some(c => c.name === 'Bát Quái' || c.name === 'Hắc Thuẫn');
+  const hasPassiveBagua = hasSkill(me, 'than-giap') && !me.equipment.some(c => c.name === 'Bát Quái' || c.name === 'Hắc Thuẫn');
   const hasBagua = hasPassiveBagua || me.equipment.some(e => e.name === 'Bát Quái');
   const canBagua = hasBagua && req.baguaAvailable !== false;
   
-  const hasDoiNui = me.heroes?.some((h, i) => me.revealedHeroes?.[i] && h.skills?.some(s => s.id === 'doi-nui'));
-  const hasThinhChinh = me.heroes?.some((h, i) => me.revealedHeroes?.[i] && h.skills?.some(s => s.id === 'thinh-chinh'));
+  const hasDoiNui = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'doi-nui');
+  const hasThinhChinh = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'thinh-chinh');
   
   const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => {
      if (c.name === 'Né') return true;
@@ -21,7 +22,7 @@ export function DodgeModal({ req, gameState, onConfirm }) {
      return false;
   }).map(c => ({
      ...c,
-     virtualReason: c.name === 'Chém' && hasDoiNui ? 'Dời Núi' : (c.name !== 'Né' && hasThinhChinh && c.color === 'black' ? 'Thính Chính' : null)
+     virtualReason: c.name === 'Chém' && hasDoiNui ? 'Dời Núi' : (c.name !== 'Né' && hasThinhChinh && c.color === 'black' ? 'Nhiếp Chính' : null)
   }));
 
   return (
@@ -33,7 +34,7 @@ export function DodgeModal({ req, gameState, onConfirm }) {
         {req.baguaAvailable === false && hasBagua ? (
             <span style={{ color: '#ef4444' }}>Bát Quái đã thất bại! Bạn bắt buộc phải dùng [Né].</span>
         ) : (
-            "Chọn 1 lá [Né] trên tay để tránh đòn."
+            req.reqDodges > 1 ? <span style={{ color: '#ef4444' }}>[Phá Quân] Yêu cầu: Bạn cần đánh ra {req.reqDodges} lá [Né] để tránh đòn.</span> : "Chọn 1 lá [Né] trên tay để tránh đòn."
         )}
       </div>
 
@@ -44,12 +45,12 @@ export function DodgeModal({ req, gameState, onConfirm }) {
         cancelText="😤 Chịu đấm"
         onSelect={(idx) => {
            const c = me.hand[idx];
-           if (c.name === 'Chém' && hasDoiNui) {
-              onConfirm({ doReact: true, virtualCardName: 'Né', activeSkill: 'Dời Núi', cardIndexSelected: idx });
-           } else if (c.name !== 'Né' && hasThinhChinh && c.color === 'black') {
-              onConfirm({ doReact: true, virtualCardName: 'Né', activeSkill: 'Thính Chính', cardIndexSelected: idx });
-           } else {
-              onConfirm({ doReact: true, cardIndexSelected: idx });
+            if (c.name === 'Chém' && hasDoiNui) {
+              onConfirm({ doReact: true, virtualCardName: 'Né', activeSkill: 'doi-nui', cardIndexSelected: idx, cardId: c.id });
+            } else if (c.name !== 'Né' && c.color === 'black' && hasThinhChinh) {
+              onConfirm({ doReact: true, virtualCardName: 'Né', activeSkill: 'thinh-chinh', cardIndexSelected: idx, cardId: c.id });
+            } else {
+              onConfirm({ doReact: true, cardIndexSelected: idx, cardId: c.id });
            }
         }}
         onCancel={() => onConfirm({ doReact: false })}
@@ -65,7 +66,7 @@ export function DodgeModal({ req, gameState, onConfirm }) {
                 👑 Kích Hoạt Tiên Phát
               </button>
             )}
-            {me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'ho-gia')) && me.isLord && (
+            {hasSkill(me, 'ho-gia') && me.isLord && (
               <button className="btn-action" style={{ backgroundColor: '#f59e0b', color: '#fff', flex: '1 1 100%' }} onClick={() => onConfirm({ doHoGia: true })}>
                 👑 Kích Hoạt Hộ Giá
               </button>
