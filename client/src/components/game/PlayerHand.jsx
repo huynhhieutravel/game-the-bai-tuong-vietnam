@@ -19,21 +19,18 @@ function getBadgeColor(card) {
   return 'rgba(0,0,0,0.5)';
 }
 
-// Bounded, auto-scaling card name badge preventing text clipping on mobile
+// Bounded, auto-scaling card name badge preventing text clipping and multi-line wrapping on mobile
 function renderCardNameBadge(card) {
   const name = card.name || '';
   const len = name.length;
-  let fontSize = '0.78rem';
-  let lineHeight = '1.15';
-  let padding = '2px 3px';
-  if (len > 11) {
-    fontSize = '0.56rem';
-    lineHeight = '1.05';
-    padding = '1px 2px';
-  } else if (len > 6) {
-    fontSize = '0.66rem';
-    lineHeight = '1.1';
-    padding = '2px 2px';
+  // Dynamic font size ensuring 2-word & long names (e.g. "Quyết Đấu", "Vạn Tiễn Quy Tâm") fit cleanly on 1 line
+  let fontSize = '0.74rem';
+  if (len > 12) {
+    fontSize = '0.50rem';
+  } else if (len > 8) {
+    fontSize = '0.58rem';
+  } else if (len > 5) {
+    fontSize = '0.64rem';
   }
 
   return (
@@ -41,27 +38,30 @@ function renderCardNameBadge(card) {
       className="card-name-pill"
       style={{ 
         position: 'absolute', 
-        bottom: '4px', 
+        bottom: '3px', 
         left: '2px', 
         right: '2px', 
         background: getBadgeColor(card), 
         color: '#ffffff', 
-        padding, 
-        borderRadius: '5px', 
+        padding: '1px 2px', 
+        borderRadius: '4px', 
         fontSize, 
-        lineHeight, 
+        lineHeight: 1.2, 
         fontWeight: 'bold', 
         textAlign: 'center', 
-        wordBreak: 'break-word', 
-        whiteSpace: 'normal', 
+        whiteSpace: 'nowrap', 
+        overflow: 'hidden', 
+        textOverflow: 'ellipsis', 
         border: '1px solid rgba(255,255,255,0.45)', 
         boxShadow: '0 2px 4px rgba(0,0,0,0.6)',
         zIndex: 5,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '18px'
+        height: '18px',
+        boxSizing: 'border-box'
       }}
+      title={name}
     >
       {name}
     </div>
@@ -104,13 +104,13 @@ export function PlayerHand(props) {
     } = props;
 
     const [isExpanded, setIsExpanded] = useState(false);
-    const MAX_VISIBLE = 6;
     
-    // Determine cards to display
-    const displayCards = (!isExpanded && me.hand.length > MAX_VISIBLE) 
-        ? me.hand.slice(0, MAX_VISIBLE) 
-        : me.hand;
-    const hiddenCount = me.hand.length - MAX_VISIBLE;
+    // Quy tắc v3: Nếu bài trên tay nhiều hơn 5 lá (> 5 lá):
+    // Hiển thị 4 lá đầu tiên + 1 ô mở rộng "+N" (ví dụ có 6 lá thì hiển thị 4 lá + ô "+2")
+    // Giữ số lượng thẻ tối đa trên thanh tay luôn là 5, không bao giờ bị đè tràn lấn vào Hero Dock hay Action Hub
+    const hasOverflow = !isExpanded && me.hand.length > 5;
+    const displayCards = hasOverflow ? me.hand.slice(0, 4) : me.hand;
+    const hiddenCount = me.hand.length - 4;
 
     return (
         <>
@@ -192,138 +192,209 @@ export function PlayerHand(props) {
                     );
                 })}
                 
-                {/* Show More Card */}
-                {!isExpanded && hiddenCount > 0 && (
+                {/* Ô mở rộng +N (cơ chế v3: khi nhiều hơn 5 lá bài, hiển thị ô +N để bấm xem toàn bộ) */}
+                {hasOverflow && (
                     <div 
-                        className="card trick" 
+                        className="card card-overflow-badge" 
                         onClick={(e) => { e.stopPropagation(); setIsExpanded(true); }} 
-                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', cursor: 'pointer', border: '2px dashed var(--color-gold)', opacity: 0.9 }}
-                        title="Bấm để xem toàn bộ bài trên tay"
+                        style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95))', 
+                            cursor: 'pointer', 
+                            border: '2px dashed var(--color-gold)', 
+                            borderRadius: '6px',
+                            boxShadow: '0 0 10px rgba(212, 168, 67, 0.35)',
+                            position: 'relative',
+                            padding: '2px',
+                            flexShrink: 0
+                        }}
+                        title={`Còn ${hiddenCount} lá bài ẩn. Bấm để mở toàn bộ ${me.hand.length} lá bài trên tay`}
                     >
-                        <span style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--color-gold)' }}>+{hiddenCount}</span>
-                        <div style={{ fontSize: '0.9rem', marginTop: '10px', color: 'white', fontWeight: 'bold' }}>Lá bài ẩn</div>
-                        <div style={{ fontSize: '0.7rem', marginTop: '5px', color: '#9ca3af' }}>(Bấm để xòe bài)</div>
+                        <span style={{ 
+                            fontSize: '1.45rem', 
+                            fontWeight: '900', 
+                            color: 'var(--color-gold)',
+                            lineHeight: 1,
+                            textShadow: '0 0 8px rgba(212, 168, 67, 0.6)'
+                        }}>
+                            +{hiddenCount}
+                        </span>
+                        <div style={{ 
+                            fontSize: '0.62rem', 
+                            marginTop: '3px', 
+                            color: '#f8fafc', 
+                            fontWeight: 'bold',
+                            whiteSpace: 'nowrap'
+                        }}>
+                            Xem hết
+                        </div>
+                        <div style={{ 
+                            fontSize: '0.50rem', 
+                            color: '#94a3b8',
+                            whiteSpace: 'nowrap'
+                        }}>
+                            ({me.hand.length} lá)
+                        </div>
                     </div>
                 )}
             </div>
 
-            {/* EXPANDED POPUP MODAL VIA PORTAL */}
+            {/* EXPANDED POPUP MODAL VIA PORTAL — OPTIMIZED FOR MOBILE LANDSCAPE */}
             {isExpanded && typeof window !== 'undefined' && createPortal(
-                <div style={{
-                    position: 'fixed',
-                    inset: 0,
-                    zIndex: 99999,
-                    background: 'rgba(0,0,0,0.85)',
-                    backdropFilter: 'blur(8px)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '40px'
-                }}>
-                    <h2 style={{ color: 'var(--color-gold)', fontSize: '2rem', marginBottom: '20px', textShadow: '0 0 20px rgba(212, 168, 67, 0.5)' }}>
-                        Toàn Bộ Bài Trên Tay ({me.hand.length} Lá)
-                    </h2>
-                    
-                    <div style={{
+                <div 
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 99999,
+                        background: 'rgba(2, 6, 23, 0.88)',
+                        backdropFilter: 'blur(8px)',
                         display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: '20px',
+                        flexDirection: 'column',
+                        alignItems: 'center',
                         justifyContent: 'center',
-                        alignContent: 'flex-start',
-                        width: '95vw',
-                        maxWidth: '1400px',
-                        height: '80vh',
-                        overflowY: 'auto',
-                        padding: '40px',
-                        background: 'rgba(17, 24, 39, 0.95)',
-                        border: '2px solid var(--color-gold)',
-                        borderRadius: 'var(--radius-lg)',
-                        boxShadow: '0 10px 50px rgba(0,0,0,0.9)'
-                    }}>
-                        {me.hand.map((card, i) => {
-                            const originalIndex = i; 
-                            let isPlayable = false;
-                            if (needsDiscard) {
-                                isPlayable = true;
-                            } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
-                                if (activeSkill === 'Dời Núi' && (card.name === 'Né' || card.name === 'Chém')) {
+                        padding: '10px 14px'
+                    }}
+                    onClick={() => setIsExpanded(false)}
+                >
+                    <div 
+                        style={{
+                            width: '96vw',
+                            maxWidth: '780px',
+                            maxHeight: '92vh',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            background: 'rgba(15, 23, 42, 0.98)',
+                            border: '2px solid var(--color-gold)',
+                            borderRadius: '14px',
+                            boxShadow: '0 10px 40px rgba(0,0,0,0.9)',
+                            overflow: 'hidden'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header modal */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 14px',
+                            borderBottom: '1px solid rgba(255,255,255,0.1)',
+                            background: 'rgba(30, 41, 59, 0.6)'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ color: 'var(--color-gold)', fontSize: '1.05rem', fontWeight: 'bold' }}>
+                                    🃏 Toàn Bộ Bài Trên Tay ({me.hand.length} Lá)
+                                </span>
+                                <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>
+                                    {needsDiscard ? `Đang chọn bỏ bài (${selectedDiscards.length} đã chọn)` : 'Chạm lá bài để đánh hoặc chọn'}
+                                </span>
+                            </div>
+                            <button 
+                                onClick={() => setIsExpanded(false)}
+                                style={{
+                                    background: 'rgba(239, 68, 68, 0.2)',
+                                    border: '1px solid rgba(239, 68, 68, 0.6)',
+                                    color: '#fca5a5',
+                                    borderRadius: '6px',
+                                    padding: '4px 12px',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                ✕ Thu gọn
+                            </button>
+                        </div>
+                        
+                        {/* Danh sách lá bài cuộn mượt mà */}
+                        <div style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '10px',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            overflowY: 'auto',
+                            padding: '14px 10px',
+                            maxHeight: '70vh'
+                        }}>
+                            {me.hand.map((card, i) => {
+                                const originalIndex = i; 
+                                let isPlayable = false;
+                                if (needsDiscard) {
                                     isPlayable = true;
-                                } else if (activeSkill === 'Khai Thiên' && card.type === CARD_TYPES.EQUIP) {
-                                    isPlayable = true;
-                                } else if (activeSkill === 'Kỳ Tập' && card.color === 'black') {
-                                    isPlayable = true;
-                                } else if (activeSkill === 'Tiên Duyên' && card.suit === 'club') {
-                                    isPlayable = true;
-                                } else if (activeSkill === 'Thần Hỏa' && card.color === 'red') {
-                                    isPlayable = true;
-                                } else if (activeSkill === 'Định Quốc' && (card.name === 'Né' || card.name === 'Sấm Sét')) {
-                                    isPlayable = true;
-                                } else if (activeSkill === 'Phá Thành') {
-                                    if (me.phaThanhColor && card.color !== me.phaThanhColor) {
+                                } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
+                                    if (activeSkill === 'Dời Núi' && (card.name === 'Né' || card.name === 'Chém')) {
                                         isPlayable = true;
+                                    } else if (activeSkill === 'Khai Thiên' && card.type === CARD_TYPES.EQUIP) {
+                                        isPlayable = true;
+                                    } else if (activeSkill === 'Kỳ Tập' && card.color === 'black') {
+                                        isPlayable = true;
+                                    } else if (activeSkill === 'Tiên Duyên' && card.suit === 'club') {
+                                        isPlayable = true;
+                                    } else if (activeSkill === 'Thần Hỏa' && card.color === 'red') {
+                                        isPlayable = true;
+                                    } else if (activeSkill === 'Định Quốc' && (card.name === 'Né' || card.name === 'Sấm Sét')) {
+                                        isPlayable = true;
+                                    } else if (activeSkill === 'Phá Thành') {
+                                        if (me.phaThanhColor && card.color !== me.phaThanhColor) {
+                                            isPlayable = true;
+                                        }
+                                    } else {
+                                        isPlayable = card.isPlayable;
                                     }
-                                } else {
-                                    isPlayable = card.isPlayable;
                                 }
-                            }
-                            
-                            return (
-                            <div
-                                key={`${card.id}-${originalIndex}-popup`}
-                                className={`card ${card.type} ${targetSession?.cardIndex === originalIndex ? 'selected' : ''} ${selectedDiscards.includes(originalIndex) ? 'selected' : ''} ${!isPlayable ? 'unplayable' : ''}`}
-                                style={getCardBg(card.name) ? { backgroundImage: `url(${getCardBg(card.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', opacity: !isPlayable ? 0.4 : 1, cursor: !isPlayable ? 'not-allowed' : 'pointer' } : { opacity: !isPlayable ? 0.4 : 1, cursor: !isPlayable ? 'not-allowed' : 'pointer' }}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (needsDiscard) {
-                                        handleDiscardToggle(originalIndex);
-                                    } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
-                                        if (isPlayable || activeSkill) {
+                                
+                                return (
+                                <div
+                                    key={`${card.id}-${originalIndex}-popup`}
+                                    className={`card ${card.type} ${targetSession?.cardIndex === originalIndex ? 'selected' : ''} ${selectedDiscards.includes(originalIndex) ? 'selected' : ''} ${!isPlayable ? 'unplayable' : ''}`}
+                                    style={getCardBg(card.name) ? { backgroundImage: `url(${getCardBg(card.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', opacity: !isPlayable ? 0.4 : 1, cursor: !isPlayable ? 'not-allowed' : 'pointer', width: '64px', height: '90px', borderRadius: '6px' } : { opacity: !isPlayable ? 0.4 : 1, cursor: !isPlayable ? 'not-allowed' : 'pointer', width: '64px', height: '90px', borderRadius: '6px' }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (needsDiscard) {
+                                            handleDiscardToggle(originalIndex);
+                                        } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
+                                            if (isPlayable || activeSkill) {
+                                                handleCardClick(originalIndex);
+                                                setIsExpanded(false);
+                                            } else {
+                                                if (handleUnplayableClick) handleUnplayableClick(originalIndex);
+                                                if (targetSession) cancelTargeting();
+                                            }
+                                        } else if (gameState.waitingForResponse) {
                                             handleCardClick(originalIndex);
                                             setIsExpanded(false);
-                                        } else {
-                                            if (handleUnplayableClick) handleUnplayableClick(originalIndex);
-                                            if (targetSession) cancelTargeting();
+                                        } else if (!isPlayable && handleUnplayableClick) {
+                                            handleUnplayableClick(originalIndex);
                                         }
-                                    } else if (gameState.waitingForResponse) {
-                                        handleCardClick(originalIndex);
-                                        setIsExpanded(false);
-                                    } else if (!isPlayable && handleUnplayableClick) {
-                                        handleUnplayableClick(originalIndex);
-                                    }
-                                }}
-                                title={`${card.name}: ${card.desc}`}
-                            >
-                                <div className="card-suit-corner" style={{ position: 'absolute', top: '3px', left: '4px', fontSize: '0.7rem', color: card.color === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.9)', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)', zIndex: 4 }}>
-                                {getSuitEmoji(card.suit)} {card.rank}
+                                    }}
+                                    title={`${card.name}: ${card.desc}`}
+                                >
+                                    <div className="card-suit-corner" style={{ position: 'absolute', top: '3px', left: '4px', fontSize: '0.7rem', color: card.color === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.9)', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)', zIndex: 4 }}>
+                                    {getSuitEmoji(card.suit)} {card.rank}
+                                    </div>
+                                    {getCardBg(card.name) ? renderCardNameBadge(card) : (
+                                    <div className="card-inner" style={{ paddingTop: '12px' }}>
+                                        <span className="card-icon">{card.emoji}</span>
+                                        <span className="card-name">{card.name}</span>
+                                        <span className="card-type-badge">
+                                        {card.type === CARD_TYPES.BASIC ? (
+                                            card.name === 'Chém' ? 'Tấn công' :
+                                            card.name === 'Né' ? 'Phòng thủ' :
+                                            card.name === 'Đào' ? 'Hồi phục' :
+                                            card.name === 'Rượu' ? 'Cường hóa' : 'Cơ bản'
+                                        ) :
+                                            CARD_TYPE_LABELS[card.type] || 'Khác'}
+                                        </span>
+                                    </div>
+                                    )}
                                 </div>
-                                {getCardBg(card.name) ? renderCardNameBadge(card) : (
-                                <div className="card-inner" style={{ paddingTop: '12px' }}>
-                                    <span className="card-icon">{card.emoji}</span>
-                                    <span className="card-name">{card.name}</span>
-                                    <span className="card-type-badge">
-                                    {card.type === CARD_TYPES.BASIC ? (
-                                        card.name === 'Chém' ? 'Tấn công' :
-                                        card.name === 'Né' ? 'Phòng thủ' :
-                                        card.name === 'Đào' ? 'Hồi phục' :
-                                        card.name === 'Rượu' ? 'Cường hóa' : 'Cơ bản'
-                                    ) :
-                                        CARD_TYPE_LABELS[card.type] || 'Khác'}
-                                    </span>
-                                </div>
-                                )}
-                            </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
-                    
-                    <button 
-                        className="btn-action primary" 
-                        style={{ marginTop: '30px', padding: '15px 40px', fontSize: '1.2rem', borderRadius: '30px' }}
-                        onClick={() => setIsExpanded(false)}
-                    >
-                        ◂ Thu gọn
-                    </button>
                 </div>
             , document.body)}
         </>

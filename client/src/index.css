@@ -1430,17 +1430,18 @@ body {
     flex-wrap: nowrap !important;
     justify-content: center !important;
     align-items: center !important;
-    gap: 12px !important;
+    gap: 8px !important;
     width: 100% !important;
     max-width: 100% !important;
-    margin: 4px auto !important;
+    margin: 2px auto !important;
   }
 
   .draft-hero-card {
-    width: clamp(124px, 17vw, 168px) !important;
-    max-width: 172px !important;
-    height: clamp(200px, 62vh, 260px) !important;
-    flex: 0 0 auto !important;
+    height: clamp(185px, 58vh, 248px) !important;
+    aspect-ratio: 1086 / 1448 !important;
+    width: auto !important;
+    max-width: 185px !important;
+    flex: 0 1 auto !important;
     border-radius: 10px !important;
   }
 
@@ -1505,9 +1506,9 @@ body {
   }
   
   .card {
-    width: 64px !important;
-    height: 90px !important;
-    font-size: 0.75rem !important;
+    width: clamp(54px, 6.8vw, 62px) !important;
+    height: clamp(80px, 22vh, 90px) !important;
+    font-size: 0.72rem !important;
     border-radius: 6px !important;
   }
   
@@ -1522,6 +1523,9 @@ body {
   .hand-cards {
     padding: 2px 0 4px 0 !important;
     gap: 5px !important;
+    max-width: 100% !important;
+    justify-content: center !important;
+    flex-wrap: nowrap !important;
   }
 }
 

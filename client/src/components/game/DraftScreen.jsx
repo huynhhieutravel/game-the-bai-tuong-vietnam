@@ -212,7 +212,16 @@ export function DraftScreen(props) {
                 )}
 
                 {hero.image ? (
-                    <img src={`/images/heroes/${hero.image}`} alt={hero.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img 
+                        src={`/images/heroes/${hero.image}`} 
+                        alt={hero.name} 
+                        style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'contain',
+                            display: 'block' 
+                        }} 
+                    />
                 ) : (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-card)', padding: '10px' }}>
                         <div style={{ fontSize: '3rem' }}>{hero.emoji || '❓'}</div>
@@ -220,26 +229,32 @@ export function DraftScreen(props) {
                     </div>
                 )}
                 
-                {/* Thanh tên tướng dàn rộng toàn bộ chân thẻ - Không bị nút Soi chèn ép */}
+                {/* Tên tướng dạng chip nổi nhẹ ở chân thẻ, không che khuất trích dẫn & HP */}
                 <div style={{ 
                     position: 'absolute', 
-                    bottom: 0, 
-                    left: 0, 
-                    right: 0, 
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.75) 75%, transparent 100%)',
-                    padding: '8px 4px 5px 4px',
+                    bottom: '4px', 
+                    left: '50%', 
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    border: '1px solid rgba(212, 168, 67, 0.4)',
+                    borderRadius: '10px',
+                    padding: '1px 8px',
                     textAlign: 'center',
-                    zIndex: 3
+                    zIndex: 3,
+                    maxWidth: '85%',
+                    pointerEvents: 'none',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.7)',
+                    backdropFilter: 'blur(3px)'
                 }}>
                     <span style={{ 
                         color: '#f8fafc', 
-                        fontSize: (hero.name || '').length > 10 ? '0.78rem' : '0.86rem', 
+                        fontSize: (hero.name || '').length > 10 ? '0.70rem' : '0.78rem', 
                         fontWeight: 'bold', 
                         display: 'block',
                         whiteSpace: 'nowrap', 
                         overflow: 'hidden', 
                         textOverflow: 'ellipsis',
-                        textShadow: '0 1px 3px rgba(0,0,0,0.9)'
+                        textShadow: '0 1px 2px rgba(0,0,0,0.9)'
                     }}>
                         {hero.name || `Tướng ${hero.id}`}
                     </span>
@@ -276,7 +291,7 @@ export function DraftScreen(props) {
                     >
                         <div style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '2rem', zIndex: 2, background: 'rgba(0,0,0,0.5)', borderRadius: '50%' }}>✅</div>
                         {vipHero.image ? (
-                        <img src={`/images/heroes/${vipHero.image}`} alt={vipHero.name} style={{ width: '100%', height: '100%', objectFit: 'fill', borderRadius: '8px' }} />
+                        <img src={`/images/heroes/${vipHero.image}`} alt={vipHero.name} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
                         ) : (
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-card)', padding: '20px' }}>
                             <div style={{ fontSize: '5rem' }}>{vipHero.emoji || '❓'}</div>

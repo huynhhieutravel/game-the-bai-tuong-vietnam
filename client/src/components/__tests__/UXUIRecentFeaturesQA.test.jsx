@@ -8,6 +8,7 @@ import { AskChangeJudgeModal } from '../modals/AskChangeJudgeModal';
 import { HauVienModal } from '../modals/HauVienModal';
 import { AskBocTramTrungDodgeModal } from '../modals/AskBocTramTrungDodgeModal';
 import { AskBocTramTrungSlashModal } from '../modals/AskBocTramTrungSlashModal';
+import { PlayerHand } from '../game/PlayerHand';
 
 describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến', () => {
   describe('1. DodgeModal - Kỹ năng Bọc Trăm Trứng & Tiên Phát trong Quốc Chiến', () => {
@@ -358,6 +359,149 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
         doProvide: true,
         cardId: 'ally_dodge_1'
       }));
+    });
+  });
+
+  describe('6. PlayerHand - Cơ chế gấp gọn v3 & Badge thẻ bài không vỡ dòng', () => {
+    const defaultGameState = {
+      phase: 'action',
+      waitingForResponse: null
+    };
+
+    it('hiển thị đầy đủ tất cả lá bài khi số lá <= 5 (không có ô +N)', () => {
+      const me = {
+        id: 0,
+        hand: [
+          { id: 'c1', name: 'Chém', type: 'basic', suit: 'spade', rank: '7' },
+          { id: 'c2', name: 'Né', type: 'basic', suit: 'heart', rank: '2' },
+          { id: 'c3', name: 'Đào', type: 'basic', suit: 'diamond', rank: '3' },
+          { id: 'c4', name: 'Rượu', type: 'basic', suit: 'club', rank: '9' },
+          { id: 'c5', name: 'Quyết Đấu', type: 'trick', suit: 'spade', rank: '4' }
+        ]
+      };
+
+      const { container } = render(
+        <PlayerHand
+          me={me}
+          gameState={defaultGameState}
+          needsDiscard={false}
+          isMyTurn={true}
+          selectedDiscards={[]}
+          handleDiscardToggle={vi.fn()}
+          handleCardClick={vi.fn()}
+        />
+      );
+
+      // 5 lá bài đều hiển thị inline
+      const cards = container.querySelectorAll('.hand-cards .card:not(.card-overflow-badge)');
+      expect(cards.length).toBe(5);
+
+      // Không có ô +N
+      const overflowBadge = container.querySelector('.card-overflow-badge');
+      expect(overflowBadge).toBeNull();
+    });
+
+    it('khi có nhiều hơn 5 lá (ví dụ 6 lá), hiển thị 4 lá đầu + 1 ô mở rộng +2 (chuẩn cơ chế v3)', () => {
+      const me = {
+        id: 0,
+        hand: [
+          { id: 'c1', name: 'Hỗn Loạn', type: 'trick', suit: 'diamond', rank: '3' },
+          { id: 'c2', name: 'Loạn Tiễn', type: 'trick', suit: 'spade', rank: 'K' },
+          { id: 'c3', name: 'Chém', type: 'basic', suit: 'diamond', rank: 'K' },
+          { id: 'c4', name: 'Quyết Đấu', type: 'trick', suit: 'spade', rank: '4' },
+          { id: 'c5', name: 'Rượu', type: 'basic', suit: 'heart', rank: 'K' },
+          { id: 'c6', name: 'Chém', type: 'basic', suit: 'diamond', rank: '9' }
+        ]
+      };
+
+      const { container } = render(
+        <PlayerHand
+          me={me}
+          gameState={defaultGameState}
+          needsDiscard={false}
+          isMyTurn={true}
+          selectedDiscards={[]}
+          handleDiscardToggle={vi.fn()}
+          handleCardClick={vi.fn()}
+        />
+      );
+
+      // Hiển thị đúng 4 lá đầu tiên
+      const cards = container.querySelectorAll('.hand-cards .card:not(.card-overflow-badge)');
+      expect(cards.length).toBe(4);
+
+      // Hiển thị ô mở rộng +2
+      const overflowBadge = container.querySelector('.card-overflow-badge');
+      expect(overflowBadge).not.toBeNull();
+      expect(overflowBadge.textContent).toContain('+2');
+      expect(overflowBadge.textContent).toContain('Xem hết');
+    });
+
+    it('thẻ Quyết Đấu có badge nowrap không bao giờ ngắt 2 dòng', () => {
+      const me = {
+        id: 0,
+        hand: [
+          { id: 'c1', name: 'Quyết Đấu', type: 'trick', suit: 'spade', rank: '4' }
+        ]
+      };
+
+      const { container } = render(
+        <PlayerHand
+          me={me}
+          gameState={defaultGameState}
+          needsDiscard={false}
+          isMyTurn={true}
+          selectedDiscards={[]}
+          handleDiscardToggle={vi.fn()}
+          handleCardClick={vi.fn()}
+        />
+      );
+
+      const pill = container.querySelector('.card-name-pill');
+      expect(pill).not.toBeNull();
+      expect(pill.textContent).toBe('Quyết Đấu');
+      expect(pill.style.whiteSpace).toBe('nowrap');
+      expect(pill.style.overflow).toBe('hidden');
+    });
+
+    it('bấm vào ô +N mở modal portal hiển thị đầy đủ toàn bộ lá bài và có nút Thu gọn', () => {
+      const me = {
+        id: 0,
+        hand: [
+          { id: 'c1', name: 'C1', type: 'basic', suit: 'spade', rank: '1' },
+          { id: 'c2', name: 'C2', type: 'basic', suit: 'spade', rank: '2' },
+          { id: 'c3', name: 'C3', type: 'basic', suit: 'spade', rank: '3' },
+          { id: 'c4', name: 'C4', type: 'basic', suit: 'spade', rank: '4' },
+          { id: 'c5', name: 'C5', type: 'basic', suit: 'spade', rank: '5' },
+          { id: 'c6', name: 'C6', type: 'basic', suit: 'spade', rank: '6' }
+        ]
+      };
+
+      const { container } = render(
+        <PlayerHand
+          me={me}
+          gameState={defaultGameState}
+          needsDiscard={false}
+          isMyTurn={true}
+          selectedDiscards={[]}
+          handleDiscardToggle={vi.fn()}
+          handleCardClick={vi.fn()}
+        />
+      );
+
+      const overflowBadge = container.querySelector('.card-overflow-badge');
+      fireEvent.click(overflowBadge);
+
+      // Modal hiển thị đủ 6 lá
+      const modalTitle = screen.getByText(/Toàn Bộ Bài Trên Tay \(6 Lá\)/i);
+      expect(modalTitle).toBeTruthy();
+
+      // Nút thu gọn đóng modal
+      const closeBtn = screen.getByRole('button', { name: /✕ Thu gọn/i });
+      expect(closeBtn).toBeTruthy();
+      fireEvent.click(closeBtn);
+
+      expect(screen.queryByText(/Toàn Bộ Bài Trên Tay \(6 Lá\)/i)).toBeNull();
     });
   });
 });
