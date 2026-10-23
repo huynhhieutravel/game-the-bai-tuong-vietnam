@@ -5,7 +5,7 @@ import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine/gameState';
 
 
 export function AskBocTramTrungSlashModal({ req, gameState, onConfirm }) {
-   const me = gameState.players.find(p => p.id === (typeof window !== 'undefined' ? window.playerId : 0)) || gameState.players[0];
+   const me = gameState.players.find(p => p.id === (req.responderId ?? req.currentActorId ?? (typeof window !== 'undefined' ? window.playerId : 0))) || gameState.players[0];
    const llq = gameState.players.find(p => p.id === req.sourceId);
    const target = req.targetId ? gameState.players.find(p => p.id === req.targetId) : null;
    

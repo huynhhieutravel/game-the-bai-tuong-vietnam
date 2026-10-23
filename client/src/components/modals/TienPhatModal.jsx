@@ -4,11 +4,25 @@ import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/util
 
 import { CardSelector } from './CardSelector';
 
+import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine/gameState';
+
 export function TienPhatModal({ req, gameState, onConfirm }) {
-  const me = gameState.players.find(p => p.id === req.targetId);
+  const targetPlayerId = req.responderId ?? req.currentActorId ?? (typeof window !== 'undefined' ? window.playerId : 0);
+  const me = gameState.players.find(p => p.id === targetPlayerId) || gameState.players[0];
   const source = gameState.players.find(p => p.id === req.sourceId); // Ly Thuong Kiet
   
-  const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => c.name === 'Né');
+  const hasDoiNui = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'doi-nui');
+  const hasThinhChinh = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'thinh-chinh');
+
+  const validCards = (me.hand || []).map((c, idx) => ({ ...c, idx })).filter(c => {
+    if (c.name === 'Né') return true;
+    if (hasDoiNui && c.name === 'Chém') return true;
+    if (hasThinhChinh && c.color === 'black') return true;
+    return false;
+  }).map(c => ({
+    ...c,
+    virtualReason: c.name === 'Chém' && hasDoiNui ? 'Dời Núi' : (c.name !== 'Né' && hasThinhChinh && c.color === 'black' ? 'Nhiếp Chính' : null)
+  }));
 
   return (
     <div style={{ textAlign: 'center', minWidth: '350px' }}>
@@ -23,7 +37,16 @@ export function TienPhatModal({ req, gameState, onConfirm }) {
         validCards={validCards}
         confirmText="💨 Đánh Né giúp"
         cancelText="⏭️ Bỏ qua"
-        onSelect={(idx) => onConfirm({ doReact: true, cardId: me.hand[idx].id })}
+        onSelect={(idx) => {
+          const c = me.hand[idx];
+          if (c.name === 'Chém' && hasDoiNui) {
+            onConfirm({ doReact: true, cardId: c.id, virtualCardName: 'Né', activeSkill: 'doi-nui', dodgeCard: c });
+          } else if (c.name !== 'Né' && c.color === 'black' && hasThinhChinh) {
+            onConfirm({ doReact: true, cardId: c.id, virtualCardName: 'Né', activeSkill: 'thinh-chinh', dodgeCard: c });
+          } else {
+            onConfirm({ doReact: true, cardId: c.id, dodgeCard: c });
+          }
+        }}
         onCancel={() => onConfirm({ doReact: false })}
       />
     </div>

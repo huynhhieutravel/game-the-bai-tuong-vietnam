@@ -5,7 +5,7 @@ import { CardSelector } from './CardSelector';
 import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine/gameState';
 
 export function DodgeModal({ req, gameState, onConfirm }) {
-  const me = gameState.players.find(p => p.id === (typeof window !== 'undefined' ? window.playerId : 0)) || gameState.players[0];
+  const me = gameState.players.find(p => p.id === (req.responderId ?? req.targetId ?? (typeof window !== 'undefined' ? window.playerId : 0))) || gameState.players[0];
   const source = gameState.players.find(p => p.id === req.sourceId);
   
   const hasPassiveBagua = hasSkill(me, 'than-giap') && !me.equipment.some(c => c.name === 'Bát Quái' || c.name === 'Hắc Thuẫn');
@@ -14,6 +14,12 @@ export function DodgeModal({ req, gameState, onConfirm }) {
   
   const hasDoiNui = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'doi-nui');
   const hasThinhChinh = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'thinh-chinh');
+
+  const hasBocTramTrung = !me.isSkillsSuppressed && (hasSkillEvenIfHidden(me, 'boc-tram-trung') || hasSkillEvenIfHidden(me, 'boc_tram_trung') || me.heroes?.some(h => h.id === 'lac-long-quan'));
+  const canBocTramTrung = hasBocTramTrung && gameState.players.some(p => p.id !== me.id && p.isAlive && (getPlayerFaction(p) === 'Lạc' || p.faction === 'lac'));
+
+  const hasTienPhat = !me.isSkillsSuppressed && (hasSkillEvenIfHidden(me, 'tien-phat') || hasSkillEvenIfHidden(me, 'tien_phat') || me.heroes?.some(h => h.id === 'ly-thuong-kiet'));
+  const canTienPhat = hasTienPhat && gameState.players.some(p => p.id !== me.id && p.isAlive && (getPlayerFaction(p) === 'Việt' || p.faction === 'viet'));
   
   const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => {
      if (c.name === 'Né') return true;
@@ -61,7 +67,12 @@ export function DodgeModal({ req, gameState, onConfirm }) {
                 ☯️ Dùng Bát Quái
               </button>
             )}
-            {me.heroes?.some((h, i) => h.id === 'ly-thuong-kiet') && me.isLord && (
+            {canBocTramTrung && (
+              <button className="btn-action" style={{ backgroundColor: '#0284c7', color: '#fff', flex: '1 1 100%' }} onClick={() => onConfirm({ callBocTramTrung: true })}>
+                🐉 Kích Hoạt Bọc Trăm Trứng
+              </button>
+            )}
+            {canTienPhat && (
               <button className="btn-action" style={{ backgroundColor: '#ec4899', color: '#fff', flex: '1 1 100%' }} onClick={() => onConfirm({ doTienPhat: true })}>
                 👑 Kích Hoạt Tiên Phát
               </button>

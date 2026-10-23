@@ -4,7 +4,7 @@ import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/util
 import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine/gameState';
 
 export function AskBocTramTrungDodgeModal({ req, gameState, onConfirm }) {
-   const me = gameState.players.find(p => p.id === (typeof window !== 'undefined' ? window.playerId : 0)) || gameState.players[0];
+   const me = gameState.players.find(p => p.id === (req.responderId ?? req.currentActorId ?? (typeof window !== 'undefined' ? window.playerId : 0))) || gameState.players[0];
    const llq = gameState.players.find(p => p.id === req.sourceId);
    
    const [selectedCardIdx, setSelectedCardIdx] = useState(null);

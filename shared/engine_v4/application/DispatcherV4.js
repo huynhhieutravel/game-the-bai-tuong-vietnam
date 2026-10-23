@@ -290,6 +290,11 @@ export class DispatcherV4 {
         if (player.equipment[slot]?.id === data.cardId) return player.equipment[slot];
       }
     }
+    if (data.dodgeCard) return data.dodgeCard;
+    if (data.peachCard) return data.peachCard;
+    if (data.slashCard) return data.slashCard;
+    if (data.negateCard) return data.negateCard;
+    if (data.card) return data.card;
     if (data.cardIndexSelected !== undefined && player.hand?.[data.cardIndexSelected]) {
       return player.hand[data.cardIndexSelected];
     }
@@ -316,14 +321,22 @@ export class DispatcherV4 {
       return;
     }
 
-    const isCancelOrSkip = responseType === 'cancel' || responseType === 'skip' || data.canceled;
+    const isCancelOrSkip = responseType === 'cancel' || 
+      responseType === 'skip' || 
+      data.canceled === true || 
+      data.doReact === false || 
+      data.doSave === false || 
+      data.doUse === false || 
+      data.doNegate === false || 
+      data.doProvide === false;
+
     const player = this.state.getPlayer(playerId);
 
     switch (frame.type) {
       case 'ASK_DODGE': {
         let dodgeCard = null;
-        if (!isCancelOrSkip && !data.useBagua && !data.doBagua) {
-          dodgeCard = this._resolveCard(player, data) || player.hand.find(c => c.type === 'dodge' || c.name === 'Né');
+        if (!isCancelOrSkip && !data.useBagua && !data.doBagua && !data.callBocTramTrung && !data.doTienPhat && !data.doHoGia) {
+          dodgeCard = this._resolveCard(player, data) || (data.doReact ? player.hand.find(c => c.type === 'dodge' || c.name === 'Né') : null);
         }
         CombatRules.respondDodge(this.state, playerId, dodgeCard, data);
         break;
@@ -332,7 +345,7 @@ export class DispatcherV4 {
       case 'ASK_PEACH': {
         let peachCard = null;
         if (!isCancelOrSkip) {
-          peachCard = this._resolveCard(player, data) || player.hand.find(c => c.type === 'peach' || c.name === 'Đào');
+          peachCard = this._resolveCard(player, data) || (data.doSave ? player.hand.find(c => c.type === 'peach' || c.name === 'Đào') : null);
         }
         CombatRules.respondPeach(this.state, playerId, peachCard);
         break;

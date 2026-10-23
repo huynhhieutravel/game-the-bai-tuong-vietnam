@@ -130,6 +130,9 @@ export function toViewModel(state, mainPlayerId = 0) {
           ...frame.context
         };
       } else if (frame.type === 'ASK_CHANGE_JUDGE') {
+        const actor = state.getPlayer ? state.getPlayer(frame.currentActorId) : (state.players || []).find(p => p.id === frame.currentActorId);
+        const hasUngBien = actor && (globalHeroRegistry.hasSkill(actor, 'ung_bien', true) || globalHeroRegistry.hasSkill(actor, 'ung-bien', true));
+        const resolvedSkills = frame.context?.skills || (hasUngBien ? ['ung-bien'] : ['quan-co']);
         vm.waitingForResponse = {
           id: frame.id,
           type: 'ask_change_judge',
@@ -138,7 +141,7 @@ export function toViewModel(state, mainPlayerId = 0) {
           targetId: frame.targetId,
           reason: frame.context?.reason,
           judgeCard: frame.context?.judgeCard,
-          skills: frame.context?.skills,
+          skills: resolvedSkills,
           askQueue: [...(frame.priorityQueue || [])],
           ...frame.context
         };

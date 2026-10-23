@@ -748,7 +748,7 @@ export class TrickRules {
 
     if (replaceCard) {
       state.priorityStack.pop();
-      state.discardFromHand(responderId, [replaceCard.id]);
+      responder.hand = responder.hand.filter(c => c.id !== replaceCard.id);
       state.discardPile.push(finalJudgeCard);
       finalJudgeCard = replaceCard;
       const skillName = globalHeroRegistry.hasSkill(responder, 'ung_bien', true) ? 'Ứng Biến' : 'Quân Cơ';
