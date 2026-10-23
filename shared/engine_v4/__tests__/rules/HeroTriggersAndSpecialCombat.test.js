@@ -4,8 +4,17 @@ import { StateMachine, PHASES } from '../../core/StateMachine.js';
 import { CombatRules } from '../../rules/CombatRules.js';
 import { TrickRules } from '../../rules/TrickRules.js';
 import { globalHeroRegistry } from '../../heroes/HeroRegistry.js';
+import { DispatcherV4 } from '../../application/DispatcherV4.js';
+import { LAC_HEROES } from '../../heroes/lac/index.js';
+import { VIET_HEROES } from '../../heroes/viet/index.js';
+import { HA_HEROES } from '../../heroes/ha/index.js';
+import { SON_HEROES } from '../../heroes/son/index.js';
 
 describe('Hero Triggers Lifecycle & Special Combat Mechanics v4', () => {
+  LAC_HEROES.forEach(h => globalHeroRegistry.registerHero(h));
+  VIET_HEROES.forEach(h => globalHeroRegistry.registerHero(h));
+  HA_HEROES.forEach(h => globalHeroRegistry.registerHero(h));
+  SON_HEROES.forEach(h => globalHeroRegistry.registerHero(h));
   const createTestState = (p0Props = {}, p1Props = {}, p2Props = {}) => {
     return new GameState({
       players: [
@@ -301,6 +310,15 @@ describe('Hero Triggers Lifecycle & Special Combat Mechanics v4', () => {
     TrickRules.respondNegate(state, 1, null);
     TrickRules.respondNegate(state, 2, null);
 
+    // Bước 1: Mục tiêu Player 1 để lộ 1 lá bài trên tay
+    expect(state.priorityStack.peek().type).toBe('ASK_HOACONG_REVEAL');
+    TrickRules.respondHoaCongReveal(state, 1, state.getPlayer(1).hand[0]);
+
+    // Bước 2: Người dùng Hỏa Công Player 0 bỏ 1 lá bài cùng chất (Cơ / Heart)
+    expect(state.priorityStack.peek().type).toBe('ASK_HOACONG_DISCARD');
+    const matchHeartCard = state.getPlayer(0).hand.find(c => c.suit === 'heart');
+    TrickRules.respondHoaCongDiscard(state, 0, matchHeartCard);
+
     // Player 1 bị dính 1 sát thương lửa và tháo xích
     expect(state.getPlayer(1).hp).toBe(3);
     expect(state.getPlayer(1).isChained).toBe(false);
@@ -308,5 +326,226 @@ describe('Hero Triggers Lifecycle & Special Combat Mechanics v4', () => {
     // Sát thương lửa lan truyền qua xiềng xích sang Player 2!
     expect(state.getPlayer(2).hp).toBe(3);
     expect(state.getPlayer(2).isChained).toBe(false);
+  });
+
+  it('12. Vũ khí Kỳ Lân Cung: Khi Chém trúng mục tiêu có Ngựa thì bắn hạ Ngựa vào chồng bài bỏ', () => {
+    const state = createTestState(
+      {
+        id: 0,
+        equipment: {
+          weapon: { id: 'wp_bow', name: 'Kỳ Lân Cung', range: 5 }
+        },
+        hand: [{ id: 'slash_kirin', name: 'Chém', type: 'slash' }]
+      },
+      {
+        id: 1,
+        hp: 4,
+        maxHp: 4,
+        equipment: {
+          horse_defense: { id: 'horse_def', name: 'Ngựa Thần (+1)' },
+          horse_attack: { id: 'horse_atk', name: 'Ngựa Chiến (-1)' }
+        },
+        hand: []
+      }
+    );
+
+    const slashCard = state.getPlayer(0).hand[0];
+    CombatRules.playSlash(state, 0, 1, slashCard);
+
+    // Player 1 không né
+    expect(state.priorityStack.peek().type).toBe('ASK_DODGE');
+    CombatRules.respondDodge(state, 1, null);
+
+    // Player 1 nhận 1 sát thương và bị bắn hạ Ngựa phòng thủ trước
+    expect(state.getPlayer(1).hp).toBe(3);
+    expect(state.getPlayer(1).equipment.horse_defense).toBeNull();
+    expect(state.getPlayer(1).equipment.horse_attack).not.toBeNull();
+    expect(state.discardPile.some(c => c.id === 'horse_def')).toBe(true);
+  });
+
+  it('13. Thánh Gióng (Tre Ngà): Khi Chém, phán xét chất và yêu cầu đối thủ bỏ bài cùng chất mới được Né', () => {
+    const state = createTestState(
+      {
+        id: 0,
+        mainHeroId: 'thanh_giong',
+        skills: ['tre_nga'],
+        hand: [{ id: 'slash_tre_nga', name: 'Chém', type: 'slash' }]
+      },
+      {
+        id: 1,
+        hp: 4,
+        maxHp: 4,
+        hand: [
+          { id: 'heart_card', name: 'Đào Viên', type: 'trick', suit: 'heart' },
+          { id: 'dodge_1', name: 'Né', type: 'dodge', suit: 'diamond' }
+        ]
+      }
+    );
+    // Chuẩn bị drawPile để phán xét ra chất 'heart'
+    state.drawPile = [{ id: 'judge_heart', name: 'Phán Xét Cơ', suit: 'heart' }];
+
+    const slashCard = state.getPlayer(0).hand[0];
+    CombatRules.playSlash(state, 0, 1, slashCard);
+
+    // Frame trên đỉnh phải là ASK_TRE_NGA_DISCARD
+    expect(state.priorityStack.peek().type).toBe('ASK_TRE_NGA_DISCARD');
+    expect(state.priorityStack.peek().context.judgeSuit).toBe('heart');
+
+    const dispatcher = new DispatcherV4(state);
+    // Player 1 bỏ lá Cơ để giữ quyền Né
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 1,
+        responseType: 'provide',
+        data: { doDiscard: true, cardId: 'heart_card' }
+      }
+    });
+
+    // Sau khi bỏ Cơ, frame kế tiếp là ASK_DODGE
+    expect(state.priorityStack.peek().type).toBe('ASK_DODGE');
+    expect(state.getPlayer(1).hand.some(c => c.id === 'heart_card')).toBe(false);
+
+    // Player 1 né thành công
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 1,
+        responseType: 'provide',
+        data: { dodgeCardId: 'dodge_1' }
+      }
+    });
+    expect(state.priorityStack.isEmpty()).toBe(true);
+    expect(state.getPlayer(1).hp).toBe(4);
+  });
+
+  it('14. Trần Quang Khải (Đoạt Sáo): END_PHASE lật mặt tướng rút 4 bài, bỏ 1 bài (tự động mặc nếu là Trang bị)', () => {
+    const state = createTestState(
+      {
+        id: 0,
+        skills: ['doat_sao'],
+        isFaceUp: true,
+        hand: []
+      },
+      { id: 1 }
+    );
+    state.drawPile = [
+      { id: 'draw_c1', name: 'Sát', type: 'slash' },
+      { id: 'draw_c2', name: 'Né', type: 'dodge' },
+      { id: 'draw_c3', name: 'Đào', type: 'peach' },
+      { id: 'wp_sword', name: 'Song Kiếm', type: 'equipment', subtype: 'equip_weapon' }
+    ];
+
+    // Trigger END_PHASE
+    globalHeroRegistry.dispatchTrigger('END_PHASE', { actorId: 0, ownerId: 0 }, state);
+
+    expect(state.priorityStack.peek().type).toBe('ASK_DOAT_SAO');
+
+    const dispatcher = new DispatcherV4(state);
+    // Player 0 chấp nhận dùng Đoạt Sáo
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 0,
+        responseType: 'provide',
+        data: { doUse: true }
+      }
+    });
+
+    // Đã lật mặt, rút 4 bài và chuyển sang ASK_DOAT_SAO_DISCARD
+    expect(state.getPlayer(0).isFaceUp).toBe(false);
+    expect(state.getPlayer(0).hand.length).toBe(4);
+    expect(state.priorityStack.peek().type).toBe('ASK_DOAT_SAO_DISCARD');
+
+    // Chọn Song Kiếm để bỏ -> Vì là Trang bị, hệ thống tự động mặc vào slot weapon
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 0,
+        responseType: 'provide',
+        data: { cardId: 'wp_sword' }
+      }
+    });
+
+    expect(state.priorityStack.isEmpty()).toBe(true);
+    expect(state.getPlayer(0).equipment.weapon?.id).toBe('wp_sword');
+  });
+
+  it('15. Khúc Thừa Dụ (Khoan Dân): Khi nhận sát thương, chọn 1 tướng rút bài cho bằng giới hạn HP', () => {
+    const state = createTestState(
+      {
+        id: 0,
+        skills: ['khoan_dan'],
+        hp: 4,
+        maxHp: 4,
+        hand: []
+      },
+      {
+        id: 1,
+        hp: 3,
+        maxHp: 4,
+        hand: [{ id: 'card_dummy', name: 'Lá bài' }]
+      }
+    );
+    state.drawPile = [
+      { id: 'c1', name: 'Bài 1' },
+      { id: 'c2', name: 'Bài 2' },
+      { id: 'c3', name: 'Bài 3' },
+      { id: 'c4', name: 'Bài 4' }
+    ];
+
+    // Player 0 nhận 1 sát thương
+    CombatRules.applyDamage(state, 1, 0, 1, 'slash');
+
+    expect(state.priorityStack.peek().type).toBe('ASK_KHOAN_DAN');
+
+    const dispatcher = new DispatcherV4(state);
+    // Chọn Player 1 (đang có 1 bài, maxHp 4 -> cần rút 3 lá để đủ 4)
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 0,
+        responseType: 'provide',
+        data: { doUse: true, targetId: 1 }
+      }
+    });
+
+    expect(state.getPlayer(1).hand.length).toBe(4);
+  });
+
+  it('16. Ngọc Hân Công Chúa (Hiền Hậu): Bỏ lá bài Cơ chặn toàn bộ sát thương, ép mục tiêu khác chịu hiệu ứng', () => {
+    const state = createTestState(
+      { id: 0, hp: 4, maxHp: 4, hand: [] },
+      {
+        id: 1,
+        skills: ['hien_hau'],
+        hp: 3,
+        maxHp: 3,
+        hand: [{ id: 'heart_prevent', name: 'Hồng Nhan', suit: 'heart' }]
+      }
+    );
+
+    // Player 0 gây sát thương lên Player 1
+    CombatRules.applyDamage(state, 0, 1, 1, 'slash');
+
+    // Chặn lại và đẩy ASK_HIEN_HAU
+    expect(state.priorityStack.peek().type).toBe('ASK_HIEN_HAU');
+
+    const dispatcher = new DispatcherV4(state);
+    // Player 1 dùng Hiền Hậu: bỏ lá heart_prevent, ép Player 0 nhận 1 sát thương
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 1,
+        responseType: 'provide',
+        data: { doUse: true, cardId: 'heart_prevent', targetId: 0, option: 1 }
+      }
+    });
+
+    // Player 1 không mất máu (vẫn 3 HP)
+    expect(state.getPlayer(1).hp).toBe(3);
+    // Player 0 nhận 1 sát thương (4 - 1 = 3 HP)
+    expect(state.getPlayer(0).hp).toBe(3);
+    expect(state.priorityStack.isEmpty()).toBe(true);
   });
 });

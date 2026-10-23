@@ -80,13 +80,16 @@ export const KhucThuaDu = {
       filter: (ctx) => ctx.ownerId === ctx.targetId,
       description: 'Sau khi nhận sát thương, có thể chọn 1 tướng rút bài cho bằng giới hạn HP (tối đa 5).',
       execute: (state, ctx) => {
-        // Mặc định chọn chính mình rút bài nếu bài trên tay < maxHp
-        const owner = ctx.owner;
-        const deficit = Math.min(5, owner.maxHp) - owner.hand.length;
-        if (deficit > 0) {
-          state.drawCards(owner.id, deficit);
-          state.addLog(`🕊️ [Khoan Dân] kích hoạt: ${owner.name} rút thêm ${deficit} lá bài cho bằng giới hạn HP!`);
-        }
+        state.priorityStack.push({
+          type: 'ASK_KHOAN_DAN',
+          sourceId: ctx.ownerId,
+          targetId: ctx.ownerId,
+          currentActorId: ctx.ownerId,
+          priorityQueue: [ctx.ownerId],
+          context: {
+            damageAmount: ctx.damageAmount
+          }
+        });
       }
     })
   ]
@@ -164,10 +167,15 @@ export const TranQuangKhai = {
       frequency: 'turn',
       trigger: 'END_PHASE',
       filter: (ctx) => ctx.ownerId === ctx.actorId,
-      description: 'Cuối lượt lật mặt tướng và rút 4 bài, bỏ 1 bài.',
+      description: 'Cuối lượt lật mặt tướng và rút 4 bài, bỏ 1 bài (nếu là Trang bị thì sử dụng).',
       execute: (state, ctx) => {
-        state.drawCards(ctx.ownerId, 4);
-        state.addLog(`⚔️ [Đoạt Sáo] kích hoạt: ${ctx.owner.name} rút 4 lá bài!`);
+        state.priorityStack.push({
+          type: 'ASK_DOAT_SAO',
+          sourceId: ctx.ownerId,
+          targetId: ctx.ownerId,
+          currentActorId: ctx.ownerId,
+          priorityQueue: [ctx.ownerId]
+        });
       }
     }),
     new SkillContract({

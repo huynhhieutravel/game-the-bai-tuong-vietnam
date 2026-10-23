@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { GameState } from '../../core/GameState.js';
 import { globalHeroRegistry } from '../../heroes/HeroRegistry.js';
 import { VIET_HEROES } from '../../heroes/viet/index.js';
+import { DispatcherV4 } from '../../application/DispatcherV4.js';
 
 describe('Heroes Hệ 🔴 VIỆT v4 (Nguỵ)', () => {
   VIET_HEROES.forEach(hero => globalHeroRegistry.registerHero(hero));
@@ -72,6 +73,18 @@ describe('Heroes Hệ 🔴 VIỆT v4 (Nguỵ)', () => {
       target: ktd
     }, state);
 
+    expect(state.priorityStack.peek().type).toBe('ASK_KHOAN_DAN');
+
+    const dispatcher = new DispatcherV4(state);
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 0,
+        responseType: 'provide',
+        data: { doUse: true, targetId: 0 }
+      }
+    });
+
     // MaxHP = 3, có sẵn 1 bài -> rút thêm 2 bài -> tổng 3 bài
     expect(ktd.hand.length).toBe(3);
   });
@@ -102,6 +115,18 @@ describe('Heroes Hệ 🔴 VIỆT v4 (Nguỵ)', () => {
       sourceId: 0,
       actorId: 0
     }, state);
+
+    expect(state.priorityStack.peek().type).toBe('ASK_DOAT_SAO');
+
+    const dispatcher = new DispatcherV4(state);
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 0,
+        responseType: 'provide',
+        data: { doUse: true }
+      }
+    });
 
     expect(tqk.hand.length).toBe(4); // Rút 4 lá bài
   });

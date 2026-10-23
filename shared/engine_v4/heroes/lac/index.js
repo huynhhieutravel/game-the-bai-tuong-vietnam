@@ -35,6 +35,7 @@ export const ThanhGiong = {
           state.addLog(`⚡ [Tre Ngà] phán xét ra chất [${judgeCard.suit}]. Mục tiêu ${ctx.target.name} phải bỏ bài cùng chất để được Né!`);
           ctx.target.temporaryFlags = ctx.target.temporaryFlags || {};
           ctx.target.temporaryFlags.treNgaRequiredSuit = judgeCard.suit;
+          return { treNgaJudgeSuit: judgeCard.suit };
         }
       }
     })
@@ -265,7 +266,24 @@ export const LangLieu = {
       filter: (ctx) => ctx.ownerId === ctx.actorId,
       description: 'Đầu lượt xem X lá bài đầu chồng rút, xếp lại tùy ý lên đầu hoặc đáy chồng bài.',
       execute: (state, ctx) => {
-        state.addLog(`🌾 [Bánh Chưng] kích hoạt: ${ctx.owner.name} xem bài đầu chồng rút.`);
+        const aliveCount = state.getAlivePlayers().length;
+        const viewCount = Math.min(aliveCount, 5);
+        if (state.drawPile.length < viewCount) {
+          state.recycleDiscardPile();
+        }
+        const viewedCards = state.drawPile.slice(-viewCount).reverse();
+        state.addLog(`🍡 [Bánh Chưng] ${ctx.owner.name} kích hoạt: xem ${viewCount} lá bài đầu chồng rút để sắp xếp lại.`);
+        state.priorityStack.push({
+          type: 'ASK_BANH_CHUNG',
+          sourceId: ctx.ownerId,
+          targetId: ctx.ownerId,
+          currentActorId: ctx.ownerId,
+          priorityQueue: [ctx.ownerId],
+          context: {
+            viewedCards,
+            viewCount
+          }
+        });
       }
     }),
     new SkillContract({

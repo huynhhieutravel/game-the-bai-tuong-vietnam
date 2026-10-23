@@ -184,6 +184,83 @@ export function toViewModel(state, mainPlayerId = 0) {
           askQueue: [...(frame.priorityQueue || [])],
           ...frame.context
         };
+      } else if (frame.type === 'ASK_HOACONG_REVEAL') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_hoacong_reveal',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_HOACONG_DISCARD') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_hoacong_discard',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          revealedCard: frame.context?.revealedCard,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_BANH_CHUNG') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_banh_chung',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          viewedCards: frame.context?.viewedCards || [],
+          viewCount: frame.context?.viewCount || 0,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_DOAT_SAO') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_doat_sao',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_DOAT_SAO_DISCARD') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_doat_sao_discard',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_HIEN_HAU') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_hien_hau',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_KHOAN_DAN') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_khoan_dan',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          amount: frame.context?.damageAmount || 1,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_TRE_NGA_DISCARD') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_tre_nga_discard',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          judgeSuit: frame.context?.judgeSuit,
+          ...frame.context
+        };
       } else {
         const isDiscard = frame.type === 'ASK_DISCARD';
         const frameType = isDiscard ? 'discard_phase' : frame.type.toLowerCase();

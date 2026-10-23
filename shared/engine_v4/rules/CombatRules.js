@@ -128,6 +128,7 @@ export class CombatRules {
       type: 'ASK_DODGE',
       sourceId,
       targetId,
+      currentActorId: targetId,
       priorityQueue: [targetId],
       context: {
         card,
@@ -136,6 +137,20 @@ export class CombatRules {
         damageAmount: slashEvent.damageAmount
       }
     });
+
+    // 9. Nếu Thánh Gióng phát động [Tre Ngà] -> Đẩy Frame ASK_TRE_NGA_DISCARD lên đỉnh stack
+    if (slashEvent.treNgaJudgeSuit) {
+      state.priorityStack.push({
+        type: 'ASK_TRE_NGA_DISCARD',
+        sourceId,
+        targetId,
+        currentActorId: targetId,
+        priorityQueue: [targetId],
+        context: {
+          judgeSuit: slashEvent.treNgaJudgeSuit
+        }
+      });
+    }
 
     // Reset cờ Rượu sau khi đã chém
     if (source.temporaryFlags?.wineActive) {
@@ -463,6 +478,31 @@ export class CombatRules {
   static applyDamage(state, sourceId, targetId, amount = 1, reason = 'normal', isChainedPropagation = false) {
     const target = state.getPlayer(targetId);
     const source = sourceId !== null ? state.getPlayer(sourceId) : null;
+    if (!target || !target.isAlive) return;
+
+    // Kiểm tra kỹ năng Hiền Hậu (Ngọc Hân Công Chúa): Chặn sát thương nếu có bài Cơ (hoặc Bích do Quốc Sắc)
+    if (globalHeroRegistry.hasSkill(target, 'hien_hau', true) && !target.temporaryFlags?.hienHauAttempted) {
+      const hasHeartOrSpade = target.hand?.some(c => {
+        const s = c.suit?.toLowerCase() || '';
+        return s === 'heart' || s === 'cơ' || s === 'spade' || s === 'bích' || c.suit === '♥' || c.suit === '♠';
+      });
+      if (hasHeartOrSpade) {
+        state.priorityStack.push({
+          type: 'ASK_HIEN_HAU',
+          sourceId: targetId,
+          targetId: targetId,
+          currentActorId: targetId,
+          priorityQueue: [targetId],
+          context: {
+            attackerId: sourceId,
+            damageAmount: amount,
+            reason,
+            isChainedPropagation
+          }
+        });
+        return;
+      }
+    }
 
     // 1. Quạt Sắt: Nếu mục tiêu ĐANG KHÔNG CÓ BÀI TRÊN TAY, sát thương tăng thêm +1
     if (source && reason.startsWith('slash')) {
@@ -515,6 +555,32 @@ export class CombatRules {
         other.isChained = false;
         state.addLog(`⚡🔥 [Xiềng Xích Liên Hoàn] Sát thương lôi hỏa truyền sang ${other.name}!`);
         this.applyDamage(state, sourceId, other.id, amount, reason, true);
+      }
+    }
+
+    // 4. Kỳ Lân Cung (Kirin Bow): Bắn hạ Ngựa của mục tiêu khi Chém gây sát thương
+    if (source && (reason === 'slash' || reason.startsWith('slash'))) {
+      const sourceWeapon = source.equipment?.weapon;
+      const isKirinBow = sourceWeapon && (
+        sourceWeapon.name === 'Kỳ Lân Cung' ||
+        sourceWeapon.id?.includes('ky_lan') ||
+        sourceWeapon.id?.includes('wp_bow') ||
+        sourceWeapon.key === 'ky-lan-cung'
+      );
+      if (isKirinBow) {
+        if (target.equipment?.horse_defense) {
+          const horse = target.equipment.horse_defense;
+          target.equipment.horse_defense = null;
+          state.discardPile.push(horse);
+          state.addLog(`🏹 [Kỳ Lân Cung] ${source.name} bắn hạ [${horse.name || 'Ngựa Thần (+1)'}] của ${target.name}!`);
+          globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: target.id, card: horse }, state);
+        } else if (target.equipment?.horse_attack) {
+          const horse = target.equipment.horse_attack;
+          target.equipment.horse_attack = null;
+          state.discardPile.push(horse);
+          state.addLog(`🏹 [Kỳ Lân Cung] ${source.name} bắn hạ [${horse.name || 'Ngựa Chiến (-1)'}] của ${target.name}!`);
+          globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: target.id, card: horse }, state);
+        }
       }
     }
 

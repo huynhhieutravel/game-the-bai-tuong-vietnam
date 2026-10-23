@@ -35,6 +35,8 @@ import { TrungDungModal } from './TrungDungModal';
 import { TuChuModal } from './TuChuModal';
 import { TuChuTargetModal } from './TuChuTargetModal';
 import { VipHeroSelectorModal } from './VipHeroSelectorModal';
+import { HoaCongRevealModal } from './HoaCongRevealModal';
+import { HoaCongDiscardModal } from './HoaCongDiscardModal';
 
 export function ModalContainer({ mainPlayerId = 0 }) {
   const gameState = useGameState();
@@ -857,20 +859,14 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         if (req.type === 'ask_hoacong_reveal' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
-              
-<div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: '#ef4444' }}>🌟 Hỏa Công (Chưa code Modal)</div>
-<button className="btn-action secondary" onClick={() => handleResponseAction({ doUse: false })}>Bỏ qua</button>
-
+              <HoaCongRevealModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
             </div>
           );
         }
         if (req.type === 'ask_hoacong_discard' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
-              
-<div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: '#ef4444' }}>🌟 Hỏa Công Bỏ Bài (Chưa code Modal)</div>
-<button className="btn-action secondary" onClick={() => handleResponseAction({ doUse: false })}>Bỏ qua</button>
-
+              <HoaCongDiscardModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
             </div>
           );
         }

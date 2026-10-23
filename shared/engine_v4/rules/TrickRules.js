@@ -457,20 +457,20 @@ export class TrickRules {
           break;
         }
 
-        // Mục tiêu để lộ 1 lá bài trên tay
-        const revealedCard = target.hand[0];
-        state.addLog(`👁️ [Hỏa Công]: ${target.name} để lộ lá bài [${revealedCard.name || revealedCard.id}] (Chất: ${revealedCard.suit || revealedCard.color}).`);
-
-        // Người chơi Hỏa Công kiểm tra xem có bài cùng chất để phóng hỏa không
-        const matchIdx = source.hand.findIndex(c => (c.suit && c.suit === revealedCard.suit) || (c.color && c.color === revealedCard.color));
-        if (matchIdx !== -1) {
-          const matchingCard = source.hand.splice(matchIdx, 1)[0];
-          state.discardPile.push(matchingCard);
-          state.addLog(`🔥 [Hỏa Công] phóng hỏa! ${source.name} bỏ lá bài [${matchingCard.name || matchingCard.id}] cùng chất, gây 1 sát thương Lửa lên ${target.name}!`);
-          CombatRules.applyDamage(state, sourceId, targetId, 1, 'fire');
-        } else {
-          state.addLog(`💨 [Hỏa Công] không thành: ${source.name} không có lá bài cùng chất để kích hỏa.`);
-        }
+        // Đẩy Frame 1: ASK_HOACONG_REVEAL cho mục tiêu chọn 1 lá bài để lộ
+        state.priorityStack.push({
+          type: 'ASK_HOACONG_REVEAL',
+          sourceId,
+          targetId,
+          currentActorId: targetId,
+          priorityQueue: [targetId],
+          context: {
+            sourceId,
+            targetId,
+            trickCard: card
+          }
+        });
+        state.addLog(`🔥 [Hỏa Công]: ${source.name} sử dụng [Hỏa Công] lên ${target.name}, yêu cầu ${target.name} để lộ 1 lá bài trên tay...`);
         break;
       }
 
@@ -826,4 +826,76 @@ export class TrickRules {
     }
     this.playTrick(state, sourceId, [targetId], card, { trickKey: 'hoa_cong' });
   }
+
+  /**
+   * Phản hồi Bước 1 Hỏa Công: Mục tiêu để lộ 1 lá bài
+   */
+  static respondHoaCongReveal(state, targetId, revealedCard = null) {
+    const frame = state.priorityStack.peek();
+    if (!frame || frame.type !== 'ASK_HOACONG_REVEAL' || frame.currentActorId !== targetId) {
+      throw new Error(`[TrickRules] Không có yêu cầu để lộ bài Hỏa Công nào đang chờ cho người chơi ${targetId}!`);
+    }
+
+    const target = state.getPlayer(targetId);
+    const { sourceId, trickCard } = frame.context;
+    state.priorityStack.pop();
+
+    const actualCard = revealedCard || (target.hand && target.hand.length > 0 ? target.hand[0] : null);
+    if (!actualCard) {
+      state.addLog(`💨 [Hỏa Công] ${target.name} không còn bài trên tay, Hỏa Công tiêu tan.`);
+      return { success: false };
+    }
+
+    state.addLog(`👁️ [Hỏa Công]: ${target.name} để lộ lá bài [${actualCard.name || actualCard.id}] (Chất: ${actualCard.suit || actualCard.color}).`);
+
+    // Đẩy Frame 2: ASK_HOACONG_DISCARD cho người dùng Hỏa Công
+    state.priorityStack.push({
+      type: 'ASK_HOACONG_DISCARD',
+      sourceId,
+      targetId,
+      currentActorId: sourceId,
+      priorityQueue: [sourceId],
+      context: {
+        sourceId,
+        targetId,
+        revealedCard: actualCard,
+        trickCard
+      }
+    });
+
+    return { success: true, revealedCard: actualCard };
+  }
+
+  /**
+   * Phản hồi Bước 2 Hỏa Công: Người ra bài bỏ 1 lá cùng chất để phóng hỏa
+   */
+  static respondHoaCongDiscard(state, sourceId, discardCard = null) {
+    const frame = state.priorityStack.peek();
+    if (!frame || frame.type !== 'ASK_HOACONG_DISCARD' || frame.currentActorId !== sourceId) {
+      throw new Error(`[TrickRules] Không có yêu cầu bỏ bài Hỏa Công nào đang chờ cho người chơi ${sourceId}!`);
+    }
+
+    const source = state.getPlayer(sourceId);
+    const target = state.getPlayer(frame.targetId);
+    const { revealedCard } = frame.context;
+    state.priorityStack.pop();
+
+    if (discardCard) {
+      const match = (discardCard.suit && discardCard.suit === revealedCard.suit) || 
+                    (discardCard.color && discardCard.color === revealedCard.color);
+      if (!match) {
+        state.addLog(`❌ [Hỏa Công]: Lá bài [${discardCard.name}] không cùng chất (${revealedCard.suit}) với lá bài đã lộ!`);
+        return { success: false, reason: 'SUIT_MISMATCH' };
+      }
+
+      state.discardFromHand(sourceId, [discardCard.id]);
+      state.addLog(`🔥 [Hỏa Công] KÍCH HỎA THÀNH CÔNG! ${source.name} bỏ lá bài [${discardCard.name}] cùng chất ${revealedCard.suit || ''}, gây 1 sát thương Lửa lên ${target.name}!`);
+      CombatRules.applyDamage(state, sourceId, target.id, 1, 'fire');
+      return { success: true, damageDealt: 1 };
+    } else {
+      state.addLog(`💨 [Hỏa Công] không thành: ${source.name} không bỏ bài cùng chất để kích hỏa.`);
+      return { success: false };
+    }
+  }
 }
+

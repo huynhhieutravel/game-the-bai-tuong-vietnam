@@ -150,6 +150,66 @@ for (let g = 0; g < 1000; g++) {
           state.priorityStack.pop();
           const p = state.getPlayer(actorId);
           p.hp = Math.min(p.maxHp, p.hp + 1);
+        } else if (frame.type === 'ASK_HOACONG_REVEAL') {
+          const p = state.getPlayer(actorId);
+          const card = p.hand && p.hand.length > 0 ? p.hand[0] : null;
+          TrickRules.respondHoaCongReveal(state, actorId, card);
+        } else if (frame.type === 'ASK_HOACONG_DISCARD') {
+          const p = state.getPlayer(actorId);
+          const { revealedCard } = frame.context;
+          const matchCard = p.hand?.find(c => (c.suit && c.suit === revealedCard?.suit) || (c.color && c.color === revealedCard?.color));
+          TrickRules.respondHoaCongDiscard(state, actorId, matchCard || null);
+        } else if (frame.type === 'ASK_TRE_NGA_DISCARD') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          const matchCard = p.hand?.find(c => c.suit === frame.context?.judgeSuit);
+          if (matchCard) {
+            state.discardFromHand(actorId, [matchCard.id]);
+          } else if (!state.priorityStack.isEmpty() && state.priorityStack.peek().type === 'ASK_DODGE') {
+            CombatRules.respondDodge(state, actorId, null);
+          }
+        } else if (frame.type === 'ASK_DOAT_SAO') {
+          state.priorityStack.pop();
+          state.drawCards(actorId, 4);
+          const p = state.getPlayer(actorId);
+          if (p.hand && p.hand.length > 0) {
+            state.priorityStack.push({
+              type: 'ASK_DOAT_SAO_DISCARD',
+              sourceId: actorId,
+              targetId: actorId,
+              currentActorId: actorId,
+              priorityQueue: [actorId]
+            });
+          }
+        } else if (frame.type === 'ASK_DOAT_SAO_DISCARD') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          if (p.hand && p.hand.length > 0) {
+            state.discardFromHand(actorId, [p.hand[0].id]);
+          }
+        } else if (frame.type === 'ASK_HIEN_HAU') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          p.temporaryFlags = p.temporaryFlags || {};
+          p.temporaryFlags.hienHauAttempted = true;
+          CombatRules.applyDamage(
+            state,
+            frame.context.attackerId,
+            actorId,
+            frame.context.damageAmount,
+            frame.context.reason,
+            frame.context.isChainedPropagation
+          );
+          p.temporaryFlags.hienHauAttempted = false;
+        } else if (frame.type === 'ASK_KHOAN_DAN') {
+          state.priorityStack.pop();
+          const p = state.getPlayer(actorId);
+          const deficit = Math.max(0, Math.min(5, p.maxHp) - (p.hand ? p.hand.length : 0));
+          if (deficit > 0) {
+            state.drawCards(actorId, deficit);
+          }
+        } else if (frame.type === 'ASK_BANH_CHUNG') {
+          state.priorityStack.pop();
         } else {
           if (frame.context?.judgeCard) state.discardPile.push(frame.context.judgeCard);
           if (frame.context?.delayedCard) state.discardPile.push(frame.context.delayedCard);
