@@ -100,7 +100,7 @@ export default function MyHeroBar(props) {
                    <div className="my-hero-hp-bar">
                      <div className="my-hero-hp-hearts">
                        {Array.from({ length: me.maxHp }).map((_, i) => (
-                         <HpHeartIcon key={i} size={15} lost={i >= me.hp} />
+                         <HpHeartIcon key={i} size={me.maxHp >= 6 ? 9.5 : (me.maxHp >= 5 ? 10.5 : 11)} lost={i >= me.hp} />
                        ))}
                      </div>
                      <span className="my-hero-hp-text">

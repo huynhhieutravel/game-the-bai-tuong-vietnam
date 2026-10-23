@@ -48,6 +48,7 @@ export class BotRunnerV4 {
                 }
               }
 
+              this.isProcessing = false;
               if (selectedPair) {
                 this.gameAPI.selectDraftHeroes(bot.id, selectedPair[0], selectedPair[1]);
               } else if (bot.draftHeroes && bot.draftHeroes.length >= 2) {
@@ -91,6 +92,7 @@ export class BotRunnerV4 {
                 const discardIds = (reaction.discardCardIds && reaction.discardCardIds.length === required)
                   ? reaction.discardCardIds
                   : (currentActor.hand || []).slice(0, required).map(c => c.id);
+                this.isProcessing = false;
                 this.gameAPI.discardCards(actor.id, discardIds);
               } else {
                 const chosenCard = reaction.dodgeCard || reaction.peachCard || reaction.slashCard || reaction.negateCard || null;
@@ -98,6 +100,7 @@ export class BotRunnerV4 {
                 const isCanceled = reaction.canceled !== undefined 
                   ? reaction.canceled 
                   : (!chosenCard && !chosenCardId && !reaction.useBagua && !reaction.doUse && !reaction.orderedCards && !reaction.doProvide && !reaction.doReact);
+                this.isProcessing = false;
                 this.gameAPI.respond({
                   playerId: actor.id,
                   cardId: chosenCardId,
@@ -108,11 +111,13 @@ export class BotRunnerV4 {
               }
             } else if (currentActor && !currentActor.isAlive) {
               // Actor đã chết -> Tự động bỏ qua yêu cầu phản hồi để giải phóng PriorityFrame, chống kẹt game
+              this.isProcessing = false;
               this.gameAPI.respond({ playerId: actor.id, canceled: true, _isAuto: true });
             }
           } catch (err) {
             console.error('[BotRunnerV4] Error during bot reaction:', err);
             // Universal AI Fallback: Bỏ qua yêu cầu nếu bị lỗi để không kẹt game
+            this.isProcessing = false;
             this.gameAPI.respond({ playerId: actor.id, canceled: true, _isAuto: true });
           } finally {
             this.isProcessing = false;
@@ -141,13 +146,16 @@ export class BotRunnerV4 {
 
               if (action && action.type === 'PLAY_CARD') {
                 const targetIds = action.targetIds || (action.targetId !== undefined ? [action.targetId] : []);
+                this.isProcessing = false;
                 this.gameAPI.playCard(currentTurnId, action.cardId, targetIds);
               } else {
+                this.isProcessing = false;
                 this.gameAPI.endPhase(currentTurnId);
               }
             }
           } catch (err) {
             console.error('[BotRunnerV4] Error during bot action phase:', err);
+            this.isProcessing = false;
             this.gameAPI.endPhase(currentTurnId);
           } finally {
             this.isProcessing = false;
@@ -157,6 +165,7 @@ export class BotRunnerV4 {
         this.isProcessing = true;
         this.timerId = setTimeout(() => {
           try {
+            this.isProcessing = false;
             this.gameAPI.drawPhase(currentTurnId);
           } finally {
             this.isProcessing = false;
@@ -166,6 +175,7 @@ export class BotRunnerV4 {
         const excess = (currentTurnPlayer.hand || []).length - currentTurnPlayer.hp;
         if (excess > 0) {
           const cardIds = currentTurnPlayer.hand.slice(0, excess).map(c => c.id);
+          this.isProcessing = false;
           this.gameAPI.discardCards(currentTurnId, cardIds);
         }
       }

@@ -98,4 +98,66 @@ describe('Engine v4 Application Layer Adapter', () => {
       runner.cleanup();
     }).not.toThrow();
   });
+
+  it('BotRunnerV4 handles multi-actor ASK_NEGATE without getting stuck on reentrancy', async () => {
+    vi.useFakeTimers();
+    let state = createGameState(4);
+    state = selectDraftHeroes(state, 0, 'chu_dong_tu', 'cao_lo');
+    state = selectDraftHeroes(state, 1, 'trieu_quang_phuc', 'phung_hung');
+    state = selectDraftHeroes(state, 2, 'ngo_quyen', 'yet_kieu');
+    state = selectDraftHeroes(state, 3, 'dinh_bo_linh', 'nguyen_bac');
+
+    state.players[0].revealedHeroes = [true, true];
+    state.players[1].revealedHeroes = [true, true];
+
+    state.players.forEach(p => { p.hand = []; });
+    const duelCard = { id: 'duel_test_1', name: 'Quyết Đấu', type: 'duel', suit: 'spade', rank: 'A' };
+    state.players[0].hand.push(duelCard);
+
+    const dispatcher = new Dispatcher(state);
+    const api = new GameAPI(dispatcher);
+    const runner = new BotRunner(api);
+
+    dispatcher.subscribe((st) => {
+      runner.onStateUpdate(st);
+    });
+
+    api.playCard(0, 'duel_test_1', [1]);
+
+    // Top frame is ASK_NEGATE for player 0
+    expect(state.priorityStack.peek().type).toBe('ASK_NEGATE');
+    expect(state.priorityStack.peek().currentActorId).toBe(0);
+
+    // Player 0 passes Hóa Giải
+    api.respond({ playerId: 0, doNegate: false });
+
+    // Bot 1 is next actor
+    expect(state.priorityStack.peek().currentActorId).toBe(1);
+
+    // Advance timers for Bot 1
+    await vi.advanceTimersByTimeAsync(700);
+
+    // Bot 2 is next actor
+    expect(state.priorityStack.peek().currentActorId).toBe(2);
+
+    // Advance timers for Bot 2
+    await vi.advanceTimersByTimeAsync(700);
+
+    // Bot 3 is next actor
+    expect(state.priorityStack.peek().currentActorId).toBe(3);
+
+    // Advance timers for Bot 3
+    await vi.advanceTimersByTimeAsync(700);
+
+    // Negate chain finishes! Now ASK_SLASH_DUEL for Player 1 (Bot 1)
+    expect(state.priorityStack.peek().type).toBe('ASK_SLASH_DUEL');
+    expect(state.priorityStack.peek().currentActorId).toBe(1);
+
+    // Advance timers for Bot 1 duel slash
+    await vi.advanceTimersByTimeAsync(700);
+
+    // Duel either continues or Bot 1 takes damage / loses
+    runner.cleanup();
+    vi.useRealTimers();
+  });
 });

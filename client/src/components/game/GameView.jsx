@@ -62,6 +62,11 @@ export default function GameView() {
   const gameState = useGameState();
   const isActionPending = useRef(false);
 
+  // Auto-reset action lock whenever gameState changes
+  useEffect(() => {
+    isActionPending.current = false;
+  }, [gameState]);
+
   const [logTab, setLogTab] = useState('all');
   const [showMobileLog, setShowMobileLog] = useState(false);
   const [showGameMenu, setShowGameMenu] = useState(false);
@@ -146,6 +151,7 @@ export default function GameView() {
   const handleEndTurn = useCallback(() => {
     if (!gameAPI) return;
     cancelTargeting();
+    isActionPending.current = false;
     gameAPI.endPhase(mainPlayerId);
   }, [gameAPI, cancelTargeting, mainPlayerId]);
 

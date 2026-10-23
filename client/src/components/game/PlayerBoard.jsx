@@ -193,7 +193,7 @@ export function PlayerBoard({
                 <div className="hero-hp-container">
                   <div className="hero-hp-hearts">
                     {Array.from({ length: player.maxHp }).map((_, i) => (
-                      <HpHeartIcon key={i} size={15} lost={i >= player.hp} />
+                      <HpHeartIcon key={i} size={player.maxHp >= 6 ? 9.5 : (player.maxHp >= 5 ? 10.5 : 12)} lost={i >= player.hp} />
                     ))}
                   </div>
                   <div className="hero-hp-badge">

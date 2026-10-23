@@ -415,19 +415,22 @@
 .my-hero-hp-bar {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  flex-shrink: 0;
 }
 
 .my-hero-hp-hearts {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 1.5px;
+  flex-shrink: 0;
 }
 
 .my-hero-hp-text {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: bold;
   color: var(--color-gold);
+  white-space: nowrap;
 }
 
 .my-hero-wine-status {
