@@ -19,6 +19,10 @@ import { hasSkill } from 'shared/engine_v4/application/index.js';
  * @property {any} handleExecuteSkill
  * @property {any} handleEndTurn
  * @property {any} cancelTargeting
+ * @property {boolean} [needsDiscard]
+ * @property {number} [discardAmount]
+ * @property {Array<number>} [selectedDiscards]
+ * @property {() => void} [confirmDiscard]
  * 
  * @param {ActionBarProps} props
  */
@@ -35,11 +39,28 @@ export function ActionBar(props) {
         handleRevealClick,
         handleExecuteSkill,
         handleEndTurn,
-        cancelTargeting
+        cancelTargeting,
+        needsDiscard,
+        discardAmount = 0,
+        selectedDiscards = [],
+        confirmDiscard
     } = props;
     return (
         <div className="action-buttons" onClick={(e) => e.stopPropagation()}>
-            {isMyTurn && gameState.phase === PHASES.DRAW && (
+            {needsDiscard && (
+              <button 
+                className="btn-action danger" 
+                disabled={selectedDiscards.length !== discardAmount}
+                onClick={confirmDiscard}
+                style={{
+                  opacity: selectedDiscards.length === discardAmount ? 1 : 0.6,
+                  filter: selectedDiscards.length === discardAmount ? 'none' : 'grayscale(0.6)'
+                }}
+              >
+                🗑️ Bỏ Bài ({selectedDiscards.length}/{discardAmount})
+              </button>
+            )}
+            {isMyTurn && gameState.phase === PHASES.DRAW && !needsDiscard && (
               <>
                 <button className="btn-action primary" onClick={() => handleDraw()}>
                   🃏 Rút Bài
@@ -48,7 +69,7 @@ export function ActionBar(props) {
                 {/* Bình Ngô is now automatically applied by the engine if the hero is revealed. */}
               </>
             )}
-            {isMyTurn && gameState.phase === PHASES.ACTION && !targetSession && (
+            {isMyTurn && gameState.phase === PHASES.ACTION && !targetSession && !needsDiscard && (
               <>
                 { (() => {
                     let skills = me.heroes ? me.heroes.filter(Boolean).flatMap((h, i) => {

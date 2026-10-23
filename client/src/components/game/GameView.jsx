@@ -6,7 +6,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useGameState, useGameAPI, useGameController } from '../../contexts/GameProvider';
 import { ModalContainer } from '../modals/ModalContainer';
 import { VipHeroSelectorModal } from '../modals/VipHeroSelectorModal';
-import { PHASES } from 'shared/data/gameData';
+import { PHASES, CARD_SUBTYPES, getCardSubType } from 'shared/data/gameData';
+import { RangeIcon, DistanceIcon } from '../common/GameIcons';
 import "../../index.css";
 
 import { useTargeting } from './hooks/useTargeting';
@@ -295,23 +296,58 @@ export default function GameView() {
       </div>
 
       <div className="game-top-bar">
-        <div className="game-title">Việt Sát</div>
-        <div className="game-status" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="game-top-left" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexWrap: 'nowrap' }}>
+          <div className="game-title">Việt Sát</div>
+          
+          {/* Text trạng thái giai đoạn dời lên trên chỗ khu vực Việt Sát */}
+          <div className="top-status-indicator" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {gameState.gameOver ? (
+              <span style={{ color: 'var(--color-gold)', fontWeight: 700, fontSize: '0.82rem' }}>
+                🏆 {winnerText} Thắng!
+              </span>
+            ) : needsDiscard ? (
+              <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '0.74rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', padding: '2px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+                ⚠️ Bỏ {discardAmount} lá ({selectedDiscards.length} đã chọn)
+              </span>
+            ) : targetSession ? (
+              <span style={{ color: '#fca5a5', fontWeight: 'bold', fontSize: '0.74rem', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239,68,68,0.5)', padding: '2px 8px', borderRadius: '12px', whiteSpace: 'nowrap' }}>
+                🎯 Hãy chọn mục tiêu!
+              </span>
+            ) : (
+              <span style={{ color: isMyTurn ? '#6ee7b7' : '#94a3b8', fontSize: '0.74rem', fontWeight: 600, background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.15)', padding: '2px 8px', borderRadius: '12px', whiteSpace: 'nowrap' }}>
+                {isMyTurn ? `⚔️ Giai đoạn ${gameState.phase === PHASES.ACTION ? 'Hành động' : gameState.phase === PHASES.DRAW ? 'Rút bài' : gameState.phase}` : '⏳ Chờ đối thủ...'}
+              </span>
+            )}
+          </div>
+
+          {/* Tầm và Cự ly dời lên trên */}
+          <div className="top-range-box" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(15, 23, 42, 0.75)', border: '1px solid var(--color-border)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
+            <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 'bold' }} title="Tầm đánh">
+              <RangeIcon size={12} /> Tầm: <strong style={{ color: '#f8fafc' }}>{me.attackRange}</strong>
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.25)' }}>|</span>
+            <span style={{ color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 'bold' }} title="Khoảng cách phòng vệ">
+              <DistanceIcon size={12} /> Cự ly: <strong style={{ color: '#f8fafc' }}>+{me.equipment?.find(c => getCardSubType(c) === CARD_SUBTYPES.EQUIP_MOUNT_DEF) ? 1 : 0}</strong>
+            </span>
+          </div>
+        </div>
+
+        <div className="game-status" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
           <button 
              onClick={sfx.toggleMute} 
-             style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', opacity: 0.7 }}
+             style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', opacity: 0.7 }}
              title={sfx.isMuted ? "Bật âm thanh" : "Tắt âm thanh"}
           >
              {sfx.isMuted ? '🔇' : '🔊'}
           </button>
-          <div className="turn-indicator">
-            {gameState.currentPlayerIndex === me.id ? '▶ Lượt của bạn' : `⏳ Chờ người chơi ${gameState.currentPlayerIndex + 1}`}
-            <span style={{ marginLeft: '10px', color: 'var(--color-gold)' }}>{gameState.phase}</span>
+          <div className="turn-indicator" style={{ fontSize: '0.72rem', padding: '2px 6px' }}>
+            {gameState.currentPlayerIndex === me.id ? '▶ Lượt của bạn' : `⏳ Chờ P${gameState.currentPlayerIndex + 1}`}
           </div>
           <button 
              className="mobile-log-toggle-btn"
              onClick={() => setShowMobileLog(prev => !prev)}
              title="Xem nhật ký trận đấu"
+             style={{ padding: '2px 8px', fontSize: '0.74rem' }}
           >
              📜 Log {gameState.logs?.length > 0 && <span className="mobile-log-count">{gameState.logs.length}</span>}
           </button>
@@ -323,14 +359,14 @@ export default function GameView() {
                background: 'rgba(212, 168, 67, 0.2)',
                border: '1px solid var(--color-gold)',
                color: 'var(--color-gold)',
-               padding: '3px 10px',
+               padding: '2px 8px',
                borderRadius: '6px',
-               fontSize: '0.8rem',
+               fontSize: '0.74rem',
                fontWeight: 'bold',
                cursor: 'pointer',
                display: 'inline-flex',
                alignItems: 'center',
-               gap: '3px'
+               gap: '2px'
              }}
           >
              ⚙️ Menu
@@ -466,40 +502,6 @@ export default function GameView() {
                   handleUnplayableClick={handleUnplayableClick}
               />
             }
-            statusMessage={
-              <div style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                {gameState.gameOver ? (
-                  <span style={{ color: 'var(--color-gold)', fontSize: '1rem', fontWeight: 700 }}>
-                    🏆 {winnerText} CHIẾN THẮNG!
-                  </span>
-                ) : !isMyTurn ? (
-                  'Đang chờ đối thủ...'
-                ) : needsDiscard ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ color: '#ef4444', fontSize: '1.2rem', fontWeight: 'bold', background: 'rgba(0,0,0,0.5)', padding: '4px 12px', borderRadius: '4px' }}>
-                        ⚠️ BẠN CẦN BỎ {discardAmount} LÁ BÀI! (Đã chọn {selectedDiscards.length})
-                      </span>
-                      {selectedDiscards.length === discardAmount && (
-                          <button className="btn-action" style={{ background: '#ef4444', color: 'white', border: '1px solid white' }} onClick={(e) => { e.stopPropagation(); confirmDiscard(); }}>
-                              🗑️ Xác nhận Vứt
-                          </button>
-                      )}
-                  </div>
-                ) : targetSession ? (
-                  <span style={{ color: 'var(--color-red-light)', fontSize: '1rem', fontWeight: 'bold', padding: '10px' }}>
-                    {targetSession.targetingDef?.steps?.[targetSession.step]?.message || targetSession.message || '🎯 HÃY CHỌN 1 MỤC TIÊU! 🎯'}
-                  </span>
-                ) : gameState.phase === PHASES.DRAW ? (
-                  <span style={{ color: 'var(--color-gold)', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                    👇 Giai đoạn Rút Bài: Hãy bấm "Rút Bài" để tiếp tục!
-                  </span>
-                ) : gameState.phase === PHASES.ACTION ? (
-                  'Đang trong Giai đoạn Hành động'
-                ) : (
-                  'Đang xử lý...'
-                )}
-              </div>
-            }
             actionBar={
               <ActionBar
                   me={me}
@@ -514,6 +516,10 @@ export default function GameView() {
                   handleExecuteSkill={handleExecuteSkill}
                   handleRevealClick={handleRevealClick}
                   cancelTargeting={cancelTargeting}
+                  needsDiscard={needsDiscard}
+                  discardAmount={discardAmount}
+                  selectedDiscards={selectedDiscards}
+                  confirmDiscard={confirmDiscard}
               />
             }
         />

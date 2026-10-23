@@ -504,4 +504,87 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
       expect(screen.queryByText(/Toàn Bộ Bài Trên Tay \(6 Lá\)/i)).toBeNull();
     });
   });
+
+  describe('7. MyHeroBar & ActionBar UX Tối ưu layout điện thoại landscape', () => {
+    it('MyHeroBar render dock header chứa HP bar và Phe tag ở trên cùng, body chứa 2x2 equipment grid', async () => {
+      const { default: MyHeroBar } = await import('../game/MyHeroBar');
+      const me = {
+        id: 0,
+        hp: 4,
+        maxHp: 4,
+        faction: 'lac',
+        attackRange: 1,
+        isRevealed: true,
+        revealedHeroes: [true, true],
+        heroes: [
+          { id: 'h1', name: 'Tướng 1', emoji: '⚔️' },
+          { id: 'h2', name: 'Tướng 2', emoji: '🛡️' }
+        ],
+        equipment: []
+      };
+
+      const { container } = render(
+        <MyHeroBar
+          me={me}
+          gameState={{ phase: 'action' }}
+          activePhase="action"
+          handleRevealClick={vi.fn()}
+          actionBar={<div>ACTION_BUTTONS</div>}
+          playerHand={<div>PLAYER_HAND</div>}
+          setHeroPopup={vi.fn()}
+          setCardPopup={vi.fn()}
+          targetSession={null}
+          handleTargetClick={vi.fn()}
+        />
+      );
+
+      // Dock header
+      const dockHeader = container.querySelector('.my-hero-dock-header');
+      expect(dockHeader).not.toBeNull();
+      expect(dockHeader.querySelector('.my-hero-hp-bar')).not.toBeNull();
+      expect(dockHeader.querySelector('.my-hero-faction-tag')).not.toBeNull();
+      expect(dockHeader.textContent).toContain('4/4');
+
+      // Dock body
+      const dockBody = container.querySelector('.my-hero-dock-body');
+      expect(dockBody).not.toBeNull();
+      expect(dockBody.querySelector('.my-hero-avatars')).not.toBeNull();
+      expect(dockBody.querySelector('.my-hero-equipment-area')).not.toBeNull();
+
+      // Stats box should NOT be inside action-hub
+      const actionHub = container.querySelector('.my-hero-action-hub');
+      expect(actionHub).not.toBeNull();
+      expect(actionHub.querySelector('.my-hero-stats-box')).toBeNull();
+    });
+
+    it('ActionBar hiển thị nút Bỏ Bài khi needsDiscard là true', async () => {
+      const { ActionBar } = await import('../game/ActionBar');
+      const confirmDiscard = vi.fn();
+      const me = {
+        id: 0,
+        isSilenced: false,
+        heroes: []
+      };
+
+      const { getByRole } = render(
+        <ActionBar
+          me={me}
+          isMyTurn={true}
+          gameState={{ phase: 'discard' }}
+          gameAPI={{}}
+          needsDiscard={true}
+          discardAmount={2}
+          selectedDiscards={[10, 11]}
+          confirmDiscard={confirmDiscard}
+        />
+      );
+
+      const discardBtn = getByRole('button', { name: /Bỏ Bài \(2\/2\)/i });
+      expect(discardBtn).not.toBeNull();
+      expect(discardBtn.disabled).toBe(false);
+
+      fireEvent.click(discardBtn);
+      expect(confirmDiscard).toHaveBeenCalled();
+    });
+  });
 });

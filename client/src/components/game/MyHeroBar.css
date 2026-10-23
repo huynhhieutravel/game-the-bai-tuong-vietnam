@@ -14,22 +14,26 @@
 /* ZONE 1: HERO DOCK (Left) */
 .my-hero-dock {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 6px;
   background: var(--color-bg-glass);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 8px 12px;
+  padding: 6px 10px;
   backdrop-filter: blur(12px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
   flex-shrink: 0;
   z-index: 20;
 }
 
-.my-hero-dock-info {
+.my-hero-dock-header {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 4px;
 }
 
 .my-hero-dock-badges {
@@ -39,9 +43,16 @@
   flex-wrap: wrap;
 }
 
-.my-hero-equipment-area {
+.my-hero-dock-body {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.my-hero-equipment-area {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
 }
 
 .my-hero-equip-slot {
@@ -373,32 +384,14 @@
   }
 
   .my-hero-dock {
-    padding: 4px 6px;
-    gap: 6px;
+    padding: 3px 6px;
+    gap: 4px;
     border-radius: 8px;
   }
 
-  .my-hero-avatars {
-    gap: 4px;
-  }
-
-  .my-hero-avatar-card {
-    width: 48px;
-    height: 68px;
-    border-radius: 6px;
-  }
-
-  .my-hero-avatar-emoji {
-    font-size: 1.3rem;
-  }
-
-  .my-hero-reveal-btn {
-    padding: 2px 4px;
-    font-size: 0.65rem;
-  }
-
-  .my-hero-dock-info {
-    gap: 3px;
+  .my-hero-dock-header {
+    padding-bottom: 2px;
+    gap: 6px;
   }
 
   .my-hero-dock-badges {
@@ -415,16 +408,41 @@
   }
 
   .my-hero-hp-text {
+    font-size: 0.7rem;
+  }
+
+  .my-hero-dock-body {
+    gap: 6px;
+  }
+
+  .my-hero-avatars {
+    gap: 4px;
+  }
+
+  .my-hero-avatar-card {
+    width: clamp(52px, 6.6vw, 60px);
+    height: clamp(74px, 21vh, 86px);
+    border-radius: 6px;
+  }
+
+  .my-hero-avatar-emoji {
+    font-size: 1.5rem;
+  }
+
+  .my-hero-reveal-btn {
+    padding: 2px 4px;
     font-size: 0.68rem;
   }
 
   .my-hero-equipment-area {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
     gap: 3px;
   }
 
   .my-hero-equip-slot {
-    width: 24px;
-    height: 24px;
+    width: clamp(30px, 3.8vw, 36px);
+    height: clamp(30px, 3.8vw, 36px);
     border-radius: 4px;
   }
 
@@ -441,38 +459,49 @@
     padding: 4px 6px;
     gap: 4px;
     border-radius: 8px;
+    justify-content: center;
   }
 
   .my-hero-action-buttons {
-    gap: 3px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    justify-content: center;
   }
 
   .my-hero-action-buttons .btn-action {
-    padding: 3px 6px;
-    font-size: 0.7rem;
-    min-width: 52px;
-    border-radius: 4px;
-  }
-
-  .my-hero-stats-box {
-    padding: 1px 4px;
-    gap: 4px;
-    font-size: 0.65rem;
+    padding: 4px 8px;
+    font-size: 0.74rem;
+    min-width: 60px;
+    border-radius: 5px;
+    white-space: nowrap;
   }
 }
 
 @media (max-height: 440px) {
+  .my-hero-dock {
+    padding: 3px 5px !important;
+    gap: 3px !important;
+  }
+
   .my-hero-avatar-card {
-    width: 42px !important;
-    height: 60px !important;
+    width: clamp(50px, 6.4vw, 58px) !important;
+    height: clamp(72px, 20.5vh, 84px) !important;
   }
+
+  .my-hero-equipment-area {
+    gap: 3px !important;
+  }
+
   .my-hero-equip-slot {
-    width: 21px !important;
-    height: 21px !important;
+    width: clamp(28px, 3.6vw, 34px) !important;
+    height: clamp(28px, 3.6vw, 34px) !important;
   }
+
   .my-hero-action-buttons .btn-action {
-    padding: 2px 5px !important;
-    font-size: 0.65rem !important;
-    min-width: 46px !important;
+    padding: 4px 7px !important;
+    font-size: 0.72rem !important;
+    min-width: 58px !important;
   }
 }
