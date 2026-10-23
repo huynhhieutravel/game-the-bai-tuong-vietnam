@@ -71,6 +71,9 @@ export function ActionBar(props) {
             )}
             {isMyTurn && gameState.phase === PHASES.ACTION && !targetSession && !needsDiscard && (
               <>
+                <button className="btn-action danger btn-end-turn" onClick={handleEndTurn}>
+                  ⏭️ Kết Thúc
+                </button>
                 { (() => {
                     let skills = me.heroes ? me.heroes.filter(Boolean).flatMap((h, i) => {
                         return ((h && h.skills) || []).map(s => ({ ...s, heroIndex: i, isRevealed: me.revealedHeroes && me.revealedHeroes[i] }));
@@ -90,7 +93,7 @@ export function ActionBar(props) {
                         return (
                           <button 
                             key={s.name + '_hidden'} 
-                            className="btn-action warning" 
+                            className="btn-action warning btn-skill" 
                             onClick={() => {
                                handleRevealClick(s.heroIndex);
                                handleExecuteSkill(s.name);
@@ -110,24 +113,27 @@ export function ActionBar(props) {
                       return (
                         <button 
                           key={s.name} 
-                          className={`btn-action ${activeSkill === s.name ? 'primary' : 'warning'}`} 
+                          className={`btn-action btn-skill ${activeSkill === s.name ? 'primary' : 'warning'}`} 
                           onClick={() => handleExecuteSkill(s.name)}
                           title={isSkillDisabled ? disableReason : s.desc}
                           disabled={isSkillDisabled}
                           style={{ opacity: isSkillDisabled ? 0.5 : 1, filter: isSkillDisabled ? 'grayscale(0.8)' : 'none' }}
                         >
-                          ✨ {s.name} {activeSkill === s.name ? '(Đang chọn)' : ''}
+                          ✨ {s.name} {activeSkill === s.name ? '✓' : ''}
                         </button>
                       );
                     });
                 })() }
-                <button className="btn-action danger" onClick={handleEndTurn}>
-                  ⏭️ Kết Thúc
-                </button>
               </>
             )}
             {targetSession && (
               <>
+                <button
+                  className="btn-action secondary btn-cancel"
+                  onClick={cancelTargeting}
+                >
+                  ✕ Hủy
+                </button>
                 {targetSession.targetingDef?.type === 'multiple' && (() => {
                   const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
                   const minTargets = targetSession.targetingDef.min !== undefined ? targetSession.targetingDef.min : 1;
@@ -135,9 +141,9 @@ export function ActionBar(props) {
                   const isReforge = isXiengXich && targetSession.selectedTargets.length === 0;
                   const canSubmit = isReforge || hasEnoughTargets;
                   
-                  let label = `✅ Xác nhận Dùng ${targetSession.virtualCardName || targetSession.card?.name || activeSkill}`;
+                  let label = `✅ Dùng ${targetSession.virtualCardName || targetSession.card?.name || activeSkill}`;
                   if (isXiengXich) {
-                     label = isReforge ? '⛓️ Rèn Lại (Bỏ 1 Rút 1)' : '🔗 Xác Nhận Xích';
+                     label = isReforge ? '⛓️ Rèn Lại (Bỏ 1)' : '🔗 Xác Nhận Xích';
                   }
 
                   return (
@@ -176,15 +182,9 @@ export function ActionBar(props) {
                         cancelTargeting();
                     }}
                   >
-                    ✅ Xác nhận Dùng {targetSession.virtualCardName || targetSession.card.name}
+                    ✅ Dùng {targetSession.virtualCardName || targetSession.card.name}
                   </button>
                 )}
-                <button
-                  className="btn-action secondary"
-                  onClick={cancelTargeting}
-                >
-                  ✕ Hủy
-                </button>
               </>
             )}
         </div>

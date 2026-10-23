@@ -1506,8 +1506,8 @@ body {
   }
   
   .card {
-    width: clamp(62px, 7.6vw, 70px) !important;
-    height: clamp(88px, 24vh, 98px) !important;
+    width: clamp(58px, 7.2vw, 66px) !important;
+    height: clamp(86px, 23.5vh, 96px) !important;
     font-size: 0.74rem !important;
     border-radius: 6px !important;
   }

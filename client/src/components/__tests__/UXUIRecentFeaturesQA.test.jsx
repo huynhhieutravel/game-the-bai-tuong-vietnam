@@ -401,7 +401,7 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
       expect(overflowBadge).toBeNull();
     });
 
-    it('khi có nhiều hơn 5 lá (ví dụ 6 lá), hiển thị 4 lá đầu + 1 ô mở rộng +2 (chuẩn cơ chế v3)', () => {
+    it('khi có 6 lá bài, tất cả 6 lá đều hiển thị trực tiếp (không bị ẩn lá nào, không có ô +N)', () => {
       const me = {
         id: 0,
         hand: [
@@ -426,9 +426,44 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
         />
       );
 
-      // Hiển thị đúng 4 lá đầu tiên
+      // Đủ 6 lá bài đều hiển thị trực tiếp
       const cards = container.querySelectorAll('.hand-cards .card:not(.card-overflow-badge)');
-      expect(cards.length).toBe(4);
+      expect(cards.length).toBe(6);
+
+      // Không có ô +N
+      const overflowBadge = container.querySelector('.card-overflow-badge');
+      expect(overflowBadge).toBeNull();
+    });
+
+    it('khi có nhiều hơn 6 lá (ví dụ 7 lá), hiển thị 5 lá đầu + 1 ô mở rộng +2', () => {
+      const me = {
+        id: 0,
+        hand: [
+          { id: 'c1', name: 'Hỗn Loạn', type: 'trick', suit: 'diamond', rank: '3' },
+          { id: 'c2', name: 'Loạn Tiễn', type: 'trick', suit: 'spade', rank: 'K' },
+          { id: 'c3', name: 'Chém', type: 'basic', suit: 'diamond', rank: 'K' },
+          { id: 'c4', name: 'Quyết Đấu', type: 'trick', suit: 'spade', rank: '4' },
+          { id: 'c5', name: 'Rượu', type: 'basic', suit: 'heart', rank: 'K' },
+          { id: 'c6', name: 'Chém', type: 'basic', suit: 'diamond', rank: '9' },
+          { id: 'c7', name: 'Né', type: 'basic', suit: 'heart', rank: '2' }
+        ]
+      };
+
+      const { container } = render(
+        <PlayerHand
+          me={me}
+          gameState={defaultGameState}
+          needsDiscard={false}
+          isMyTurn={true}
+          selectedDiscards={[]}
+          handleDiscardToggle={vi.fn()}
+          handleCardClick={vi.fn()}
+        />
+      );
+
+      // Hiển thị đúng 5 lá đầu tiên
+      const cards = container.querySelectorAll('.hand-cards .card:not(.card-overflow-badge)');
+      expect(cards.length).toBe(5);
 
       // Hiển thị ô mở rộng +2
       const overflowBadge = container.querySelector('.card-overflow-badge');
@@ -473,7 +508,8 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
           { id: 'c3', name: 'C3', type: 'basic', suit: 'spade', rank: '3' },
           { id: 'c4', name: 'C4', type: 'basic', suit: 'spade', rank: '4' },
           { id: 'c5', name: 'C5', type: 'basic', suit: 'spade', rank: '5' },
-          { id: 'c6', name: 'C6', type: 'basic', suit: 'spade', rank: '6' }
+          { id: 'c6', name: 'C6', type: 'basic', suit: 'spade', rank: '6' },
+          { id: 'c7', name: 'C7', type: 'basic', suit: 'spade', rank: '7' }
         ]
       };
 
@@ -492,8 +528,8 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
       const overflowBadge = container.querySelector('.card-overflow-badge');
       fireEvent.click(overflowBadge);
 
-      // Modal hiển thị đủ 6 lá
-      const modalTitle = screen.getByText(/Toàn Bộ Bài Trên Tay \(6 Lá\)/i);
+      // Modal hiển thị đủ 7 lá
+      const modalTitle = screen.getByText(/Toàn Bộ Bài Trên Tay \(7 Lá\)/i);
       expect(modalTitle).toBeTruthy();
 
       // Nút thu gọn đóng modal
@@ -501,7 +537,7 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
       expect(closeBtn).toBeTruthy();
       fireEvent.click(closeBtn);
 
-      expect(screen.queryByText(/Toàn Bộ Bài Trên Tay \(6 Lá\)/i)).toBeNull();
+      expect(screen.queryByText(/Toàn Bộ Bài Trên Tay \(7 Lá\)/i)).toBeNull();
     });
   });
 

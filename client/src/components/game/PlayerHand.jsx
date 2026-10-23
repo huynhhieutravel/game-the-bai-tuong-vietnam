@@ -105,12 +105,13 @@ export function PlayerHand(props) {
 
     const [isExpanded, setIsExpanded] = useState(false);
     
-    // Quy tắc v3: Nếu bài trên tay nhiều hơn 5 lá (> 5 lá):
-    // Hiển thị 4 lá đầu tiên + 1 ô mở rộng "+N" (ví dụ có 6 lá thì hiển thị 4 lá + ô "+2")
-    // Giữ số lượng thẻ tối đa trên thanh tay luôn là 5, không bao giờ bị đè tràn lấn vào Hero Dock hay Action Hub
-    const hasOverflow = !isExpanded && me.hand.length > 5;
-    const displayCards = hasOverflow ? me.hand.slice(0, 4) : me.hand;
-    const hiddenCount = me.hand.length - 4;
+    // Quy tắc tối ưu: Cố định hiển thị đầy đủ tối thiểu 6 thẻ bài trực tiếp trên thanh tay.
+    // Chỉ kích hoạt thu gọn khi số lá > 6 (từ 7 lá trở lên) để đảm bảo 6 lá luôn nhìn thấy trọn vẹn:
+    // Hiển thị 5 lá đầu tiên + 1 ô mở rộng "+N" (ví dụ có 7 lá thì hiển thị 5 lá + ô "+2")
+    const FOLD_THRESHOLD = 6;
+    const hasOverflow = !isExpanded && me.hand.length > FOLD_THRESHOLD;
+    const displayCards = hasOverflow ? me.hand.slice(0, 5) : me.hand;
+    const hiddenCount = me.hand.length - 5;
 
     return (
         <>
