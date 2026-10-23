@@ -1,4 +1,5 @@
 import { getSuitEmoji } from 'shared/constants/cardTypes';
+import { getCardBg, getBadgeColor } from 'shared/utils/cardStyles';
 // @ts-check
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from "react-router-dom";
@@ -371,28 +372,38 @@ export default function GameView() {
           </div>
 
           <div className="played-cards" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', minHeight: isLandscapeMobile ? (gameState.playedCards?.length ? '65px' : '0px') : '120px', alignItems: 'center' }}>
-            {gameState.playedCards?.map((card, i) => (
-              <div
-                key={`${card.id}-${i}`}
-                className={`card ${card.type}`}
-                style={{
-                  transform: `rotate(${Math.random() * 10 - 5}deg) scale(0.9) translate(${Math.random() * 20 - 10}px, ${Math.random() * 20 - 10}px)`,
-                  margin: '-15px',
-                  boxShadow: '0 5px 15px rgba(0,0,0,0.5)',
-                  cursor: 'pointer'
-                }}
-                title={`${card.name}: ${card.desc}`}
-                onClick={() => setCardPopup(card)}
-              >
-                <div className="card-suit-corner" style={{ position: 'absolute', top: '4px', left: '6px', fontSize: '0.75rem', color: card.color === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.85)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-                  {getSuitEmoji(card.suit)} {card.rank}
+            {gameState.playedCards?.map((card, i) => {
+              const bg = getCardBg(card.name);
+              return (
+                <div
+                  key={`${card.id}-${i}`}
+                  className={`card ${card.type}`}
+                  style={{
+                    ...(bg ? { backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' } : {}),
+                    transform: `rotate(${Math.random() * 10 - 5}deg) scale(0.9) translate(${Math.random() * 20 - 10}px, ${Math.random() * 20 - 10}px)`,
+                    margin: '-15px',
+                    boxShadow: '0 5px 15px rgba(0,0,0,0.5)',
+                    cursor: 'pointer'
+                  }}
+                  title={`${card.name}: ${card.desc}`}
+                  onClick={() => setCardPopup(card)}
+                >
+                  <div className="card-suit-corner" style={{ position: 'absolute', top: '3px', left: '4px', fontSize: '0.7rem', color: card.color === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.9)', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)', zIndex: 4 }}>
+                    {getSuitEmoji(card.suit)} {card.rank}
+                  </div>
+                  {bg ? (
+                    <div style={{ position: 'absolute', bottom: '4px', left: '2px', right: '2px', background: getBadgeColor(card), color: '#ffffff', padding: '1px 3px', borderRadius: '4px', fontSize: '0.62rem', fontWeight: 'bold', textAlign: 'center', border: '1px solid rgba(255,255,255,0.4)', zIndex: 4, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                      {card.name}
+                    </div>
+                  ) : (
+                    <div className="card-inner" style={{ paddingTop: '12px' }}>
+                      <span className="card-icon">{card.emoji}</span>
+                      <span className="card-name">{card.name}</span>
+                    </div>
+                  )}
                 </div>
-                <div className="card-inner" style={{ paddingTop: '12px' }}>
-                  <span className="card-icon">{card.emoji}</span>
-                  <span className="card-name">{card.name}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {(gameState.playedCards?.length || 0) === 0 && targetSession && (
               <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.8)', fontStyle: 'italic', background: 'rgba(0,0,0,0.5)', padding: '5px 10px', borderRadius: '5px' }}>
                 {targetSession.targetingDef?.steps?.[targetSession.step]?.message || targetSession.message || '🎯 Hãy chọn 1 mục tiêu...'}

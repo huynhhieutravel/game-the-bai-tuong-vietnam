@@ -1486,13 +1486,23 @@ body {
   }
   
   .card {
-    width: 48px !important;
-    height: 68px !important;
+    width: 64px !important;
+    height: 90px !important;
     font-size: 0.75rem !important;
+    border-radius: 6px !important;
   }
   
   .player-hand-area {
-    padding: 2px var(--space-md);
+    padding: 0 4px 2px 4px !important;
+  }
+
+  .player-hand-area::before {
+    height: 95px !important;
+  }
+
+  .hand-cards {
+    padding: 2px 0 4px 0 !important;
+    gap: 5px !important;
   }
 }
 

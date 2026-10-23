@@ -919,5 +919,22 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
   - **Khái niệm:** Huy hiệu thông báo thời gian phản hồi cố định (`top: 20px, right: 20px`, `zIndex: 99999`) hiển thị số giây còn lại (`⏳ {timeLeft}s`) trong suốt quá trình một Modal tương tác đang mở.
   - **Cảnh báo động thái:** Khi thời gian còn $\le 5$ giây, huy hiệu tự động kích hoạt trạng thái cảnh báo khẩn cấp: viền đỏ rực (`#ef4444`), phát sáng nhẹ và nền đỏ mờ, giúp người chơi nhanh chóng nhận biết và kịp thời ra quyết định.
 
+---
+
+## 63. Kiến Trúc Giao Diện Di Động Cockpit (Mobile Battlefield Cockpit Architecture)
+
+- **🕹️ Cockpit Layout (Bố Cục Cockpit Di Động):**
+  - **Khái niệm:** Hệ thống phân bổ giao diện bàn chơi tối ưu cho màn hình cảm ứng di động xoay ngang (Landscape), loại bỏ hoàn toàn thanh trạng thái chia đôi màn hình ở giữa và phân rã thành 4 phân vùng công thái học: `Hero Dock` (trái dưới), `Hand Fan` (giữa dưới), `Action Hub` (phải dưới), và `Arena Field` (nửa trên).
+- **🛡️ Hero Dock (Bến Tướng & Khí Giới):**
+  - **Khái niệm:** Phân vùng góc dưới bên trái neo giữ 2 thẻ Tướng (Chính Tướng & Phó Tướng), thanh máu kết hợp (HP), huy hiệu Phe phái và 4 ô trang bị (Vũ khí, Giáp, Ngựa công, Ngựa thủ). Giúp người chơi theo dõi toàn bộ tài nguyên phòng thủ của mình trong một tầm mắt duy nhất mà không chiếm diện tích trung tâm.
+- **🃏 Hand Fan (Khay Bài Cung Xòe Tự Thích Ứng):**
+  - **Khái niệm:** Khay bài trên tay neo ở mép đáy chính giữa, tự động co giãn kích thước thẻ bài và kích thước phông chữ (Fluid Typography) theo số lượng bài hiện có. Áp dụng hiệu ứng nhô cao (Card Elevation) khi chạm chọn và loại bỏ hoàn toàn hiện tượng tràn khung hoặc cắt cụt tên thẻ bài (ví dụ: `Ngựa Chiến (-1)`).
+- **⚡ Action Hub (Trung Tâm Kích Hoạt Ngón Cái):**
+  - **Khái niệm:** Cụm điều khiển tập trung ở góc dưới bên phải, gồm nút kích hoạt Kỹ Năng Tướng, nút Lật Mặt Tướng và nút Kết Thúc Lượt (`⏭️`). Đặt tại vị trí công thái học thuận lợi nhất cho ngón cái tay phải của game thủ mobile.
+- **🏟️ Arena Field (Chiến Trường Trung Tâm Vòng Cung):**
+  - **Khái niệm:** Không gian bàn đấu chính ở nửa trên màn hình. Các đối thủ (Bot / Người chơi khác) được bố trí theo hình cánh cung cân đối quanh bàn tiệc, kèm thanh HP trực quan và số bài trên tay. Khu vực giữa bàn dành trọn cho các thẻ bài vừa xuất kích và thông báo hiệu ứng.
+- **🔍 Hero Inspector (Bảng Chi Tiết Tướng Toàn Cảnh):**
+  - **Khái niệm:** Bảng thông tin chi tiết kích hoạt khi chạm vào thẻ tướng trong màn chọn tướng (DraftScreen) hoặc trên bàn chơi. Hiển thị phóng to chân dung tướng cùng toàn bộ văn bản kỹ năng với phông chữ lớn, sắc nét, có độ tương phản cao, giải quyết triệt để lỗi không đọc được chữ nhỏ trên thẻ bài giấy.
+
 
 

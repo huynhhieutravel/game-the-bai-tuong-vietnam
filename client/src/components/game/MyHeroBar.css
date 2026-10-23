@@ -1,44 +1,52 @@
 /* ============================================
-   MyHeroBar Component Styles
+   MyHeroBar Component Styles — Cockpit Architecture
    DO NOT MODIFY THESE STYLES TO CHANGE GAME LOGIC
    ============================================ */
 
 .my-hero-bar {
   display: flex;
-  gap: 20px;
-  align-items: stretch;
-  width: 100%;
-}
-
-.my-hero-main-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 15px;
-}
-
-.my-hero-top-actions {
-  display: flex;
+  align-items: flex-end;
   justify-content: space-between;
-  align-items: center;
+  gap: 12px;
   width: 100%;
+}
+
+/* ZONE 1: HERO DOCK (Left) */
+.my-hero-dock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   background: var(--color-bg-glass);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 10px 15px;
+  padding: 8px 12px;
   backdrop-filter: blur(12px);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.my-hero-dock-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.my-hero-dock-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .my-hero-equipment-area {
   display: flex;
-  gap: 15px;
+  gap: 8px;
 }
 
 .my-hero-equip-slot {
-  width: 50px;
-  height: 50px;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -86,7 +94,7 @@
 .my-hero-equip-badge {
   font-size: 0.5rem;
   color: #f1f5f9;
-  text-shadow: 0 0 4px rgba(0,0,0,1);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 1);
   background: transparent;
   border-radius: 2px;
   padding: 1px 3px;
@@ -101,11 +109,11 @@
 }
 
 .my-hero-equip-badge.has-bg {
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .my-hero-equip-emoji {
-  font-size: 1.4rem;
+  font-size: 1.2rem;
   margin-top: 2px;
 }
 
@@ -117,39 +125,75 @@
   line-height: 1.1;
 }
 
+/* ZONE 2: HAND FAN (Center) */
+.my-hero-hand-zone {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  min-width: 0;
+  overflow: visible;
+  z-index: 15;
+}
+
+.my-hero-hand-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ZONE 3: ACTION HUB (Right) */
+.my-hero-action-hub {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  background: var(--color-bg-glass);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+  z-index: 20;
+}
+
 .my-hero-action-buttons {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
-  flex: 1;
-}
-
-.my-hero-bottom-row {
-  display: flex;
+  flex-direction: column;
+  gap: 6px;
   width: 100%;
-  align-items: flex-end;
-  height: 200px;
 }
 
+.my-hero-action-buttons .btn-action {
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  font-weight: bold;
+  min-width: 80px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+/* AVATARS */
 .my-hero-avatars {
   display: flex;
-  gap: 15px;
-  z-index: 10;
-  flex-shrink: 0;
+  gap: 8px;
 }
 
 .my-hero-avatar-card {
-  position: relative;
-  width: 140px;
-  height: 200px;
-  background: rgba(0,0,0,0.5);
+  width: 65px;
+  height: 92px;
+  background: var(--color-bg-card);
+  border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
-  border: 2px solid var(--color-gold-dark);
+  position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
   outline-offset: 2px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .my-hero-avatar-card.targetable {
@@ -177,19 +221,19 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 2rem;
+  font-size: 1.8rem;
 }
 
 .my-hero-judgement-area {
-  top: -10px;
-  left: -10px;
+  top: 4px;
+  left: 4px;
   z-index: 20;
 }
 
 .my-hero-judgement-item {
-  width: 24px;
-  height: 24px;
-  font-size: 0.8rem;
+  width: 20px;
+  height: 20px;
+  font-size: 0.75rem;
 }
 
 .my-hero-silence-overlay {
@@ -197,12 +241,12 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 2.5rem;
-  background: rgba(0,0,0,0.5);
-  padding: 10px;
+  font-size: 2rem;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px;
   border-radius: 50%;
   z-index: 10;
-  filter: drop-shadow(0 0 10px rgba(0,0,0,0.8));
+  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.8));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -222,8 +266,8 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  font-size: 3.5rem;
-  filter: drop-shadow(0 0 5px rgba(0,0,0,1));
+  font-size: 2.5rem;
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 1));
   opacity: 0.9;
 }
 
@@ -236,7 +280,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -244,337 +288,103 @@
 }
 
 .my-hero-reveal-btn {
-  padding: 8px 16px;
-  font-size: 1rem;
+  padding: 4px 8px;
+  font-size: 0.8rem;
   font-weight: bold;
 }
 
-.my-hero-bottom-hand {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-end;
-  margin-left: 30px;
-}
-
-.my-hero-hand-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.my-hero-right-details {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  width: 350px;
-  flex-shrink: 0;
-  background: var(--color-bg-glass);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-}
-
-.my-hero-names-container {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-
-.my-hero-name-text {
-  font-size: 1.3rem;
-  color: var(--color-gold);
-  font-weight: bold;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.my-hero-faction-tags {
-  display: flex;
-  gap: 10px;
-  margin: 8px 0;
-  flex-wrap: wrap;
-}
-
+/* FACTION & HP */
 .my-hero-faction-tag {
-  font-size: 0.9rem;
-  padding: 5px 12px;
-  border-radius: 4px;
-  color: white;
+  font-size: 0.68rem;
   font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
 }
-.my-hero-faction-tag.datam { background: #9ca3af; }
-.my-hero-faction-tag.lac { background: #10b981; }
-.my-hero-faction-tag.son { background: #b45309; }
-.my-hero-faction-tag.ha { background: #3b82f6; }
-.my-hero-faction-tag.default { background: #ef4444; }
-.my-hero-faction-tag.unrevealed { background: #4b5563; }
+
+.my-hero-faction-tag.lac { background: #10b981; color: white; }
+.my-hero-faction-tag.son { background: #b45309; color: white; }
+.my-hero-faction-tag.ha { background: #3b82f6; color: white; }
+.my-hero-faction-tag.viet { background: #ef4444; color: white; }
+.my-hero-faction-tag.datam { background: #9ca3af; color: white; }
+.my-hero-faction-tag.default { background: #4b5563; color: white; }
+.my-hero-faction-tag.unrevealed { background: rgba(0, 0, 0, 0.6); color: #f59e0b; border: 1px dashed #f59e0b; }
 
 .my-hero-hp-bar {
-  margin-top: 15px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .my-hero-hp-hearts {
   display: flex;
   align-items: center;
-  gap: 3px;
-}
-
-.my-hero-hp-pip {
-  width: 20px;
-  height: 20px;
-  margin: 0 3px;
-  border-radius: 50%;
-  background: #ef4444;
-  box-shadow: 0 0 5px #ef4444;
-}
-
-.my-hero-hp-pip.lost {
-  background: #374151;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
+  gap: 2px;
 }
 
 .my-hero-hp-text {
-  font-size: 0.95rem;
-  font-weight: 800;
-  color: #f1f5f9;
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  padding: 1px 7px;
-  border-radius: 4px;
-  margin-left: 6px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--color-gold);
 }
 
 .my-hero-wine-status {
-  margin-left: 12px;
-  font-size: 1.2rem;
-  color: #ef4444;
-  font-weight: bold;
-  text-shadow: 0 0 5px red;
+  font-size: 0.75rem;
+  color: #c084fc;
 }
 
+/* COMBAT STATS */
 .my-hero-stats-box {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 20px;
-  font-size: 1.05rem;
-  color: var(--color-text-secondary);
-  background: rgba(0,0,0,0.5);
-  padding: 15px 18px;
-  border-radius: 8px;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.72rem;
 }
 
 .my-hero-stat-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 3px;
 }
 
 .my-hero-stat-label {
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-.my-hero-stat-label.atk { color: #ef4444; }
-.my-hero-stat-label.def { color: #3b82f6; }
-
-.my-hero-stat-value {
-  color: white;
-  font-size: 1.1rem;
-  font-weight: bold;
+  gap: 2px;
+  color: var(--color-text-muted);
 }
 
-.my-hero-skills-box {
-  margin-top: 15px;
-  background: rgba(0,0,0,0.4);
-  padding: 10px 15px;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  color: #d1d5db;
-  max-height: 180px;
-  overflow-y: auto;
-}
-
-.my-hero-skills-title {
-  color: var(--color-gold);
-  margin-bottom: 8px;
-  font-weight: bold;
-}
-
-.my-hero-skill-row {
-  margin-bottom: 8px;
-  line-height: 1.4;
-}
-
-.my-hero-skill-name {
-  color: #10b981;
-}
+.my-hero-stat-label.atk { color: #f87171; }
+.my-hero-stat-label.def { color: #60a5fa; }
+.my-hero-stat-value { font-weight: bold; color: #ffffff; }
 
 /* ============================================
-   Responsive — Mobile Portrait (max-width: 768px) & Landscape (max-height: 520px)
+   RESPONSIVE: MOBILE PORTRAIT & LANDSCAPE
    ============================================ */
 @media (max-width: 768px), (max-height: 520px) {
   .my-hero-bar {
-    flex-direction: column;
-    gap: 4px;
-    width: 100%;
-  }
-
-  /* Biến Right Details thành Header Info Bar thanh lịch ở phía trên */
-  .my-hero-right-details {
-    order: -1;
-    width: 100%;
-    padding: 4px 8px;
-    border-radius: var(--radius-sm);
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 4px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    min-width: 0;
-  }
-
-  .my-hero-names-container {
-    margin-bottom: 0;
-    flex-direction: row;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  .my-hero-name-text {
-    font-size: 0.8rem;
-    max-width: 90px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .my-hero-faction-tags {
-    margin: 0;
-    gap: 3px;
-  }
-
-  .my-hero-faction-tag {
-    font-size: 0.65rem;
-    padding: 2px 5px;
-    border-radius: 3px;
-  }
-
-  .my-hero-hp-bar {
-    margin-top: 0;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .my-hero-hp-hearts {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-  }
-
-  .my-hero-hp-pip {
-    width: 9px;
-    height: 9px;
-    margin: 0 1px;
-  }
-
-  .my-hero-hp-text {
-    font-size: 0.72rem;
-    padding: 0 4px;
-    margin-left: 2px;
-  }
-
-  .my-hero-stats-box {
-    margin-top: 0;
-    padding: 2px 6px;
-    flex-direction: row;
     gap: 6px;
-    font-size: 0.7rem;
-    border-radius: 4px;
-  }
-
-  .my-hero-stat-row {
-    gap: 2px;
-  }
-
-  .my-hero-stat-value {
-    font-size: 0.75rem;
-  }
-
-  /* Main area */
-  .my-hero-main-area {
-    gap: 4px;
-    width: 100%;
-  }
-
-  /* Top actions row: Equipments & Action buttons */
-  .my-hero-top-actions {
-    padding: 4px 6px;
-    gap: 4px;
-    border-radius: var(--radius-sm);
-  }
-
-  .my-hero-equipment-area {
-    gap: 4px;
-  }
-
-  .my-hero-equip-slot {
-    width: 32px;
-    height: 32px;
-    border-radius: 4px;
-  }
-
-  .my-hero-equip-icon-empty {
-    font-size: 1.1rem;
-  }
-
-  .my-hero-equip-emoji {
-    font-size: 0.95rem;
-  }
-
-  .my-hero-equip-name {
-    display: none;
-  }
-
-  .my-hero-action-buttons {
-    gap: 4px;
-  }
-
-  .my-hero-action-buttons .btn-action {
-    padding: 4px 8px;
-    font-size: 0.75rem;
-    min-width: 65px;
-    border-radius: 4px;
-  }
-
-  /* Bottom row: Avatars & Hand */
-  .my-hero-bottom-row {
-    height: auto;
-    min-height: 85px;
     align-items: flex-end;
+    padding: 0 4px 4px 4px;
+  }
+
+  .my-hero-dock {
+    padding: 4px 6px;
     gap: 6px;
-    width: 100%;
+    border-radius: 8px;
   }
 
   .my-hero-avatars {
-    gap: 5px;
+    gap: 4px;
   }
 
   .my-hero-avatar-card {
-    width: 58px;
-    height: 82px;
+    width: 48px;
+    height: 68px;
     border-radius: 6px;
   }
 
@@ -583,50 +393,86 @@
   }
 
   .my-hero-reveal-btn {
-    padding: 3px 6px;
-    font-size: 0.7rem;
+    padding: 2px 4px;
+    font-size: 0.65rem;
   }
 
-  .my-hero-bottom-hand {
-    margin-left: 0;
+  .my-hero-dock-info {
+    gap: 3px;
+  }
+
+  .my-hero-dock-badges {
+    gap: 4px;
+  }
+
+  .my-hero-faction-tag {
+    font-size: 0.6rem;
+    padding: 1px 4px;
+  }
+
+  .my-hero-hp-bar {
+    gap: 2px;
+  }
+
+  .my-hero-hp-text {
+    font-size: 0.68rem;
+  }
+
+  .my-hero-equipment-area {
+    gap: 3px;
+  }
+
+  .my-hero-equip-slot {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+  }
+
+  .my-hero-equip-name {
+    display: none;
+  }
+
+  .my-hero-hand-zone {
     flex: 1;
     min-width: 0;
-    overflow-x: auto;
-    width: calc(100% - 130px);
   }
 
-  .my-hero-hand-wrapper {
-    width: 100%;
+  .my-hero-action-hub {
+    padding: 4px 6px;
+    gap: 4px;
+    border-radius: 8px;
+  }
+
+  .my-hero-action-buttons {
+    gap: 3px;
+  }
+
+  .my-hero-action-buttons .btn-action {
+    padding: 3px 6px;
+    font-size: 0.7rem;
+    min-width: 52px;
+    border-radius: 4px;
+  }
+
+  .my-hero-stats-box {
+    padding: 1px 4px;
+    gap: 4px;
+    font-size: 0.65rem;
   }
 }
 
-@media (max-height: 520px) {
-  .my-hero-bar {
-    gap: 2px !important;
-  }
-  .my-hero-right-details {
-    padding: 2px 6px !important;
-    gap: 2px !important;
-  }
-  .my-hero-top-actions {
-    padding: 2px 6px !important;
-    gap: 3px !important;
+@media (max-height: 440px) {
+  .my-hero-avatar-card {
+    width: 42px !important;
+    height: 60px !important;
   }
   .my-hero-equip-slot {
-    width: 28px !important;
-    height: 28px !important;
+    width: 21px !important;
+    height: 21px !important;
   }
   .my-hero-action-buttons .btn-action {
-    padding: 2px 6px !important;
-    font-size: 0.72rem !important;
-    min-width: 52px !important;
-  }
-  .my-hero-bottom-row {
-    min-height: 72px !important;
-    gap: 4px !important;
-  }
-  .my-hero-avatar-card {
-    width: 50px !important;
-    height: 70px !important;
+    padding: 2px 5px !important;
+    font-size: 0.65rem !important;
+    min-width: 46px !important;
   }
 }

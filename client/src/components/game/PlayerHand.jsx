@@ -19,6 +19,55 @@ function getBadgeColor(card) {
   return 'rgba(0,0,0,0.5)';
 }
 
+// Bounded, auto-scaling card name badge preventing text clipping on mobile
+function renderCardNameBadge(card) {
+  const name = card.name || '';
+  const len = name.length;
+  let fontSize = '0.78rem';
+  let lineHeight = '1.15';
+  let padding = '2px 3px';
+  if (len > 11) {
+    fontSize = '0.56rem';
+    lineHeight = '1.05';
+    padding = '1px 2px';
+  } else if (len > 6) {
+    fontSize = '0.66rem';
+    lineHeight = '1.1';
+    padding = '2px 2px';
+  }
+
+  return (
+    <div 
+      className="card-name-pill"
+      style={{ 
+        position: 'absolute', 
+        bottom: '4px', 
+        left: '2px', 
+        right: '2px', 
+        background: getBadgeColor(card), 
+        color: '#ffffff', 
+        padding, 
+        borderRadius: '5px', 
+        fontSize, 
+        lineHeight, 
+        fontWeight: 'bold', 
+        textAlign: 'center', 
+        wordBreak: 'break-word', 
+        whiteSpace: 'normal', 
+        border: '1px solid rgba(255,255,255,0.45)', 
+        boxShadow: '0 2px 4px rgba(0,0,0,0.6)',
+        zIndex: 5,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '18px'
+      }}
+    >
+      {name}
+    </div>
+  );
+}
+
 // @ts-check
 /** 
  * @typedef {import('../../engine/types/view/PlayerViewModel').PlayerViewModel} PlayerViewModel
@@ -121,15 +170,10 @@ export function PlayerHand(props) {
                         }}
                         title={`${card.name}: ${card.desc}`}
                     >
-                        <div className="card-suit-corner" style={{ position: 'absolute', top: '4px', left: '6px', fontSize: '0.75rem', color: card.color === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.85)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                        <div className="card-suit-corner" style={{ position: 'absolute', top: '3px', left: '4px', fontSize: '0.7rem', color: card.color === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.9)', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)', zIndex: 4 }}>
                         {getSuitEmoji(card.suit)} {card.rank}
                         </div>
-                        {getCardBg(card.name) && (
-                        <div style={{ position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)', background: getBadgeColor(card), color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 'bold', whiteSpace: 'nowrap', border: '1px solid rgba(255,255,255,0.4)', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-                            {card.name}
-                        </div>
-                        )}
-                        {!getCardBg(card.name) && (
+                        {getCardBg(card.name) ? renderCardNameBadge(card) : (
                         <div className="card-inner" style={{ paddingTop: '12px' }}>
                             <span className="card-icon">{card.emoji}</span>
                             <span className="card-name">{card.name}</span>
@@ -250,15 +294,10 @@ export function PlayerHand(props) {
                                 }}
                                 title={`${card.name}: ${card.desc}`}
                             >
-                                <div className="card-suit-corner" style={{ position: 'absolute', top: '4px', left: '6px', fontSize: '0.75rem', color: card.color === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.85)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                                <div className="card-suit-corner" style={{ position: 'absolute', top: '3px', left: '4px', fontSize: '0.7rem', color: card.color === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.9)', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)', zIndex: 4 }}>
                                 {getSuitEmoji(card.suit)} {card.rank}
                                 </div>
-                                {getCardBg(card.name) && (
-                                <div style={{ position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)', background: getBadgeColor(card), color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 'bold', whiteSpace: 'nowrap', border: '1px solid rgba(255,255,255,0.4)', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-                                    {card.name}
-                                </div>
-                                )}
-                                {!getCardBg(card.name) && (
+                                {getCardBg(card.name) ? renderCardNameBadge(card) : (
                                 <div className="card-inner" style={{ paddingTop: '12px' }}>
                                     <span className="card-icon">{card.emoji}</span>
                                     <span className="card-name">{card.name}</span>
