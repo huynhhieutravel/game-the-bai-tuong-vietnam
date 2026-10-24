@@ -40,24 +40,133 @@ export function PlayerBoard({
     const isTargetable = targetSession?.validTargets.includes(player.id);
     const isSelected = targetSession?.selectedTargets.includes(player.id);
 
+    // Support both Array and Object equipment structures
+    const getEquipCard = (slotType) => {
+        if (!player.equipment) return null;
+        if (Array.isArray(player.equipment)) {
+            return player.equipment.find(c => getCardSubType(c) === slotType);
+        }
+        return player.equipment[slotType] || player.equipment[slotType.replace('equip_', '')];
+    };
+
+    const getFactionColor = (faction, isDaTam) => {
+        if (isDaTam) return '#9ca3af';
+        if (faction === 'Lạc') return '#10b981';
+        if (faction === 'Sơn') return '#b45309';
+        if (faction === 'Hà') return '#3b82f6';
+        if (faction === 'Việt') return '#ef4444';
+        return '#64748b';
+    };
+
+    const renderHeroSlot = (slotIdx) => {
+        const isRevealed = Boolean(player.revealedHeroes?.[slotIdx]);
+        const hero = player.heroes?.[slotIdx];
+        const roleLabel = slotIdx === 0 ? 'Chính' : 'Phó';
+
+        if (!isRevealed) {
+            return (
+                <div 
+                    key={slotIdx}
+                    className="opponent-hero-slot facedown"
+                    style={{
+                        width: '54px',
+                        height: '76px',
+                        borderRadius: '6px',
+                        background: 'linear-gradient(145deg, #1e293b 0%, #0b1120 100%)',
+                        border: '1.5px solid rgba(212, 168, 67, 0.45)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
+                        boxShadow: 'inset 0 0 10px rgba(0,0,0,0.8), 0 2px 6px rgba(0,0,0,0.5)',
+                        userSelect: 'none'
+                    }}
+                    title={`Tướng ${roleLabel}: Chưa lộ diện (Bấm để xem thông tin)`}
+                >
+                    <div style={{ fontSize: '1.4rem', opacity: 0.85, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))' }}>
+                        🕵️
+                    </div>
+                    <div style={{ fontSize: '0.52rem', color: '#f59e0b', fontWeight: 'bold', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        {roleLabel} Ẩn
+                    </div>
+                </div>
+            );
+        }
+
+        const heroFaction = hero?.faction || player.faction || 'none';
+        const borderColor = getFactionColor(heroFaction, player.isDaTam);
+
+        return (
+            <div 
+                key={slotIdx}
+                className="opponent-hero-slot faceup"
+                style={{
+                    width: '54px',
+                    height: '76px',
+                    borderRadius: '6px',
+                    background: '#0f172a',
+                    border: `1.5px solid ${borderColor}`,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    boxShadow: `0 2px 8px ${borderColor}40`,
+                    userSelect: 'none'
+                }}
+                title={`${hero?.name || 'Võ Tướng'} (${roleLabel} Tướng) - Bấm để xem chi tiết`}
+            >
+                {hero?.image ? (
+                    <img 
+                        src={`/images/heroes/${hero.image}`} 
+                        alt={hero.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }}
+                    />
+                ) : (
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem' }}>
+                        {hero?.emoji || '⚔️'}
+                    </div>
+                )}
+                <div 
+                    style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 70%, transparent 100%)',
+                        padding: '2px 1px',
+                        textAlign: 'center',
+                        fontSize: '0.55rem',
+                        fontWeight: 'bold',
+                        color: '#ffffff',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                    }}
+                >
+                    {hero?.name || `Tướng ${slotIdx + 1}`}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div
             className={`player-zone ${isCurrentTurn ? 'is-current-turn' : ''} ${!player.isAlive ? 'dead' : ''} ${className || ''} ${animationClass || ''}`}
             style={{
               ...style,
-              cursor: isTargetable ? 'crosshair' : 'default',
+              cursor: isTargetable ? 'crosshair' : 'pointer',
               outline: isSelected ? '3px solid var(--color-gold)' : (isTargetable ? '3px dashed #ef4444' : 'none'),
               outlineOffset: '4px',
-              borderRadius: 'var(--radius-lg)'
+              borderRadius: '10px'
             }}
             onClick={() => {
               if (isTargetable) {
                 handleTargetClick(player.id);
-              } else if (player.isRevealed) {
+              } else {
                 setHeroPopup(player);
               }
             }}
           >
+            {/* Target Distance Indicator */}
             {(() => {
                if (!isTargetable) return null;
                
@@ -66,7 +175,6 @@ export function PlayerBoard({
                
                if (virtualName === 'Chém' || virtualName === null) {
                   const hasNoThanOrThuyTo = me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'no-than' || s.id === 'thuy-to'));
-                  // Note: rankToNumber will need to be imported or handled
                   if (hasNoThanOrThuyTo && targetSession.card) {
                       const rankMap = { 'A': 1, 'J': 11, 'Q': 12, 'K': 13 };
                       const r = rankMap[targetSession.card.rank] || parseInt(targetSession.card.rank, 10);
@@ -74,179 +182,175 @@ export function PlayerBoard({
                   }
                }
                return (
-                 <div style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: '#ef4444', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', zIndex: 10, fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                   ⚔️ Tầm đánh: {rng} 🛡️ Khoảng cách: {player.distanceFromMe}
+                 <div className="target-distance-banner" style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', background: '#ef4444', color: 'white', padding: '3px 8px', borderRadius: '4px', fontSize: '0.72rem', zIndex: 30, fontWeight: 'bold', whiteSpace: 'nowrap', boxShadow: '0 2px 6px rgba(0,0,0,0.5)' }}>
+                   ⚔️ Tầm: {rng} | 🛡️ Cự ly: {player.distanceFromMe}
                  </div>
                );
             })()}
-            <div className="player-name">
-              {player.name}
-              {isCurrentTurn && ' 🎯'}
+
+            {/* Header: Player Name + Faction Badge */}
+            <div className="player-header-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '4px', marginBottom: '2px' }}>
+              <div className="player-name" style={{ fontSize: '0.75rem', fontWeight: 'bold', color: isCurrentTurn ? 'var(--color-gold)' : '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '80px' }}>
+                {player.name}
+                {isCurrentTurn && ' 🎯'}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                {!player.isRevealed ? (
+                  <span className="player-faction-badge unrevealed" style={{ fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', background: '#334155', color: '#cbd5e1', fontWeight: 'bold' }}>
+                    🕵️ ẨN
+                  </span>
+                ) : (
+                  <span className={`player-faction-badge ${player.faction?.toLowerCase()}`} style={{ fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', background: getFactionColor(player.faction, player.isDaTam), color: 'white', fontWeight: 'bold' }}>
+                    {player.isDaTam ? '🐺 DÃ TÂM' : player.faction?.toUpperCase()}
+                  </span>
+                )}
+                {player.isRevealed && me.faction && player.faction && (
+                  <span style={{ fontSize: '0.52rem', color: (me.faction === player.faction && !me.isDaTam && !player.isDaTam) ? '#10b981' : '#f87171', fontWeight: 'bold' }}>
+                    {(me.faction === player.faction && !me.isDaTam && !player.isDaTam) ? '🤝' : '⚔️'}
+                  </span>
+                )}
+              </div>
             </div>
-            {(() => {
-              /** @type {import('react').CSSProperties & { '--color-border'?: string }} */
-              const heroCardStyle = {
-                position: 'relative',
-                '--color-border': player.isRevealed ? (player.isDaTam ? '#9ca3af' : (player.faction === 'Lạc' ? '#10b981' : player.faction === 'Sơn' ? '#b45309' : player.faction === 'Hà' ? '#3b82f6' : '#ef4444')) : 'var(--color-border)'
-              };
-              return (
-                <div className={`hero-card ${!player.isAlive ? 'dead' : ''} ${!player.isRevealed ? 'hidden' : ''} ${player.isFlipped ? 'flipped' : ''}`} style={heroCardStyle}>
-              
+
+            {/* Dual Hero Container (Hình chữ nhật chứa 2 thẻ tướng Chính & Phó) */}
+            <div 
+              className="opponent-dual-hero-frame" 
+              style={{ 
+                display: 'flex', 
+                gap: '5px', 
+                position: 'relative', 
+                width: '100%', 
+                justifyContent: 'center',
+                background: 'rgba(0, 0, 0, 0.45)',
+                padding: '4px',
+                borderRadius: '8px',
+                border: `1.5px solid ${player.isRevealed ? getFactionColor(player.faction, player.isDaTam) : 'rgba(255,255,255,0.18)'}`,
+                boxSizing: 'border-box'
+              }}
+            >
+              {/* Overlays for Silenced & Chained */}
               {player.isSilenced && (
-                 <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: '2.5rem', background: 'rgba(0,0,0,0.5)', padding: '10px', borderRadius: '50%', zIndex: 10, filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.8))', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Kỹ năng bị khóa!">
-                   🔒
-                 </div>
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: '2rem', background: 'rgba(0,0,0,0.65)', padding: '6px', borderRadius: '50%', zIndex: 20 }} title="Kỹ năng bị khóa!">
+                  🔒
+                </div>
               )}
               {player.isChained && (
-                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 12, pointerEvents: 'none' }} title="Bị Xích!">
-                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%) rotate(45deg)', fontSize: '3.5rem', filter: 'drop-shadow(0 0 5px rgba(0,0,0,1))', opacity: 0.9 }}>⛓️</div>
-                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%) rotate(-45deg)', fontSize: '3.5rem', filter: 'drop-shadow(0 0 5px rgba(0,0,0,1))', opacity: 0.9 }}>⛓️</div>
-                 </div>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 18, pointerEvents: 'none' }} title="Bị Xích!">
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%) rotate(45deg)', fontSize: '2.5rem', opacity: 0.9 }}>⛓️</div>
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%) rotate(-45deg)', fontSize: '2.5rem', opacity: 0.9 }}>⛓️</div>
+                </div>
               )}
-              
-              {/* Judgement Area */}
-              <div className="judgement-area" style={{ display: 'flex', gap: '4px', position: 'absolute', top: '6px', left: '6px', zIndex: 15 }}>
-                {player.judgementArea && player.judgementArea.map((card, i) => {
-                  const icon = card.emoji || (card.name === 'Sấm Sét' ? '⚡' : card.name === 'Hỗn Loạn' ? '🌀' : '📜');
-                  return (
-                    <div 
-                      key={i} 
-                      className="judgement-item" 
-                      title={`${card.name}: Cẩm nang trì hoãn`}
-                      style={{
-                        background: 'rgba(0, 0, 0, 0.8)',
-                        border: '1px solid #f59e0b',
-                        borderRadius: '4px',
-                        padding: '2px 5px',
-                        fontSize: '0.85rem',
-                        boxShadow: '0 0 6px rgba(245, 158, 11, 0.7)',
-                        cursor: 'help'
-                      }}
-                    >
-                      {icon}
-                    </div>
-                  );
-                })}
-              </div>
 
-              <div className="hero-portrait" style={{ display: 'flex', width: '100%' }}>
-                {/* TƯỚNG 1 */}
-                <div className="hero-tooltip-container" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid rgba(255,255,255,0.1)' }}>
-                  {!player.revealedHeroes?.[0] ? (
-                     <div style={{ fontSize: '1.5rem' }}>🕵️</div>
-                  ) : (
-                    <>
-                      {player.heroes?.[0]?.image ? <img src={`/images/heroes/${player.heroes?.[0]?.image}`} style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center' }} /> : (player.heroes?.[0]?.emoji || '🕵️')}
-                      <div className="hero-tooltip-content" style={{ bottom: '110%', width: '220px' }}>
-                        <h4 style={{ margin: '0 0 5px 0', color: 'var(--color-gold)' }}>{player.heroes?.[0]?.name}</h4>
-                        {player.heroes?.[0]?.skills?.map((skill, idx) => (
-                          <div key={idx} style={{ marginBottom: '4px', fontSize: '0.75rem', lineHeight: '1.2', textAlign: 'left' }}>
-                            <strong style={{ color: 'var(--color-gold-light)' }}>{skill.name}:</strong> {skill.desc}
-                          </div>
-                        ))}
+              {/* Judgement Area */}
+              {player.judgementArea && player.judgementArea.length > 0 && (
+                <div className="judgement-area" style={{ display: 'flex', gap: '3px', position: 'absolute', top: '-10px', left: '2px', zIndex: 25 }}>
+                  {player.judgementArea.map((card, i) => {
+                    const icon = card.emoji || (card.name === 'Sấm Sét' ? '⚡' : card.name === 'Hỗn Loạn' ? '🌀' : '📜');
+                    return (
+                      <div 
+                        key={i} 
+                        className="judgement-item" 
+                        title={`${card.name}: Cẩm nang trì hoãn`} 
+                        style={{ 
+                          background: 'rgba(0,0,0,0.85)', 
+                          border: '1px solid #f59e0b', 
+                          borderRadius: '4px', 
+                          padding: '1px 4px', 
+                          fontSize: '0.75rem', 
+                          boxShadow: '0 0 6px rgba(245, 158, 11, 0.7)' 
+                        }}
+                      >
+                        {icon}
                       </div>
-                    </>
-                  )}
+                    );
+                  })}
                 </div>
-                
-                {/* TƯỚNG 2 */}
-                <div className="hero-tooltip-container" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {!player.revealedHeroes?.[1] ? (
-                     <div style={{ fontSize: '1.5rem' }}>🕵️</div>
-                  ) : (
-                    <>
-                      {player.heroes?.[1]?.image ? <img src={`/images/heroes/${player.heroes?.[1]?.image}`} style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center' }} /> : (player.heroes?.[1]?.emoji || '🕵️')}
-                      <div className="hero-tooltip-content" style={{ bottom: '110%', width: '220px' }}>
-                        <h4 style={{ margin: '0 0 5px 0', color: 'var(--color-gold)' }}>{player.heroes?.[1]?.name}</h4>
-                        {player.heroes?.[1]?.skills?.map((skill, idx) => (
-                          <div key={idx} style={{ marginBottom: '4px', fontSize: '0.75rem', lineHeight: '1.2', textAlign: 'left' }}>
-                            <strong style={{ color: 'var(--color-gold-light)' }}>{skill.name}:</strong> {skill.desc}
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
+              )}
+
+              {/* Slot 1: Chính tướng */}
+              {renderHeroSlot(0)}
+              {/* Slot 2: Phó tướng */}
+              {renderHeroSlot(1)}
+            </div>
+
+            {/* HP Bar */}
+            <div className="player-hp-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginTop: '3px', padding: '0 2px' }}>
+              <div className="hero-hp-hearts" style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                {Array.from({ length: player.maxHp }).map((_, i) => (
+                  <HpHeartIcon key={i} size={player.maxHp >= 6 ? 11 : 12.5} lost={i >= player.hp} />
+                ))}
               </div>
-              <div className="hero-info">
-                <div className="hero-name" style={{ fontSize: '0.65rem' }}>
-                   {!player.isRevealed ? 'Tướng Ẩn' : `${player.revealedHeroes?.[0] ? player.heroes?.[0]?.name : '???'} & ${player.revealedHeroes?.[1] ? player.heroes?.[1]?.name : '???'}`}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', margin: '4px 0' }}>
-                  {!player.isRevealed ? (
-                    <div style={{ fontSize: '0.6rem', padding: '1px 6px', borderRadius: '4px', background: '#4b5563', color: 'white', fontWeight: 'bold' }}>
-                      🕵️ HỆ ẨN
-                    </div>
-                  ) : (
-                    <>
-                      <div style={{ fontSize: '0.6rem', padding: '1px 6px', borderRadius: '4px', background: player.isDaTam ? '#9ca3af' : (player.faction === 'Lạc' ? '#10b981' : player.faction === 'Sơn' ? '#b45309' : player.faction === 'Hà' ? '#3b82f6' : '#ef4444'), color: 'white', fontWeight: 'bold' }}>
-                        {player.isDaTam ? '🐺 DÃ TÂM' : `PHE ${player.faction.toUpperCase()}`}
-                      </div>
-                      {(
-                        <div style={{ fontSize: '0.55rem', color: (me.faction === player.faction && !me.isDaTam && !player.isDaTam) ? '#10b981' : '#ef4444', fontWeight: 'bold', textShadow: '0 0 2px black', background: 'rgba(0,0,0,0.6)', padding: '1px 4px', borderRadius: '4px' }}>
-                          {(me.faction === player.faction && !me.isDaTam && !player.isDaTam) ? '🤝 ĐỒNG MINH' : '⚔️ KẺ THÙ'}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-                <div className="hero-hp-container">
-                  <div className="hero-hp-hearts">
-                    {Array.from({ length: player.maxHp }).map((_, i) => (
-                      <HpHeartIcon key={i} size={player.maxHp >= 6 ? 9.5 : (player.maxHp >= 5 ? 10.5 : 12)} lost={i >= player.hp} />
-                    ))}
-                  </div>
-                  <div className="hero-hp-badge">
-                    {player.hp}/{player.maxHp}
-                  </div>
-                  {player.drankWine && (
-                    <span className="hero-wine-tag" title="Đang say rượu (+1 Sát thương)">🍷</span>
-                  )}
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--color-gold)' }}>
+                  {player.hp}/{player.maxHp}
+                </span>
+                {player.drankWine && (
+                  <span title="Đang say rượu (+1 Sát thương)" style={{ fontSize: '0.75rem' }}>🍷</span>
+                )}
               </div>
-              </div>
-            );
-            })()}
-            <div className="player-stat-badges">
-              <span className="player-stat-badge stat-cards" title="Số lá bài trên tay">
-                <HandCardsIcon size={14} /> <span>{player.hand.length}</span>
+            </div>
+
+            {/* Stat Badges: Hand Cards, Attack Range, Distance */}
+            <div className="player-stat-badges" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: '4px', marginTop: '2px' }}>
+              <span className="player-stat-badge stat-cards" title={`Số lá bài trên tay: ${player.hand.length}`} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', background: 'rgba(30, 41, 59, 0.85)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', fontWeight: 'bold', color: '#f8fafc' }}>
+                <HandCardsIcon size={15} /> <span>{player.hand.length}</span>
               </span>
-              <span className="player-stat-badge stat-range" title={`Tầm đánh của người này: ${player.attackRange}`}>
-                <RangeIcon size={14} /> <span>{player.attackRange}</span>
+              <span className="player-stat-badge stat-range" title={`Tầm đánh của người này: ${player.attackRange}`} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', background: 'rgba(153, 27, 27, 0.4)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', fontWeight: 'bold', color: '#fca5a5' }}>
+                <RangeIcon size={15} /> <span>{player.attackRange}</span>
               </span>
-              <span className="player-stat-badge stat-distance" title={`Khoảng cách từ bạn đến người này: ${player.distanceFromMe}`}>
-                <DistanceIcon size={14} /> <span>{player.distanceFromMe}</span>
+              <span className="player-stat-badge stat-distance" title={`Khoảng cách từ bạn đến người này: ${player.distanceFromMe}`} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', background: 'rgba(30, 58, 138, 0.4)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', fontWeight: 'bold', color: '#93c5fd' }}>
+                <DistanceIcon size={15} /> <span>{player.distanceFromMe}</span>
               </span>
             </div>
-            {player.equipment?.length > 0 && (
-              <div className="equipment-area">
-                {[
-                  { type: CARD_SUBTYPES.EQUIP_WEAPON, icon: <WeaponIcon size={16} />, title: 'Vũ khí' },
-                  { type: CARD_SUBTYPES.EQUIP_ARMOR, icon: <ArmorIcon size={16} />, title: 'Phòng cụ' },
-                  { type: CARD_SUBTYPES.EQUIP_MOUNT_ATK, icon: <MountAtkIcon size={16} />, title: 'Ngựa công (-1)' },
-                  { type: CARD_SUBTYPES.EQUIP_MOUNT_DEF, icon: <MountDefIcon size={16} />, title: 'Ngựa thủ (+1)' }
-                ].map((slot, i) => {
-                  const eqCard = player.equipment.find(c => getCardSubType(c) === slot.type);
-                  const bgImage = eqCard ? getCardBg(eqCard.name) : null;
-                  return (
-                    <div key={i} className={`equip-slot ${eqCard ? 'equipped' : 'empty'}`} title={eqCard ? `${eqCard.name}: ${eqCard.desc}` : slot.title} style={{ ...(bgImage ? { backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid var(--color-gold)' } : {}), cursor: eqCard ? 'pointer' : 'default' }} onClick={() => { if (eqCard) setCardPopup(eqCard) }}>
-                      {eqCard ? (
-                        <>
-                          <div style={{ fontSize: '0.5rem', color: eqCard.color === 'red' ? '#ef4444' : '#f1f5f9', textShadow: '0 0 4px rgba(0,0,0,1)', background: bgImage ? 'rgba(0,0,0,0.5)' : 'transparent', borderRadius: '2px', padding: '1px 3px', position: 'absolute', top: '2px', left: '2px', fontWeight: 'bold' }}>
-                            {getSuitEmoji(eqCard.suit)}{eqCard.rank}
-                          </div>
-                          {!bgImage && (
-                            <div style={{ fontSize: '0.55rem', textAlign: 'center', color: '#f1f5f9', marginTop: '10px' }}>{eqCard.name}</div>
-                          )}
-                        </>
-                      ) : (
-                        <span className="equip-slot-icon-empty">{slot.icon}</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+
+            {/* Compact Mini Equipment Row (Nằm gọn gàng trong khung đối thủ) */}
+            <div className="equipment-area opponent-equipment-row" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: '3px', marginTop: '3px' }}>
+              {[
+                { type: CARD_SUBTYPES.EQUIP_WEAPON, icon: <WeaponIcon size={13} />, title: 'Vũ khí' },
+                { type: CARD_SUBTYPES.EQUIP_ARMOR, icon: <ArmorIcon size={13} />, title: 'Phòng cụ' },
+                { type: CARD_SUBTYPES.EQUIP_MOUNT_ATK, icon: <MountAtkIcon size={13} />, title: 'Ngựa công (-1)' },
+                { type: CARD_SUBTYPES.EQUIP_MOUNT_DEF, icon: <MountDefIcon size={13} />, title: 'Ngựa thủ (+1)' }
+              ].map((slot, i) => {
+                const eqCard = getEquipCard(slot.type);
+                const bgImage = eqCard ? getCardBg(eqCard.name) : null;
+                return (
+                  <div 
+                    key={i} 
+                    className={`equip-slot ${eqCard ? 'equipped' : 'empty'}`} 
+                    title={eqCard ? `${eqCard.name}: ${eqCard.desc}` : slot.title} 
+                    style={{ 
+                      width: '24px', 
+                      height: '24px', 
+                      borderRadius: '4px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      position: 'relative',
+                      background: eqCard ? (bgImage ? `url(${bgImage})` : 'rgba(212, 168, 67, 0.25)') : 'rgba(15, 23, 42, 0.5)',
+                      backgroundSize: 'cover',
+                      border: eqCard ? '1px solid var(--color-gold)' : '1px dashed rgba(255,255,255,0.15)',
+                      cursor: eqCard ? 'pointer' : 'default',
+                      boxShadow: eqCard ? '0 0 6px rgba(212, 168, 67, 0.5)' : 'none'
+                    }} 
+                    onClick={(e) => { 
+                      if (eqCard) {
+                        e.stopPropagation();
+                        setCardPopup(eqCard);
+                      }
+                    }}
+                  >
+                    {eqCard ? (
+                      <span style={{ fontSize: '0.52rem', color: eqCard.color === 'red' ? '#ef4444' : '#ffffff', fontWeight: 'bold', textShadow: '0 0 3px black' }}>
+                        {getSuitEmoji(eqCard.suit)}{eqCard.rank}
+                      </span>
+                    ) : (
+                      <span style={{ opacity: 0.35, display: 'flex' }}>{slot.icon}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
     );
 }
+

@@ -966,17 +966,31 @@ body {
 }
 
 .mobile-log-close-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   color: white;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  font-size: 0.9rem;
-  display: flex;
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   cursor: pointer;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+  transition: all 0.2s ease;
+  min-height: 32px;
+}
+
+.mobile-log-close-btn:hover {
+  background: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
+  transform: translateY(-1px);
+}
+
+.mobile-log-close-btn:active {
+  transform: scale(0.96);
+  opacity: 0.9;
 }
 
 .mobile-log-toggle-btn {
@@ -1507,13 +1521,9 @@ body {
   }
   
   .player-zone {
-    min-width: 70px !important;
-  }
-
-  .hero-card {
-    width: 70px !important;
-    min-height: unset !important;
-    height: 90px !important;
+    min-width: 125px !important;
+    max-width: 150px !important;
+    padding: 3px 5px !important;
   }
   
   .card {
@@ -1522,9 +1532,16 @@ body {
     font-size: 0.7rem !important;
     border-radius: 6px !important;
   }
+
+  .card.selected {
+    transform: translateY(-16px) scale(1.06) !important;
+    z-index: 10 !important;
+    box-shadow: 0 0 14px rgba(212, 168, 67, 0.85) !important;
+  }
   
   .player-hand-area {
     padding: 0 4px 0 4px !important;
+    overflow: visible !important;
   }
 
   .player-hand-area::before {
@@ -1532,13 +1549,15 @@ body {
   }
 
   .hand-cards {
-    padding: 0 0 2px 0 !important;
-    margin: 0 !important;
+    padding: 20px 0 2px 0 !important;
+    margin-top: -20px !important;
     gap: 4px !important;
     max-width: 100% !important;
     justify-content: flex-start !important;
     flex-wrap: nowrap !important;
     align-items: flex-end !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
   }
 }
 

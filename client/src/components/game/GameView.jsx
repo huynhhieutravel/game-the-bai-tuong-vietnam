@@ -237,19 +237,19 @@ export default function GameView() {
     let rx, ry, baseY, scale;
     if (isLandscapeMobile) {
       rx = totalOpponents > 4 ? 38 : 34; // vw
-      ry = 14; // % độ võng hình vòng cung tự nhiên, hạ người chơi 2 & 4 xuống ngang sườn bàn
-      baseY = 36; // Trọng tâm Y ở 36%: người chơi 3 ở top 22% (36 - 14), người chơi 2 & 4 ở top 36%
-      scale = totalOpponents >= 6 ? 0.48 : (totalOpponents >= 4 ? 0.54 : 0.60);
+      ry = 14; // % độ võng hình vòng cung tự nhiên
+      baseY = 27; // Trọng tâm Y ở 27%: người chơi 3 ở top 13% (27 - 14), người chơi 2 & 4 ở top 27%
+      scale = totalOpponents >= 6 ? 0.78 : (totalOpponents >= 4 ? 0.85 : 0.92);
     } else if (isMobile) {
       rx = totalOpponents > 4 ? 37 : 35; // vw
-      ry = totalOpponents > 4 ? 20 : 15; // %
-      baseY = totalOpponents > 4 ? 37 : 34; // Trọng tâm Y
-      scale = totalOpponents >= 6 ? 0.58 : (totalOpponents >= 4 ? 0.62 : 0.68);
+      ry = totalOpponents > 4 ? 18 : 14; // %
+      baseY = totalOpponents > 4 ? 34 : 30; // Trọng tâm Y
+      scale = totalOpponents >= 6 ? 0.75 : (totalOpponents >= 4 ? 0.82 : 0.88);
     } else {
       rx = totalOpponents > 4 ? 34 : 27;
-      ry = 20;
-      baseY = 32;
-      scale = totalOpponents >= 6 ? 0.68 : (totalOpponents >= 4 ? 0.74 : 0.8);
+      ry = 18;
+      baseY = 28;
+      scale = 1;
     }
     
     // Desktop: lùi 160px để chừa chỗ cho History Sidebar. Mobile: căn giữa 50%
@@ -421,7 +421,7 @@ export default function GameView() {
           );
         })}
         
-        <div className="board-center" style={{ zIndex: 1, position: 'absolute', top: isLandscapeMobile ? '41%' : (isMobile ? '46%' : '38%'), left: isMobile ? '50%' : 'calc(50% - 160px)', transform: isLandscapeMobile ? 'translate(-50%, -50%) scale(0.78)' : 'translate(-50%, -50%)', width: '250px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div className="board-center" style={{ zIndex: 1, position: 'absolute', top: isLandscapeMobile ? '48%' : (isMobile ? '46%' : '38%'), left: isMobile ? '50%' : 'calc(50% - 160px)', transform: isLandscapeMobile ? 'translate(-50%, -50%) scale(0.78)' : 'translate(-50%, -50%)', width: '250px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           
           <div className="deck-info" style={{ display: 'flex', justifyContent: 'center', gap: isLandscapeMobile ? '10px' : '20px', marginBottom: isLandscapeMobile ? '4px' : '15px' }}>
             <div style={{ textAlign: 'center', background: 'rgba(0,0,0,0.5)', padding: isLandscapeMobile ? '2px 10px' : '5px 15px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)' }}>
@@ -443,7 +443,7 @@ export default function GameView() {
                   className={`card ${card.type}`}
                   style={{
                     ...(bg ? { backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' } : {}),
-                    transform: `rotate(${Math.random() * 10 - 5}deg) scale(0.9) translate(${Math.random() * 20 - 10}px, ${Math.random() * 20 - 10}px)`,
+                    transform: `rotate(${Math.random() * 10 - 5}deg) scale(${isLandscapeMobile ? 0.76 : 0.9}) translate(${Math.random() * 20 - 10}px, ${Math.random() * 20 - 10}px)`,
                     margin: '-15px',
                     boxShadow: '0 5px 15px rgba(0,0,0,0.5)',
                     cursor: 'pointer'
@@ -546,18 +546,19 @@ export default function GameView() {
              onClick={() => setShowMobileLog(false)} 
              title="Thoát nhật ký"
              style={{ 
-               background: '#ef4444', 
+               background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
                color: 'white', 
-               border: 'none', 
+               border: '1px solid rgba(255, 255, 255, 0.25)', 
                borderRadius: '8px', 
-               padding: '6px 14px', 
-               fontSize: '0.85rem', 
+               padding: '6px 16px', 
+               fontSize: '0.88rem', 
                fontWeight: 'bold', 
-               display: 'flex', 
+               display: 'inline-flex', 
                alignItems: 'center', 
-               gap: '4px', 
+               gap: '6px', 
                cursor: 'pointer',
-               boxShadow: '0 2px 6px rgba(239, 68, 68, 0.4)'
+               boxShadow: '0 2px 8px rgba(239, 68, 68, 0.45)',
+               minHeight: '34px'
              }}
            >
              ✕ Thoát
@@ -584,18 +585,18 @@ export default function GameView() {
             );
           })}
         </div>
-        <div className="game-log-footer" style={{ padding: '8px 16px', background: 'rgba(15, 23, 42, 0.95)', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div className="game-log-footer" style={{ padding: '10px 16px', background: 'rgba(15, 23, 42, 0.98)', borderTop: '1px solid rgba(212, 168, 67, 0.35)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <button 
+            className="btn-action primary"
             onClick={() => setShowMobileLog(false)} 
             style={{ 
-              background: 'rgba(255, 255, 255, 0.1)', 
-              border: '1px solid rgba(255, 255, 255, 0.25)', 
-              color: '#f8fafc', 
-              padding: '6px 24px', 
+              padding: '8px 36px', 
               borderRadius: '8px', 
-              fontSize: '0.85rem', 
+              fontSize: '0.92rem', 
               fontWeight: 'bold', 
-              cursor: 'pointer' 
+              cursor: 'pointer',
+              minWidth: '200px',
+              boxShadow: '0 4px 14px rgba(212, 168, 67, 0.35)'
             }}
           >
             ✕ Đóng Nhật Ký
@@ -614,13 +615,13 @@ export default function GameView() {
              left: 0, 
              width: '100%', 
              height: '100%', 
-             background: 'rgba(0,0,0,0.92)', 
+             background: 'rgba(0,0,0,0.88)', 
              zIndex: 1200, 
              display: 'flex', 
              flexDirection: 'column', 
              alignItems: 'center', 
              justifyContent: 'center', 
-             backdropFilter: 'blur(14px)', 
+             backdropFilter: 'blur(10px)', 
              padding: '8px', 
              boxSizing: 'border-box' 
            }} 
@@ -632,29 +633,33 @@ export default function GameView() {
               title="Thoát xem tướng"
               style={{ 
                 position: 'absolute', 
-                top: '10px', 
-                right: '14px', 
+                top: '12px', 
+                right: '16px', 
                 zIndex: 1220, 
-                background: '#ef4444', 
+                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
                 color: 'white', 
-                border: 'none', 
+                border: '1px solid rgba(255, 255, 255, 0.3)', 
                 borderRadius: '8px', 
-                padding: '6px 14px', 
-                fontSize: '0.85rem', 
+                padding: '6px 16px', 
+                fontSize: '0.88rem', 
                 fontWeight: 'bold', 
                 cursor: 'pointer',
                 boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)'
               }}
             >
-              ✕ Thoát
+              ✕ Đóng
             </button>
+
+            <div style={{ color: 'var(--color-gold)', fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '8px', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+              📜 Xem Tướng: {heroPopup.name} {heroPopup.isRevealed ? `(Phe ${heroPopup.faction})` : '(Chưa lộ diện)'}
+            </div>
 
             <div 
               style={{ 
                 display: 'flex', 
-                gap: '16px', 
+                gap: '14px', 
                 maxWidth: '96vw', 
-                maxHeight: '88vh', 
+                maxHeight: '82vh', 
                 overflowY: 'auto', 
                 overflowX: 'auto', 
                 padding: '4px', 
@@ -677,7 +682,7 @@ export default function GameView() {
                         background: 'linear-gradient(180deg, #161e2e 0%, #0d121d 100%)', 
                         borderRadius: '12px', 
                         border: '2px dashed #4b5563', 
-                        height: 'clamp(240px, 80vh, 340px)', 
+                        height: isLandscapeMobile ? 'clamp(150px, 58vh, 230px)' : 'clamp(200px, 68vh, 300px)', 
                         aspectRatio: '1086 / 1448',
                         boxShadow: '0 8px 30px rgba(0,0,0,0.85)',
                         display: 'flex',
@@ -689,9 +694,9 @@ export default function GameView() {
                       }} 
                       onClick={e => e.stopPropagation()}
                     >
-                      <div style={{ fontSize: '50px' }}>🕵️</div>
-                      <div style={{ color: '#9ca3af', fontWeight: 'bold', fontSize: '1rem', marginTop: '8px' }}>TƯỚNG ẨN</div>
-                      <div style={{ color: '#6b7280', fontSize: '0.8rem', marginTop: '4px' }}>Chưa lộ diện</div>
+                      <div style={{ fontSize: '42px' }}>🕵️</div>
+                      <div style={{ color: '#9ca3af', fontWeight: 'bold', fontSize: '0.9rem', marginTop: '8px' }}>TƯỚNG ẨN</div>
+                      <div style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: '4px' }}>Chưa lộ diện</div>
                     </div>
                   );
                 }
@@ -706,14 +711,14 @@ export default function GameView() {
                       background: 'linear-gradient(180deg, #161e2e 0%, #0d121d 100%)', 
                       borderRadius: '12px', 
                       border: `2px solid ${factionColor}`, 
-                      height: 'clamp(240px, 82vh, 350px)', 
+                      height: isLandscapeMobile ? 'clamp(150px, 58vh, 230px)' : 'clamp(200px, 68vh, 300px)', 
                       aspectRatio: '1086 / 1448',
                       boxShadow: '0 8px 30px rgba(0,0,0,0.85)', 
                       display: 'flex', 
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      overflow: 'hidden',
+                      flexDirection: 'column', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      overflow: 'hidden', 
                       position: 'relative'
                     }} 
                     onClick={e => e.stopPropagation()}
@@ -730,10 +735,10 @@ export default function GameView() {
                         }} 
                       />
                     ) : (
-                      <div style={{ padding: '20px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '60px' }}>{hero?.emoji || '🎴'}</div>
-                        <h3 style={{ color: 'var(--color-gold)', margin: '8px 0 4px 0' }}>{hero?.name}</h3>
-                        <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '8px', background: factionColor, color: 'white' }}>{heroFaction}</span>
+                      <div style={{ padding: '16px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '50px' }}>{hero?.emoji || '🎴'}</div>
+                        <h3 style={{ color: 'var(--color-gold)', margin: '6px 0 3px 0', fontSize: '1rem' }}>{hero?.name}</h3>
+                        <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '8px', background: factionColor, color: 'white' }}>{heroFaction}</span>
                       </div>
                     )}
                   </div>
@@ -742,17 +747,17 @@ export default function GameView() {
             </div>
 
             <button 
+              className="btn-action primary"
               onClick={() => setHeroPopup(null)} 
               style={{ 
-                marginTop: '10px', 
-                background: 'rgba(255, 255, 255, 0.1)', 
-                border: '1px solid rgba(255, 255, 255, 0.25)', 
-                color: '#f8fafc', 
-                padding: '6px 20px', 
+                marginTop: '12px', 
+                padding: '6px 32px', 
                 borderRadius: '8px', 
-                fontSize: '0.85rem', 
+                fontSize: '0.9rem', 
                 fontWeight: 'bold', 
-                cursor: 'pointer' 
+                cursor: 'pointer',
+                minWidth: '180px',
+                boxShadow: '0 4px 12px rgba(212, 168, 67, 0.35)'
               }}
             >
               ✕ Đóng
