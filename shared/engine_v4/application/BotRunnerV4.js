@@ -99,7 +99,7 @@ export class BotRunnerV4 {
                 const chosenCardId = reaction.cardId || chosenCard?.id;
                 const isCanceled = reaction.canceled !== undefined 
                   ? reaction.canceled 
-                  : (!chosenCard && !chosenCardId && !reaction.useBagua && !reaction.doUse && !reaction.orderedCards && !reaction.doProvide && !reaction.doReact);
+                  : (!chosenCard && !chosenCardId && !reaction.useBagua && !reaction.doUse && !reaction.orderedCards && !reaction.doProvide && !reaction.doReact && !reaction.doJudge && !reaction.doDiscard && !reaction.option && !reaction.selectedAlly && !reaction.suit && !reaction.virtualCardName && !reaction.costType && !reaction.cardIds && !reaction.targetId && !reaction.targetA && !reaction.targets);
                 this.isProcessing = false;
                 this.gameAPI.respond({
                   playerId: actor.id,
@@ -147,7 +147,24 @@ export class BotRunnerV4 {
               if (action && action.type === 'PLAY_CARD') {
                 const targetIds = action.targetIds || (action.targetId !== undefined ? [action.targetId] : []);
                 this.isProcessing = false;
-                this.gameAPI.playCard(currentTurnId, action.cardId, targetIds);
+                this.gameAPI.playCard(currentTurnId, action.cardId, targetIds, {
+                  virtualCardName: action.virtualCardName,
+                  asSlash: action.asSlash,
+                  asChain: action.asChain,
+                  ...(action.customData || {})
+                });
+              } else if (action && action.type === 'USE_SKILL') {
+                this.isProcessing = false;
+                this.gameAPI.useSkill(
+                  currentTurnId,
+                  action.skillId,
+                  action.cardIds || [],
+                  action.targets || [],
+                  action.options || {}
+                );
+              } else if (action && action.type === 'REVEAL_HERO') {
+                this.isProcessing = false;
+                this.gameAPI.revealHero(currentTurnId, action.heroIndex);
               } else {
                 this.isProcessing = false;
                 this.gameAPI.endPhase(currentTurnId);

@@ -10,6 +10,7 @@ import { CombatRules } from '../rules/CombatRules.js';
 import { TrickRules } from '../rules/TrickRules.js';
 import { BotBrain } from '../ai/BotBrain.js';
 import { GameInvariants } from '../core/Invariants.js';
+import { globalHeroRegistry } from '../heroes/HeroRegistry.js';
 
 export class HeadlessRunner {
   /**
@@ -352,22 +353,25 @@ export class HeadlessRunner {
         const currentBotId = state.currentTurnPlayerId;
         const action = BotBrain.decideAction(state, currentBotId);
 
-        if (action.type === 'PLAY_CARD') {
+        if (action.type === 'REVEAL_HERO') {
+          const p = state.getPlayer(currentBotId);
+          globalHeroRegistry.revealPlayerHero(state, p, action.heroIndex, null, true);
+        } else if (action.type === 'PLAY_CARD') {
           const card = state.getPlayer(currentBotId).hand.find(c => c.id === action.cardId);
-          if (card && card.type === 'slash') {
-            CombatRules.playSlash(state, currentBotId, action.targetId, card);
-          } else if (card && card.type === 'trick') {
-            try {
-              TrickRules.playTrick(state, currentBotId, action.targetId !== undefined ? [action.targetId] : [], card);
-            } catch (e) {
-              // Nếu mục tiêu không hợp lệ hoặc đã có trong khu phán xét, kết thúc hành động
-              stateMachine.endActionPhase();
-            }
-          } else if (card && card.type === 'peach') {
-            // Ăn Đào
+          if (card && (card.type === 'slash' || action.asSlash || action.virtualCardName === 'Chém')) {
+            CombatRules.playSlash(state, currentBotId, action.targetId, card, { asSlash: action.asSlash || action.virtualCardName === 'Chém' });
+          } else if (card && (card.type === 'peach' || action.virtualCardName === 'Đào')) {
+            // Ăn Đào / Dùng Đào
             const p = state.getPlayer(currentBotId);
             state.discardFromHand(currentBotId, [card.id]);
             p.hp = Math.min(p.maxHp, p.hp + 1);
+          } else if (card && (card.type === 'trick' || action.asChain || action.customData?.asFireAttack || action.virtualCardName === 'Hỏa Công' || action.virtualCardName === 'Xiềng Xích')) {
+            try {
+              const trickCard = action.virtualCardName ? { ...card, name: action.virtualCardName, virtual: true } : card;
+              TrickRules.playTrick(state, currentBotId, action.targetIds || (action.targetId !== undefined ? [action.targetId] : []), trickCard);
+            } catch (e) {
+              stateMachine.endActionPhase();
+            }
           } else if (card) {
             // Trang bị: Chuyển từ tay sang slot trang bị (trang bị cũ vào discardPile)
             const p = state.getPlayer(currentBotId);
@@ -385,6 +389,80 @@ export class HeadlessRunner {
             } else {
               state.discardPile.push(card);
             }
+          }
+        } else if (action.type === 'USE_SKILL') {
+          const p = state.getPlayer(currentBotId);
+          const skillId = action.skillId;
+          const cardIds = action.cardIds || [];
+          const targets = action.targets || [];
+
+          if (skillId === 'bach_dang') {
+            const count = cardIds.length > 0 ? cardIds.length : p.hand.length;
+            const discardedAll = (count === p.hand.length);
+            state.discardFromHand(currentBotId, cardIds.length > 0 ? cardIds : p.hand.map(c => c.id));
+            state.drawCards(currentBotId, discardedAll ? count + 1 : count);
+            p.skillUsage = p.skillUsage || {};
+            p.skillUsage.bach_dang = { usedThisTurn: true };
+          } else if (skillId === 'lan_sau') {
+            if (p.hp > 1) {
+              p.hp -= 1;
+              state.drawCards(currentBotId, 2);
+            }
+          } else if (skillId === 'dieu_duoc') {
+            if (targets.length > 0 && cardIds.length > 0) {
+              const target = state.getPlayer(targets[0]);
+              if (target && target.isAlive && target.hp < target.maxHp) {
+                state.discardFromHand(currentBotId, [cardIds[0]]);
+                target.hp += 1;
+                p.skillUsage = p.skillUsage || {};
+                p.skillUsage.dieu_duoc = { usedThisTurn: true };
+              }
+            }
+          } else if (skillId === 'ky_tap') {
+            if (targets.length > 0 && cardIds.length > 0) {
+              state.discardFromHand(currentBotId, [cardIds[0]]);
+              TrickRules.playDismantle(state, currentBotId, targets[0], { name: 'Tước Bài', virtual: true });
+            }
+          } else if (skillId === 'hoa_than_an_tu') {
+            if (targets.length > 0 && cardIds.length > 0) {
+              state.discardFromHand(currentBotId, [cardIds[0]]);
+              TrickRules.playChaos(state, currentBotId, targets[0], { name: 'Hỗn Loạn', virtual: true });
+            }
+          } else if (skillId === 'hoa_than') {
+            if (targets.length >= 2 && cardIds.length > 0) {
+              state.discardFromHand(currentBotId, [cardIds[0]]);
+              p.skillUsage = p.skillUsage || {};
+              p.skillUsage.hoa_than = { usedThisTurn: true };
+              TrickRules.playDuel(state, targets[0], targets[1], { name: 'Quyết Đấu', virtual: true });
+            }
+          } else if (skillId === 'binh_loan') {
+            if (cardIds.length >= 2) {
+              state.discardFromHand(currentBotId, cardIds.slice(0, 2));
+              TrickRules.playArrowRain(state, currentBotId, { name: 'Loạn Tiễn', virtual: true });
+            }
+          } else if (skillId === 'pha_thanh') {
+            if (targets.length > 0 && cardIds.length > 0) {
+              state.discardFromHand(currentBotId, [cardIds[0]]);
+              TrickRules.playDuel(state, currentBotId, targets[0], { name: 'Quyết Đấu', virtual: true });
+            }
+          } else if (skillId === 'tien_phong') {
+            if (targets.length > 0) {
+              if (action.options?.costType === 'weapon' && p.equipment?.weapon) {
+                const w = p.equipment.weapon;
+                p.equipment.weapon = null;
+                state.discardPile.push(w);
+              } else {
+                p.hp -= 1;
+              }
+              CombatRules.applyDamage(state, currentBotId, targets[0], 1, 'tien_phong');
+            }
+          } else if (skillId === 'can_gian') {
+            if (targets.length > 0 && p.hp > 1) {
+              p.hp -= 1;
+              state.drawCards(targets[0], 2);
+            }
+          } else {
+            stateMachine.endActionPhase();
           }
         } else {
           // Kết thúc Pha Hành động -> Chuyển sang Bỏ bài

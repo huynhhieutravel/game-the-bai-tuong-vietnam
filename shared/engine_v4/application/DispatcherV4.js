@@ -160,11 +160,15 @@ export class DispatcherV4 {
     const cardName = virtualCardName || card.name;
     const isRedCard = card.color === 'red' || card.suit === 'heart' || card.suit === 'diamond' || card.suit === '♥' || card.suit === '♦';
     const isNonTargetedRedCard = ['dodge', 'peach', 'wine', 'equip'].includes(cardType) || ['Né', 'Đào', 'Rượu'].includes(card.name);
-    const hasDoiNuiSlash = globalHeroRegistry.hasSkill(player, 'doi_nui', true) && (cardType === 'dodge' || card.name === 'Né' || virtualCardName === 'Chém');
-    const hasKhaiThien = globalHeroRegistry.hasSkill(player, 'khai_thien', true) && isRedCard && (virtualCardName === 'Chém' || payload.asSlash || (targetIds.length > 0 && isNonTargetedRedCard));
+    const isTargetingOther = targetIds.length > 0 && targetIds[0] !== sourceId;
+    const hasDoiNuiSlash = globalHeroRegistry.hasSkill(player, 'doi_nui', true) && (virtualCardName === 'Chém' || payload.asSlash || (isTargetingOther && (cardType === 'dodge' || card.name === 'Né')));
+    const hasKhaiThien = globalHeroRegistry.hasSkill(player, 'khai_thien', true) && isRedCard && (virtualCardName === 'Chém' || payload.asSlash || (isTargetingOther && isNonTargetedRedCard));
 
-    // 1. Chém (Slash)
-    if (cardType === 'slash' || cardName === 'Chém' || hasDoiNuiSlash || hasKhaiThien) {
+    // 1. Chém (Slash) - Chỉ xử lý khi bài thực sự là Chém hoặc biến đổi thành Chém, KHÔNG xử lý khi virtualCardName là Đào/Rượu/Cẩm nang
+    const isConvertedNonSlash = virtualCardName && virtualCardName !== 'Chém';
+    const isSlashAction = !isConvertedNonSlash && (cardName === 'Chém' || (!virtualCardName && cardType === 'slash') || hasDoiNuiSlash || hasKhaiThien);
+
+    if (isSlashAction) {
       if (player.temporaryFlags?.vanDonWin && targetIds.length > 1) {
         const targets = targetIds.slice(0, 2);
         this.state.discardFromHand(sourceId, [card.id]);
@@ -332,7 +336,8 @@ export class DispatcherV4 {
     }
     const hasTienDuyenChain = globalHeroRegistry.hasSkill(player, 'tien_duyen_chu_dong_tu', true) && (card.suit === 'club' || card.suit === '♣') && (virtualCardName === 'Xiềng Xích' || payload.asChain);
     if (cardName === 'Xiềng Xích' || card.idKey === 'xieng_xich' || hasTienDuyenChain) {
-      TrickRules.playIronChain(this.state, sourceId, targetIds, card, { isIronChain: true, reforge: payload.reforge });
+      const chainCard = hasTienDuyenChain ? { ...card, name: 'Xiềng Xích', idKey: 'xieng_xich', virtual: true } : card;
+      TrickRules.playIronChain(this.state, sourceId, targetIds, chainCard, { isIronChain: true, reforge: payload.reforge });
       return;
     }
     if (cardName === 'Mượn Đao') {
@@ -348,7 +353,8 @@ export class DispatcherV4 {
     if (cardName === 'Hỏa Công' || cardName === 'Hỏa công' || card.idKey === 'hoa_cong' || hasThanHoa) {
       const targetId = targetIds[0];
       if (targetId === undefined) throw new Error('Vui lòng chọn mục tiêu để Hỏa Công!');
-      TrickRules.playFireAttack(this.state, sourceId, targetId, card);
+      const fireCard = hasThanHoa ? { ...card, name: 'Hỏa Công', idKey: 'hoa_cong', virtual: true } : card;
+      TrickRules.playFireAttack(this.state, sourceId, targetId, fireCard);
       return;
     }
 
@@ -842,13 +848,15 @@ export class DispatcherV4 {
 
             if (myRank > oppRank) {
               this.state.addLog(`⚔️ [Tự Chủ] ${player.name} (${myCard.name} [${myRank}]) THẮNG ${target.name} (${oppCard.name} [${oppRank}])!`);
-              const aliveOthers = this.state.getAlivePlayers().filter(p => p.id !== target.id && p.id !== playerId);
-              if (aliveOthers.length > 0) {
-                CombatRules.playSlash(this.state, target.id, aliveOthers[0].id, { name: 'Chém', virtual: true });
+              const aliveOthers = this.state.getAlivePlayers().filter(p => p.id !== target.id && p.id !== playerId && !(globalHeroRegistry.hasSkill(p, 'dam_bac') && (!p.hand || p.hand.length === 0)));
+              if (aliveOthers.length > 0 && !target.temporaryFlags?.vanDonLose) {
+                CombatRules.playSlash(this.state, target.id, aliveOthers[0].id, { name: 'Chém', virtual: true, infiniteRange: true }, { infiniteRange: true });
               }
             } else {
               this.state.addLog(`⚔️ [Tự Chủ] ${player.name} (${myCard.name} [${myRank}]) THUA ${target.name} (${oppCard.name} [${oppRank}])! ${target.name} lập tức Chém ${player.name}!`);
-              CombatRules.playSlash(this.state, target.id, playerId, { name: 'Chém', virtual: true });
+              if (!target.temporaryFlags?.vanDonLose && !(globalHeroRegistry.hasSkill(player, 'dam_bac') && (!player.hand || player.hand.length === 0))) {
+                CombatRules.playSlash(this.state, target.id, playerId, { name: 'Chém', virtual: true, infiniteRange: true }, { infiniteRange: true });
+              }
             }
           }
         }
@@ -1537,7 +1545,7 @@ export class DispatcherV4 {
         }
         this.state.discardFromHand(playerId, [card.id]);
         this.state.addLog(`⚡ [Phá Thành] ${player.name} dùng lá [${card.name}] màu ${cardColor} như [Quyết Đấu]!`);
-        TrickRules.playDuel(this.state, playerId, targets[0], { ...card, name: 'Quyết Đấu', virtual: true });
+        TrickRules.playDuel(this.state, playerId, targets[0], { ...card, name: 'Quyết Đấu', idKey: 'quyet_dau', virtual: true });
         return;
       }
 

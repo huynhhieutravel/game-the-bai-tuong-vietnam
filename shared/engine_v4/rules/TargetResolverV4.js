@@ -44,7 +44,7 @@ export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCa
   }
 
   // 2. Tra cứu card name / slug
-  const isVirtual = Boolean(cardNameOrId && physicalCard && cardNameOrId !== physicalCard.id);
+  const isVirtual = Boolean(cardNameOrId && physicalCard && cardNameOrId !== physicalCard.id && cardNameOrId !== physicalCard.name);
   let actualCardName = cardNameOrId;
   if (physicalCard && cardNameOrId === physicalCard.id) {
     actualCardName = physicalCard.name;
@@ -62,21 +62,23 @@ export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCa
   if (slug === 'ne' && player && globalHeroRegistry.hasSkill(player, 'doi_nui', true)) {
     slug = 'chem';
   }
-  // Thần Trụ Trời Khai Thiên: Mọi lá bài Đỏ đều dùng như [Chém]
+  // Thần Trụ Trời Khai Thiên: Mọi lá bài Đỏ đều dùng như [Chém] (chỉ chuyển slug khi là Né hoặc được chỉ định làm Chém)
   if (player && globalHeroRegistry.hasSkill(player, 'khai_thien', true) && isRed) {
-    slug = 'chem';
+    if (slug === 'ne' || actualCardName === 'Chém' || cardNameOrId === 'Chém') {
+      slug = 'chem';
+    }
   }
   // Rùa Vàng Thần Hỏa: Dùng bài Đỏ làm [Hỏa Công]
-  if (player && globalHeroRegistry.hasSkill(player, 'than_hoa', true) && isRed && (cardNameOrId === 'Hỏa Công' || actualCardName === 'Hỏa Công' || isVirtual)) {
+  if (player && globalHeroRegistry.hasSkill(player, 'than_hoa', true) && isRed && (cardNameOrId === 'Hỏa Công' || actualCardName === 'Hỏa Công')) {
     slug = 'hoa-cong';
   }
   // Rùa Vàng Linh Giám: Dùng bài Đen làm [Hóa Giải]
-  if (player && globalHeroRegistry.hasSkill(player, 'linh_giam', true) && isBlack && (cardNameOrId === 'Hóa Giải' || actualCardName === 'Hóa Giải' || isVirtual)) {
+  if (player && globalHeroRegistry.hasSkill(player, 'linh_giam', true) && isBlack && (cardNameOrId === 'Hóa Giải' || actualCardName === 'Hóa Giải')) {
     slug = 'hoa-giai';
   }
   // Chử Đồng Tử Tiên Duyên: Dùng bài ♣ làm [Xiềng Xích]
   const isClub = physicalCard && (physicalCard.suit === 'club' || physicalCard.suit === '♣');
-  if (player && globalHeroRegistry.hasSkill(player, 'tien_duyen_chu_dong_tu', true) && isClub && (cardNameOrId === 'Xiềng Xích' || actualCardName === 'Xiềng Xích' || isVirtual)) {
+  if (player && globalHeroRegistry.hasSkill(player, 'tien_duyen_chu_dong_tu', true) && isClub && (cardNameOrId === 'Xiềng Xích' || actualCardName === 'Xiềng Xích')) {
     slug = 'xieng-xich';
   }
   // Dã Tượng Kỳ Tập: Dùng bài Đen làm [Tước Bài]
@@ -181,7 +183,7 @@ export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCa
           return alive.filter(x => {
             if (x.id === p.id) return false;
             // Nghệ An Kế (Nguyễn Chích): Miễn nhiễm Cướp Bài
-            if (globalHeroRegistry.hasSkill(x, 'nghe_an_ke', true)) return false;
+            if (globalHeroRegistry.hasSkill(x, 'nghe_an_ke') || x.skills?.includes('nghe_an_ke')) return false;
             const dist = RangeSystem.calculateDistance(p, x, alive);
             if (!hasInfiniteTrickRange && dist > 1) return false;
             const hasHand = x.hand && x.hand.length > 0;
@@ -236,7 +238,7 @@ export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCa
           return alive.filter(x => {
             if (x.id === p.id) return false;
             // Nghệ An Kế (Nguyễn Chích): Miễn nhiễm Hỗn Loạn
-            if (globalHeroRegistry.hasSkill(x, 'nghe_an_ke', true)) return false;
+            if (globalHeroRegistry.hasSkill(x, 'nghe_an_ke') || x.skills?.includes('nghe_an_ke')) return false;
             const alreadyHas = x.judgementArea && x.judgementArea.some(c => c.name === 'Hỗn Loạn' || c.idKey === 'hon_loan' || c.idKey === 'hon-loan');
             return !alreadyHas;
           });
@@ -412,8 +414,8 @@ export function canPlayCard(state, playerId, cardNameOrId, physicalCardId = null
     }
   }
 
-  // Thần Trụ Trời Khai Thiên: Mọi lá bài Đỏ đều dùng như Chém
-  if (hasKhaiThien) {
+  // Khai Thiên cho phép dùng bài ảo là Chém
+  if (hasKhaiThien && isVirtual && actualCardName === 'Chém') {
     slug = 'chem';
   }
 
@@ -423,16 +425,26 @@ export function canPlayCard(state, playerId, cardNameOrId, physicalCardId = null
 
   if (slug === 'dao') {
     if (player.hp >= player.maxHp) {
-      return { valid: false, reason: 'Máu đã đầy, không thể dùng Đào' };
+      if (hasKhaiThien) {
+        slug = 'chem';
+      } else {
+        return { valid: false, reason: 'Máu đã đầy, không thể dùng Đào' };
+      }
+    } else {
+      return { valid: true };
     }
-    return { valid: true };
   }
 
   if (slug === 'ruou') {
     if ((player.turnStats?.wineCount || player.wineCount || 0) >= 1) {
-      return { valid: false, reason: 'Mỗi lượt chỉ được uống Rượu 1 lần trong giai đoạn Hành động' };
+      if (hasKhaiThien) {
+        slug = 'chem';
+      } else {
+        return { valid: false, reason: 'Mỗi lượt chỉ được uống Rượu 1 lần trong giai đoạn Hành động' };
+      }
+    } else {
+      return { valid: true };
     }
-    return { valid: true };
   }
 
   if (slug === 'chem') {

@@ -195,9 +195,26 @@ for (let g = 0; g < 1000; g++) {
         const action = BotBrain.decideAction(state, currentTurnId);
         if (action && action.type === 'PLAY_CARD') {
           const targetIds = action.targetIds || (action.targetId !== undefined ? [action.targetId] : []);
-          proxiedAPI.playCard(currentTurnId, action.cardId, targetIds);
+          proxiedAPI.playCard(currentTurnId, action.cardId, targetIds, {
+            virtualCardName: action.virtualCardName,
+            asSlash: action.asSlash,
+            asChain: action.asChain,
+            ...(action.customData || {})
+          });
           stats.totalActions++;
           stats.totalTricks++;
+        } else if (action && action.type === 'USE_SKILL') {
+          proxiedAPI.useSkill(
+            currentTurnId,
+            action.skillId,
+            action.cardIds || [],
+            action.targets || [],
+            action.options || {}
+          );
+          stats.totalActions++;
+        } else if (action && action.type === 'REVEAL_HERO') {
+          proxiedAPI.revealHero(currentTurnId, action.heroIndex);
+          stats.totalActions++;
         } else {
           proxiedAPI.endPhase(currentTurnId);
           stats.totalActions++;

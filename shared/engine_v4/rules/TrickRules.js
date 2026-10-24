@@ -29,7 +29,7 @@ export class TrickRules {
     }
 
     // 0b. Kiểm tra Nghệ An Kế (Nguyễn Chích) nếu là Cướp Bài
-    if ((card.name === 'Cướp Bài' || card.idKey === 'cuop_bai') && targets.length > 0) {
+    if (!extraArgs?.isIronChain && (card.name === 'Cướp Bài' || card.idKey === 'cuop_bai') && targets.length > 0) {
       const target = state.getPlayer(targets[0]);
       if (target && (globalHeroRegistry.hasSkill(target, 'nghe_an_ke', true) || target.skills?.includes('nghe_an_ke'))) {
         throw new Error(`[Nghệ An Kế] ${target.name} không thể trở thành mục tiêu của [Cướp Bài]!`);
@@ -37,7 +37,7 @@ export class TrickRules {
     }
 
     // 1. Phân loại Cẩm nang thường vs Cẩm nang Trì hoãn (Sấm Sét, Hỗn Loạn, Binh Lương Thốn Đoạn)
-    const isDelayed = ['sam_set', 'hon_loan', 'binh_luong'].includes(card.idKey || card.id) || ['Sấm Sét', 'Hỗn Loạn', 'Binh Lương Thốn Đoạn', 'Binh Lương'].includes(card.name);
+    const isDelayed = ['Sấm Sét', 'Hỗn Loạn', 'Binh Lương Thốn Đoạn', 'Binh Lương'].includes(card.name) || (!card.virtual && ['sam_set', 'hon_loan', 'binh_luong'].includes(card.idKey || card.id));
     if (isDelayed) {
       return this._playDelayedTrick(state, sourceId, targets[0] ?? sourceId, card);
     }

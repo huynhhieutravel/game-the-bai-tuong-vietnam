@@ -936,5 +936,19 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
 - **🔍 Hero Inspector (Bảng Chi Tiết Tướng Toàn Cảnh):**
   - **Khái niệm:** Bảng thông tin chi tiết kích hoạt khi chạm vào thẻ tướng trong màn chọn tướng (DraftScreen) hoặc trên bàn chơi. Hiển thị phóng to chân dung tướng cùng toàn bộ văn bản kỹ năng với phông chữ lớn, sắc nét, có độ tương phản cao, giải quyết triệt để lỗi không đọc được chữ nhỏ trên thẻ bài giấy.
 
+---
+
+## 14. TRÍ TUỆ NHÂN TẠO BOTAI & BẤT BIẾN TẦNG ỨNG DỤNG (BOTAI TACTICAL ENGINE & APPLICATION INVARIANTS)
+
+- **🤖 Proactive Hero Reveal Policy (Chính Sách Chủ Động Hiển Lộ Tướng Của Bot):**
+  - **Khái niệm:** Thuật toán đánh giá trạng thái đầu lượt của Bot trong `BotBrain._decideHeroReveal`. Bot chủ động hiển lộ tướng nếu vị tướng sở hữu kỹ năng kích hoạt chủ động trong pha hành động (`lan_sau`, `tu_chu`, `thinh_chinh`, `than_hoa`, `thuy_to`, `chuong_duong`, `linh_giam`, `duong_quan`, `trung_dung`) để mở khóa chuỗi combo chiến thuật thay vì ẩn mình thụ động.
+- **🔄 Virtual Card Routing Precedence (Độ Ưu Tiên Định Tuyến Thẻ Bài Ảo):**
+  - **Khái niệm:** Nguyên lý phân tách định tuyến trong `DispatcherV4._handlePlayCard`. Khi một lá bài được chuyển đổi bởi kỹ năng tướng (như `thinh_chinh` thành `Đào`, `than_hoa` thành `Hỏa Công`, `tien_duyen_chu_dong_tu` thành `Xiềng Xích`), thuộc tính `virtualCardName` được gán quyền ưu tiên cao hơn kiểu thẻ bài vật lý (`cardType`). Mọi lá bài chuyển đổi không phải Chém (`isConvertedNonSlash`) đều bị loại trừ khỏi luồng `CombatRules.playSlash`, ngăn chặn tuyệt đối lỗi tự chém vào bản thân khi hồi phục máu hoặc thiêu đốt.
+- **🛡️ Locked Passive Target Immunity (Bất Biến Miễn Nhiễm Tỏa Định Kỹ):**
+  - **Khái niệm:** Quy tắc bảo toàn tính miễn nhiễm của các kỹ năng Tỏa định (như `dam_bac` của Lang Liêu khi hết bài trên tay không thể bị Chém/Quyết đấu; `nghe_an_ke` của Nguyễn Chích không thể bị Cướp Bài/Hỗn Loạn). Quy tắc này được đồng bộ xuyên suốt từ `TargetResolverV4` đến `BotBrain` và `TrickRules`/`CombatRules`, đảm bảo Bot không bao giờ gửi đi payload hành động vi phạm điều kiện miễn nhiễm.
+- **⏱️ Active Non-Card Reaction Resolver (Bộ Phản Hồi Ngăn Xếp Phi Thẻ Bài):**
+  - **Khái niệm:** Cơ chế trong `BotRunnerV4` và `BotBrain` xử lý các khung ưu tiên phản hồi không yêu cầu tiêu hao thẻ bài vật lý (như `doJudge: true` của Phá Thành, `doUse: true` của Dưỡng Quân, `suit` của Tâm Công, `option` của Mượn Đao). Tránh việc hệ thống nhận diện nhầm các quyết định logic này là trạng thái hủy bỏ (`canceled: true`).
+
+
 
 
