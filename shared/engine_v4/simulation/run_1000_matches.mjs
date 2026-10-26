@@ -369,6 +369,9 @@ for (let g = 0; g < MATCH_COUNT; g++) {
           const p = state.getPlayer(actorId);
           if (p && p.hp > 1) {
             p.hp -= 1;
+            p.skillUsage = p.skillUsage || {};
+            p.skillUsage.tien_phong = { usedThisTurn: true };
+            p.skillUsage.tien_phong_nguyen_lu = { usedThisTurn: true };
             const target = state.getPlayer(frame.targetId);
             if (target && target.isAlive) {
               CombatRules.applyDamage(state, actorId, target.id, 1, 'tien_phong');

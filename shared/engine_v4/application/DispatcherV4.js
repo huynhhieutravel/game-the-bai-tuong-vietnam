@@ -1653,6 +1653,11 @@ export class DispatcherV4 {
               player.hp -= 1;
               this.state.addLog(`⚡ [Tiên Phong] ${player.name} mất 1 HP, gây 1 sát thương lên ${target?.name}!`);
             }
+            player.skillUsage = player.skillUsage || {};
+            player.skillUsage.tien_phong = player.skillUsage.tien_phong || {};
+            player.skillUsage.tien_phong_nguyen_lu = player.skillUsage.tien_phong_nguyen_lu || {};
+            player.skillUsage.tien_phong.usedThisTurn = true;
+            player.skillUsage.tien_phong_nguyen_lu.usedThisTurn = true;
             CombatRules.applyDamage(this.state, player.id, target.id, 1, 'tien_phong');
           }
         }
@@ -2248,6 +2253,13 @@ export class DispatcherV4 {
     }
 
     if (normSkillId === 'tien_phong' || normSkillId === 'tien_phong_nguyen_lu') {
+      player.skillUsage = player.skillUsage || {};
+      player.skillUsage.tien_phong = player.skillUsage.tien_phong || {};
+      player.skillUsage.tien_phong_nguyen_lu = player.skillUsage.tien_phong_nguyen_lu || {};
+      if (player.skillUsage.tien_phong.usedThisTurn || player.skillUsage.tien_phong_nguyen_lu.usedThisTurn) {
+        throw new Error('[Tiên Phong] Mỗi lượt chỉ được sử dụng 1 lần!');
+      }
+
       if (targets.length > 0) {
         const target = this.state.getPlayer(targets[0]);
         if (!target || !target.isAlive) {
@@ -2303,6 +2315,8 @@ export class DispatcherV4 {
             player.hp -= 1;
             this.state.addLog(`⚡ [Tiên Phong] ${player.name} mất 1 HP, gây 1 sát thương lên ${target.name}!`);
           }
+          player.skillUsage.tien_phong.usedThisTurn = true;
+          player.skillUsage.tien_phong_nguyen_lu.usedThisTurn = true;
           CombatRules.applyDamage(this.state, player.id, target.id, 1, 'tien_phong');
         } else {
           this.state.priorityStack.push({

@@ -531,10 +531,11 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
 
 - **⚡ Tiên Phong — Đột Phá Tiền Tuyến, Đánh Đổi Uy Lực (Vanguard Damage Strike):**
   - **Chủ Động Kỹ (Active Skill):** Kích hoạt trong Pha Ra bài (`PHASES.ACTION`).
+  - **Giới hạn lượt (Once-Per-Turn Restriction):** Mỗi lượt chỉ được sử dụng đúng 1 lần (`player.skillUsage.tien_phong.usedThisTurn = true`). Đã khắc phục triệt để lỗi Bot AI hoặc người chơi kích hoạt liên tiếp nhiều lần trong cùng một lượt theo [ADR 0103](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/docs/adr/0103-fix-tien-phong-once-per-turn-restriction.md).
   - **Điều kiện tầm đánh:** Mục tiêu bắt buộc phải nằm trong tầm công kích hiệu dụng của Nguyễn Lữ (`RangeSystem.inSlashRange(player, target, alivePlayers)`). Nếu không trang bị vũ khí, tầm đánh mặc định là 1.
   - **Hình thức trả chi phí:**
     - **Mất 1 Máu (`costType: 'hp'`):** Nguyễn Lữ tự trừ 1 HP của bản thân để gây trực tiếp 1 điểm sát thương lên mục tiêu.
-    - **Hy sinh Vũ khí (`costType: 'weapon'`):** Tháo lá bài vũ khí đang trang bị vào chồng bài bỏ (`discardPile`), kích hoạt sự kiện `ON_EQUIP_LOST` và gây trực tiếp 1 điểm sát thương lên mục tiêu mà bản thân không mất máu.
+    - **Hy sinh Vũ khí (`costType: 'weapon'`):** Tháo lá bài vũ khí đang trang bị (hoặc bỏ lá bài vũ khí trên tay) vào chồng bài bỏ (`discardPile`), kích hoạt sự kiện `ON_EQUIP_LOST` và gây trực tiếp 1 điểm sát thương lên mục tiêu mà bản thân không mất máu.
 
 ---
 

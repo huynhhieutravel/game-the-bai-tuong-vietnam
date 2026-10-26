@@ -376,8 +376,9 @@ export class BotBrain {
       }
     }
 
-    // 8. Tiên Phong (Nguyễn Lữ) - Hy sinh vũ khí hoặc HP để gây 1 sát thương chắc chắn
-    if ((hasSkill(bot, 'tien_phong_nguyen_lu') || hasSkill(bot, 'tien_phong'))) {
+    // 8. Tiên Phong (Nguyễn Lữ) - Hy sinh vũ khí hoặc HP để gây 1 sát thương chắc chắn (Mỗi lượt 1 lần)
+    const tienPhongUsed = Boolean(bot.skillUsage?.tien_phong?.usedThisTurn || bot.skillUsage?.tien_phong_nguyen_lu?.usedThisTurn);
+    if ((hasSkill(bot, 'tien_phong_nguyen_lu') || hasSkill(bot, 'tien_phong')) && !tienPhongUsed) {
       const handWeapon = (bot.hand || []).find(c => c && (c.type === 'weapon' || c.subtype === 'equip_weapon' || c.subType === 'equip_weapon'));
       const hasWeapon = Boolean(bot.equipment?.weapon || handWeapon);
       const canCost = hasWeapon || bot.hp > 1;

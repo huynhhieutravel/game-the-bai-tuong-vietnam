@@ -239,5 +239,62 @@ describe('QA Toàn Diện Tướng Hệ Việt: Nguyễn Lữ (Nguyen Lu QA Suit
       expect(state.getPlayer(1).hp).toBe(4);
       expect(state.priorityStack.isEmpty()).toBe(true);
     });
+
+    it('2.6. Giới hạn mỗi lượt một lần: Sau khi đã dùng Tiên Phong, dùng lần 2 sẽ bị từ chối', () => {
+      const state = createMockGameState();
+      const dispatcher = new DispatcherV4(state, new StateMachine(state));
+
+      // Lần 1: Dùng thành công
+      dispatcher.dispatchAction({
+        type: 'ACTION_USE_SKILL',
+        playerId: 0,
+        skillId: 'tien_phong_nguyen_lu',
+        targets: [1],
+        costType: 'hp'
+      });
+
+      expect(state.getPlayer(0).hp).toBe(3);
+      expect(state.getPlayer(1).hp).toBe(3);
+      expect(state.getPlayer(0).skillUsage?.tien_phong?.usedThisTurn).toBe(true);
+
+      // Lần 2 trong cùng 1 lượt: Phải bị chặn và ném lỗi khi throwOnError: true!
+      expect(() => {
+        dispatcher.dispatchAction({
+          type: 'ACTION_USE_SKILL',
+          playerId: 0,
+          skillId: 'tien_phong_nguyen_lu',
+          targets: [1],
+          costType: 'hp',
+          throwOnError: true
+        });
+      }).toThrowError(/\[Tiên Phong\] Mỗi lượt chỉ được sử dụng 1 lần!/);
+    });
+
+    it('2.7. Bot AI tuân thủ luật mỗi lượt một lần: Không kích hoạt Tiên Phong liên tục trong cùng 1 lượt', async () => {
+      const { BotBrain } = await import('../../ai/BotBrain.js');
+      const state = createMockGameState();
+      const bot = state.getPlayer(0);
+      bot.isBot = true;
+      // Kẻ địch 2 HP để bot ưu tiên Tiên Phong kết liễu
+      state.getPlayer(1).hp = 2;
+
+      // Khi chưa dùng: Bot có thể kích hoạt Tiên Phong
+      const action1 = BotBrain.decideAction(state, 0);
+      expect(action1).not.toBeNull();
+      expect(action1.skillId).toBe('tien_phong');
+
+      // Giả lập bot đã dùng Tiên Phong trong lượt
+      bot.skillUsage = {
+        tien_phong: { usedThisTurn: true },
+        tien_phong_nguyen_lu: { usedThisTurn: true }
+      };
+
+      // Sau khi đã dùng: Bot TUYỆT ĐỐI KHÔNG dùng Tiên Phong lần 2!
+      const action2 = BotBrain.decideAction(state, 0);
+      if (action2 && action2.type === 'USE_SKILL') {
+        expect(action2.skillId).not.toBe('tien_phong');
+        expect(action2.skillId).not.toBe('tien_phong_nguyen_lu');
+      }
+    });
   });
 });

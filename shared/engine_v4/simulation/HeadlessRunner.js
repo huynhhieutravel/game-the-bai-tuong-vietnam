@@ -496,6 +496,9 @@ export class HeadlessRunner {
             }
           } else if (skillId === 'tien_phong') {
             if (targets.length > 0) {
+              p.skillUsage = p.skillUsage || {};
+              p.skillUsage.tien_phong = { usedThisTurn: true };
+              p.skillUsage.tien_phong_nguyen_lu = { usedThisTurn: true };
               if (action.options?.costType === 'weapon' && p.equipment?.weapon) {
                 const w = p.equipment.weapon;
                 p.equipment.weapon = null;
