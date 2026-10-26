@@ -245,6 +245,17 @@ export class BotBrain {
       };
       const blackCard = bot.hand.find(c => isBlack(c) && c.type !== 'peach' && c.name !== 'Đào');
       if (blackCard) {
+        // Ưu tiên cứu viện đồng minh dính cẩm nang phán xét trước
+        const afflictedAlly = alivePlayers.find(p => p.id !== bot.id && this._isKnownAlly(bot, p) && p.judgementArea?.length > 0);
+        if (afflictedAlly) {
+          return {
+            type: 'USE_SKILL',
+            skillId: 'ky_tap',
+            cardIds: [blackCard.id],
+            targets: [afflictedAlly.id]
+          };
+        }
+
         const potentialVictims = alivePlayers.filter(p => 
           p.id !== bot.id && 
           !this._isKnownAlly(bot, p) && 
@@ -343,12 +354,23 @@ export class BotBrain {
           !(hasSkill(p, 'dam_bac') && (!p.hand || p.hand.length === 0))
         );
         const sortedEnemies = this._sortTargetsByPriority(bot, validEnemies, state);
-        if (sortedEnemies.length > 0) {
+        const availableSlashCount = this.getAvailableSlashCount(bot, matchCard.id);
+        const safeCandidates = sortedEnemies.filter(target => {
+          const targetHand = target.hand?.length || 0;
+          if (targetHand === 0) return true; // Trừng phạt mục tiêu 0 bài
+          if (availableSlashCount === 0) return false; // Cấm tự sát khi 0 Chém
+          if (availableSlashCount === 1) {
+            if (bot.hp <= 1) return false;
+            if (targetHand >= 2) return false;
+          }
+          return true;
+        });
+        if (safeCandidates.length > 0) {
           return {
             type: 'USE_SKILL',
             skillId: 'pha_thanh',
             cardIds: [matchCard.id],
-            targets: [sortedEnemies[0].id]
+            targets: [safeCandidates[0].id]
           };
         }
       }
@@ -551,12 +573,20 @@ export class BotBrain {
         if (card.name === 'Sấm Sét' || card.idKey === 'sam_set') {
           const alreadyHas = bot.judgementArea && bot.judgementArea.some(j => j.name === 'Sấm Sét' || j.idKey === 'sam_set');
           if (!alreadyHas) {
-            return {
-              type: 'PLAY_CARD',
-              cardId: card.id,
-              targetId: bot.id,
-              targetIds: [bot.id]
-            };
+            // Q3: Kiểm Soát Rủi Ro Đặt Sấm Sét
+            const hasJudgeSkill = hasSkill(bot, 'hoan_dieu') || hasSkill(bot, 'linh_giam');
+            const isHealthy = bot.hp >= 3;
+            const isDesperate = alivePlayers.filter(p => this._isKnownEnemy(bot, p)).length >= 3 && 
+                                alivePlayers.filter(p => this._isKnownAlly(bot, p)).length <= 1;
+
+            if (isHealthy || hasJudgeSkill || isDesperate) {
+              return {
+                type: 'PLAY_CARD',
+                cardId: card.id,
+                targetId: bot.id,
+                targetIds: [bot.id]
+              };
+            }
           }
         }
       }
@@ -612,6 +642,26 @@ export class BotBrain {
         const availableTargetIds = getAvailableTargets(state, bot.id, card.name, card.id);
         if (!availableTargetIds || availableTargetIds.length === 0) continue;
 
+        const isStealOrDismantle = card.name === 'Cướp Bài' || card.idKey === 'cuop_bai' || card.name === 'Tước Bài' || card.idKey === 'tuoc_bai';
+
+        // 1. Q4: Cứu viện đồng minh đang dính cẩm nang phán xét nguy hiểm (Sấm Sét, Hỗn Loạn, Binh Lương)
+        if (isStealOrDismantle) {
+          const afflictedAlly = availableTargetIds
+            .map(id => state.getPlayer(id))
+            .find(p => p && p.isAlive && (this._isKnownAlly(bot, p) || p.id === bot.id) && p.judgementArea && p.judgementArea.length > 0);
+
+          if (afflictedAlly) {
+            const rescueCard = afflictedAlly.judgementArea[0];
+            return {
+              type: 'PLAY_CARD',
+              cardId: card.id,
+              targetId: afflictedAlly.id,
+              targetIds: [afflictedAlly.id],
+              targetCardId: rescueCard.id
+            };
+          }
+        }
+
         const validCandidates = availableTargetIds
           .map(id => state.getPlayer(id))
           .filter(p => {
@@ -625,10 +675,70 @@ export class BotBrain {
         const sortedEnemies = this._sortTargetsByPriority(bot, validCandidates, state);
         if (sortedEnemies.length === 0) continue;
 
-        // Ràng buộc riêng của Hỏa Công: Bot phải có ít nhất 1 lá bài khác trên tay để sẵn sàng bỏ
+        // 2. Q1 & Q2: Ràng buộc an toàn của Quyết Đấu (Safe Duel & Punish Protocol)
+        if (card.name === 'Quyết Đấu' || card.idKey === 'quyet_dau') {
+          const availableSlashCount = this.getAvailableSlashCount(bot, card.id);
+          const safeCandidates = sortedEnemies.filter(target => {
+            const targetHand = target.hand?.length || 0;
+            // Đòn trừng phạt 100%: Mục tiêu 0 bài trên tay (không thể đánh Chém)
+            if (targetHand === 0) return true;
+
+            // Nếu đối thủ có bài nhưng Bot có 0 Chém: CẤM TUYỆT ĐỐI dùng Quyết Đấu
+            if (availableSlashCount === 0) return false;
+
+            // Nếu Bot chỉ có 1 Chém:
+            // - Không đấu nếu đối thủ có >= 2 bài (nguy cơ đối thủ có 2 Chém làm Bot mất máu, hoặc tiêu hao mất Chém công kích thường)
+            // - Không đấu nếu Bot đang hấp hối (hp <= 1)
+            if (availableSlashCount === 1) {
+              if (bot.hp <= 1) return false;
+              if (targetHand >= 2) return false;
+            }
+
+            return true;
+          });
+
+          if (safeCandidates.length === 0) continue;
+
+          const targetEnemy = safeCandidates[0];
+          return {
+            type: 'PLAY_CARD',
+            cardId: card.id,
+            targetId: targetEnemy.id,
+            targetIds: [targetEnemy.id]
+          };
+        }
+
+        // 3. Q5: Ràng buộc riêng của Hỏa Công (Chained Synergy & Card Check)
         if (card.name === 'Hỏa Công' || card.idKey === 'hoa_cong') {
           const otherCards = bot.hand.filter(c => c.id !== card.id);
           if (otherCards.length === 0) continue;
+
+          // Ưu tiên mục tiêu bị Xiềng Xích để kích hoạt sát thương lây lan
+          const chainedEnemies = sortedEnemies.filter(p => p.chained);
+          const targetEnemy = chainedEnemies.length > 0 ? chainedEnemies[0] : sortedEnemies[0];
+          return {
+            type: 'PLAY_CARD',
+            cardId: card.id,
+            targetId: targetEnemy.id,
+            targetIds: [targetEnemy.id]
+          };
+        }
+
+        // 4. Q4: Với Cướp Bài / Tước Bài lên kẻ địch: Ưu tiên chọn trang bị nguy hiểm
+        if (isStealOrDismantle) {
+          const targetEnemy = sortedEnemies[0];
+          const armor = targetEnemy.equipment?.armor;
+          const weapon = targetEnemy.equipment?.weapon;
+          const horseDef = targetEnemy.equipment?.horse_defense;
+          const targetEquip = armor || weapon || horseDef;
+
+          return {
+            type: 'PLAY_CARD',
+            cardId: card.id,
+            targetId: targetEnemy.id,
+            targetIds: [targetEnemy.id],
+            targetCardId: targetEquip ? targetEquip.id : null
+          };
         }
 
         const targetEnemy = sortedEnemies[0];
@@ -653,11 +763,13 @@ export class BotBrain {
         );
         const sortedVictims = this._sortTargetsByPriority(bot, potentialVictims, state);
         if (sortedVictims.length > 0) {
+          const chainedVictims = sortedVictims.filter(p => p.chained);
+          const victim = chainedVictims.length > 0 ? chainedVictims[0] : sortedVictims[0];
           return {
             type: 'PLAY_CARD',
             cardId: redCard.id,
-            targetId: sortedVictims[0].id,
-            targetIds: [sortedVictims[0].id],
+            targetId: victim.id,
+            targetIds: [victim.id],
             virtualCardName: 'Hỏa Công',
             customData: { asFireAttack: true }
           };
@@ -685,19 +797,9 @@ export class BotBrain {
     const canSlash = hasCrossbow || (bot.turnStats?.slashCount || 0) < 1;
     if (!canSlash) return null;
 
-    const hasDoiNui = globalHeroRegistry.hasSkill(bot, 'doi_nui', true);
-    const hasKhaiThien = globalHeroRegistry.hasSkill(bot, 'khai_thien', true);
-    const isRed = c => {
-      if (!c) return false;
-      const col = globalHeroRegistry.getEffectiveColor(bot, c);
-      return col ? col === 'red' : Boolean(c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
-    };
-
-    const slashCard = bot.hand.find(c => c.type === 'slash' || c.name === 'Chém') || 
-      (hasDoiNui ? bot.hand.find(c => c.type === 'dodge' || c.name === 'Né') : null) ||
-      (hasKhaiThien ? bot.hand.find(c => isRed(c) && c.type !== 'peach' && c.name !== 'Đào') : null);
-
-    if (!slashCard) return null;
+    const availableSlashes = this.getAvailableSlashes(bot);
+    if (availableSlashes.length === 0) return null;
+    const slashCard = availableSlashes[0];
 
     const alivePlayers = state.getAlivePlayers();
     const validTargets = RangeSystem.getValidSlashTargets(bot, alivePlayers, slashCard);
@@ -746,6 +848,58 @@ export class BotBrain {
       virtualCardName: virtualName,
       asSlash: Boolean(virtualName)
     };
+  }
+
+  /**
+   * Helper thống kê toàn bộ các nguồn Chém (thực tế và chuyển hóa từ kỹ năng)
+   */
+  static getAvailableSlashes(bot, excludeCardId = null) {
+    if (!bot || !bot.hand || bot.hand.length === 0) return [];
+    const hand = excludeCardId ? bot.hand.filter(c => c.id !== excludeCardId) : bot.hand;
+    const hasDoiNui = globalHeroRegistry.hasSkill(bot, 'doi_nui', true);
+    const hasKhaiThien = globalHeroRegistry.hasSkill(bot, 'khai_thien', true);
+    const isRed = c => {
+      if (!c) return false;
+      const col = globalHeroRegistry.getEffectiveColor(bot, c);
+      return col ? col === 'red' : Boolean(c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+    };
+
+    const slashes = [];
+    const usedIds = new Set();
+
+    // 1. Lá Chém thật
+    for (const c of hand) {
+      if (c.type === 'slash' || c.name === 'Chém') {
+        slashes.push(c);
+        usedIds.add(c.id);
+      }
+    }
+
+    // 2. Kỹ năng Dời Núi (Sơn Tinh): Né làm Chém
+    if (hasDoiNui) {
+      for (const c of hand) {
+        if (!usedIds.has(c.id) && (c.type === 'dodge' || c.name === 'Né')) {
+          slashes.push({ ...c, virtualName: 'Chém', asSlash: true });
+          usedIds.add(c.id);
+        }
+      }
+    }
+
+    // 3. Kỹ năng Khai Thiên (Thánh Gióng): Bài Đỏ không phải Đào làm Chém
+    if (hasKhaiThien) {
+      for (const c of hand) {
+        if (!usedIds.has(c.id) && isRed(c) && c.type !== 'peach' && c.name !== 'Đào') {
+          slashes.push({ ...c, virtualName: 'Chém', asSlash: true });
+          usedIds.add(c.id);
+        }
+      }
+    }
+
+    return slashes;
+  }
+
+  static getAvailableSlashCount(bot, excludeCardId = null) {
+    return this.getAvailableSlashes(bot, excludeCardId).length;
   }
 
   /**
@@ -864,6 +1018,7 @@ export class BotBrain {
     if (target.equipment?.weapon) score += 12;
     if (target.equipment?.horse_attack) score += 8;
     if (target.equipment?.armor) score -= 8;
+    if (target.chained) score += 15; // Mục tiêu bị xiềng xích dễ chịu sát thương lan nguyên tố
 
     // 6. Khoảng Cách Cự Ly (Proximity Penalty)
     if (state && typeof RangeSystem?.getDistance === 'function') {
@@ -1097,11 +1252,26 @@ export class BotBrain {
         const target = state.getPlayer(targetId);
         if (!target) return { type: 'ACTION_REACT', canceled: true };
 
+        // 1. Q4: Nếu mục tiêu là ĐỒNG MINH (hoặc bản thân): Ưu tiên tuyệt đối gỡ cẩm nang phán xét độc hại!
+        if (this._isKnownAlly(bot, target) || bot.id === target.id) {
+          if (target.judgementArea && target.judgementArea.length > 0) {
+            return {
+              type: 'ACTION_REACT',
+              cardId: target.judgementArea[0].id,
+              zone: 'judge',
+              canceled: false
+            };
+          }
+        }
+
+        // 2. Nếu mục tiêu là KẺ ĐỊCH:
+        // Ưu tiên tước/cướp trang bị: Giáp phòng thủ (Bát Quái Trận...) -> Vũ khí nguy hiểm -> Ngựa thủ
         const equipCards = Object.values(target.equipment || {}).filter(Boolean);
         if (equipCards.length > 0) {
           const armor = target.equipment?.armor;
           const weapon = target.equipment?.weapon;
-          const chosenEquip = armor || weapon || equipCards[0];
+          const horseDef = target.equipment?.horse_defense;
+          const chosenEquip = armor || weapon || horseDef || equipCards[0];
           return {
             type: 'ACTION_REACT',
             cardId: chosenEquip.id,
@@ -1572,19 +1742,10 @@ export class BotBrain {
 
       case 'ASK_SLASH_DUEL':
       case 'ASK_SLASH_RESPONSE': {
-        const hasDoiNui = globalHeroRegistry.hasSkill(bot, 'doi_nui', true);
-        const hasKhaiThien = globalHeroRegistry.hasSkill(bot, 'khai_thien', true);
-        const isRed = c => {
-          if (!c) return false;
-          const col = globalHeroRegistry.getEffectiveColor(bot, c);
-          return col ? col === 'red' : Boolean(c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
-        };
-        const slashCard = bot.hand.find(c => c.type === 'slash' || c.name === 'Chém') ||
-          (hasDoiNui ? bot.hand.find(c => c.type === 'dodge' || c.name === 'Né') : null) ||
-          (hasKhaiThien ? (bot.hand.find(c => isRed(c) && c.type !== 'peach' && c.name !== 'Đào') || bot.hand.find(isRed)) : null);
+        const availableSlashes = this.getAvailableSlashes(bot);
         return {
           type: 'ACTION_REACT',
-          slashCard: slashCard || null
+          slashCard: availableSlashes.length > 0 ? availableSlashes[0] : null
         };
       }
 

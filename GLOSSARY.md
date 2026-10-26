@@ -1418,3 +1418,39 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
 
 - **🐺 Giao Thức Kẻ Cô Độc / Tướng Dã Tâm (Careerist / Lone Wolf Protocol):**
   - Khi Bot mang thân phận Dã Tâm (`isDaTam = true`), Bot vẫn tuân thủ nguyên tắc cân bằng thế lực: tuyệt đối không tiếp tay cho phe đông quân số. Bot Dã Tâm sẽ ưu tiên tiêu diệt các thành viên Phe Áp Đảo trước để đưa ván cờ về thế cờ tàn solo 1v1 cân sức.
+
+---
+
+## 90. QUY TẮC TÁC CHIẾN CẨM NANG & QUẢN LÝ RỦI RO BOT AI (SAFE DUEL, SUPPORT TRICKS & RISK PROTOCOL)
+
+- **⚔️ Giao Thức Quyết Đấu An Toàn & Đòn Trừng Phạt (Safe Duel & Punish Protocol):**
+  - **Khái niệm:** Chuẩn hóa quy tắc ra quyết định cẩm nang [Quyết Đấu] và kỹ năng khiêu chiến ([Phá Thành] của Đô Đốc Bảo) trong [BotBrain.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/ai/BotBrain.js) theo [ADR 0099](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/docs/adr/0099-tactical-ai-safe-duel-support-tricks-and-lightning-risk.md).
+  - **2 Quy tắc cốt lõi:**
+    1. **Đòn Trừng Phạt 100% (Guaranteed Punish):** Khi kẻ địch đã cạn kiệt bài trên tay (`targetHandCount === 0`) và không có kỹ năng miễn nhiễm/phản đòn, Bot được phép phát động Quyết Đấu ngay cả khi Bot có 0 lá Chém, vì nạn nhân chắc chắn không thể đáp trả và phải chịu 1 sát thương miễn phí.
+    2. **Quyết Đấu An Toàn (Safe Duel Constraint):** Khi kẻ địch còn từ $\ge 1$ bài trên tay:
+       - Bot **bắt buộc phải có ít nhất 1 nguồn Chém dự trữ** (`getAvailableSlashCount(bot, excludeCardId) >= 1`, bao gồm lá Chém thật và bài chuyển hóa từ kỹ năng Sơn Tinh `doi_nui`, Thánh Gióng `khai_thien`).
+       - Tuyệt đối **CẤM** phát động Quyết Đấu khi Bot có 0 nguồn Chém dự trữ để triệt tiêu 100% nguy cơ tự sát.
+       - Khi Bot chỉ có đúng 1 nguồn Chém: không Quyết Đấu với kẻ địch có $\ge 2$ bài hoặc khi Bot đang hấp hối ($\le 1$ HP).
+
+- **🗡️ Trình Tự Tác Chiến Quyết Đấu & Chém (Duel vs Slash Sequence):**
+  - **Khái niệm:** Trí tuệ sắp xếp thứ tự dùng bài giữa [Quyết Đấu] và [Chém]:
+    - Nếu Bot có từ $\ge 2$ nguồn Chém: Bot phát động [Quyết Đấu] trước để bào mòn bài Chém / sinh lực đối thủ, sau đó tiếp tục tung lá [Chém] còn lại để dồn sát thương cực đại.
+    - Nếu Bot chỉ có đúng 1 nguồn Chém và đối thủ có bài: Bot ưu tiên đánh [Chém] thông thường trước (nếu bị Né, Bot không mất máu; nếu dùng Quyết Đấu thua sẽ mất máu). Sau khi đã Chém, Bot giữ lại lá Quyết Đấu cho các lượt tiếp theo.
+
+- **⚡ Quản Lý Rủi Ro Sấm Sét Tự Thân (Self-Lightning Risk Management):**
+  - **Khái niệm:** Quy định điều kiện an toàn khi Bot cân nhắc đặt lá bài [Sấm Sét] vào khu phán xét của bản thân (`targetId: bot.id`).
+  - **Quy tắc:** Bot chỉ được tự cắm Sấm Sét nếu:
+    1. Máu của Bot còn khỏe mạnh (`hp >= 3`), HOẶC
+    2. Bot sở hữu kỹ năng can thiệp bài phán xét (Nguyễn Bặc `hoan_dieu`, Lê Văn Duyệt `linh_giam`), HOẶC
+    3. Phe ta đang bị dồn vào thế yếu tuyệt vọng (phe địch áp đảo quân số, cần tạo đột biến lật kèo).
+    - Tuyệt đối **KHÔNG tự cắm Sấm Sét** khi Bot đang hấp hối ($\le 2$ HP) ở thế trận bình thường.
+
+- **🤝 Cứu Viện Đồng Minh Với Cướp Bài & Tước Bài (Support Steal & Dismantle):**
+  - **Khái niệm:** Mở rộng trí tuệ tương trợ đồng đội trong [BotBrain.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/ai/BotBrain.js) và [DispatcherV4.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/application/DispatcherV4.js).
+  - Khi đồng minh (hoặc bản thân Bot) đang bị dính cẩm nang phán xét nguy hại (`Sấm Sét`, `Hỗn Loạn`, `Binh Lương`), Bot ưu tiên sử dụng [Tước Bài] hoặc [Cướp Bài] chỉ định đích danh lá bùa hại đó (`targetCardId`) để giải cứu đồng minh.
+  - Khi tấn công kẻ địch: Bot ưu tiên tước/cướp Trang bị phòng thủ hiểm hóc (Bát Quái Trận, Ngựa phòng thủ +1) hoặc vũ khí tầm xa trước khi bốc ngẫu nhiên bài trên tay.
+
+- **🔥 Hỏa Công Tương Hỗ Xiềng Xích (Chained Fire Attack Synergy):**
+  - **Khái niệm:** Chiến thuật khuếch đại sát thương diện rộng của [Hỏa Công] khi kết hợp với trạng thái [Xiềng Xích].
+  - Khi lựa chọn mục tiêu Hỏa Công, Bot ưu tiên hàng đầu các kẻ địch đang bị Xiềng Xích (`chained: true`) để kích hoạt chuỗi sát thương nguyên tố lửa lan truyền toàn bộ các mục tiêu bị xích trên bàn cờ.
+

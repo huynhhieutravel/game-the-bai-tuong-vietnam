@@ -157,7 +157,11 @@ describe('QA Toàn Diện Bộ Não Chiến Thuật Bot AI (BotBrain Tactical De
       const p3 = state.getPlayer(3); // Kẻ địch khác
       p3.hand = [{ id: 'c3', name: 'Chém' }];
 
-      p0.hand = [{ id: 'duel_1', name: 'Quyết Đấu', type: 'trick', idKey: 'quyet_dau' }];
+      p0.hand = [
+        { id: 'duel_1', name: 'Quyết Đấu', type: 'trick', idKey: 'quyet_dau' },
+        { id: 'slash_1', name: 'Chém', type: 'slash', suit: 'spade', rank: 7 },
+        { id: 'slash_2', name: 'Chém', type: 'slash', suit: 'club', rank: 8 }
+      ];
       const action = BotBrain.decideAction(state, 0);
       expect(action.type).toBe('PLAY_CARD');
       expect(action.targetId).toBe(3); // Nhắm vào p3 thay vì p1

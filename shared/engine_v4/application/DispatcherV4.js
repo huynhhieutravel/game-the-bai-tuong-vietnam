@@ -313,15 +313,15 @@ export class DispatcherV4 {
         this._ensureHeroRevealedForSkill(player, 'ky_tap', 'Kỳ Tập');
         this.state.discardFromHand(sourceId, [card.id]);
         this.state.addLog(`⚡ [Kỳ Tập] ${player.name} sử dụng lá bài Đen [${card.name}] như [Tước Bài]!`);
-        TrickRules.playDismantle(this.state, sourceId, targetId, { ...card, name: 'Tước Bài', idKey: 'tuoc_bai', virtual: true }, { interactive: isInteractive });
+        TrickRules.playDismantle(this.state, sourceId, targetId, { ...card, name: 'Tước Bài', idKey: 'tuoc_bai', virtual: true }, { interactive: isInteractive, targetCardId: payload.targetCardId });
         return;
       }
-      TrickRules.playDismantle(this.state, sourceId, targetId, card, { interactive: isInteractive });
+      TrickRules.playDismantle(this.state, sourceId, targetId, card, { interactive: isInteractive, targetCardId: payload.targetCardId });
       return;
     }
     if (cardName === 'Cướp Bài') {
       const targetId = targetIds[0];
-      TrickRules.playSteal(this.state, sourceId, targetId, card, { interactive: isInteractive });
+      TrickRules.playSteal(this.state, sourceId, targetId, card, { interactive: isInteractive, targetCardId: payload.targetCardId });
       return;
     }
     if (cardName === 'Vạn Tiễn Quy Tâm' || cardName === 'Loạn Tiễn') {
