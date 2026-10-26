@@ -1166,24 +1166,6 @@ export class BotBrain {
         return { type: 'ACTION_REACT', negateCard: null };
       }
 
-      case 'ASK_BOC_TRAM_TRUNG_DODGE': {
-        // Đồng minh phe Lạc ra Né giùm cho Chúa công Lạc Long Quân
-        const hasDoiNui = globalHeroRegistry.hasSkill(bot, 'doi_nui', true);
-        const dodgeCard = bot.hand.find(c => c.type === 'dodge' || c.name === 'Né') || 
-          (hasDoiNui ? bot.hand.find(c => c.type === 'slash' || c.name === 'Chém') : null);
-        if (dodgeCard) {
-          return {
-            type: 'ACTION_REACT',
-            doProvide: true,
-            cardId: dodgeCard.id
-          };
-        }
-        return {
-          type: 'ACTION_REACT',
-          doProvide: false
-        };
-      }
-
       case 'ASK_BOC_TRAM_TRUNG_SLASH': {
         // Đồng minh phe Lạc ra Chém giùm cho Chúa công Lạc Long Quân
         const hasDoiNui = globalHeroRegistry.hasSkill(bot, 'doi_nui', true);

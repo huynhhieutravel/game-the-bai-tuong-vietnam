@@ -407,16 +407,16 @@ describe('QA Toàn Diện Bộ Não Chiến Thuật Bot AI (BotBrain Tactical De
   });
 
   describe('4. Xử Lý Phản Hồi Chuyên Biệt Các Priority Frame (Specialized Reaction Stack)', () => {
-    it('4.1. ASK_BOC_TRAM_TRUNG_DODGE: Đồng minh Lạc ra Né giùm cho Lạc Long Quân', () => {
+    it('4.1. ASK_BOC_TRAM_TRUNG_SLASH: Đồng minh Lạc ra Chém giùm cho Lạc Long Quân', () => {
       const state = createMockState();
       const p1 = state.getPlayer(1);
       p1.faction = 'lac';
-      p1.hand = [{ id: 'dodge_ally', name: 'Né', type: 'dodge' }];
+      p1.hand = [{ id: 'slash_ally', name: 'Chém', type: 'slash' }];
 
-      const frame = { type: 'ASK_BOC_TRAM_TRUNG_DODGE', currentActorId: 1 };
+      const frame = { type: 'ASK_BOC_TRAM_TRUNG_SLASH', currentActorId: 1 };
       const reaction = BotBrain.decideReaction(state, 1, frame);
       expect(reaction.doProvide).toBe(true);
-      expect(reaction.cardId).toBe('dodge_ally');
+      expect(reaction.cardId).toBe('slash_ally');
     });
 
     it('4.2. ASK_TIEN_PHAT: Lý Thường Kiệt bỏ lá Né để hóa giải cú Chém của kẻ địch', () => {

@@ -177,10 +177,11 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
   - **Thưởng diệt địch:** Khi tiêu diệt một người chơi khác phe đã lộ diện, kẻ kết liễu được rút số lá bài bằng **số đồng minh đã lộ diện của nạn nhân + 1** (tối thiểu là 2 lá bài). Nếu tiêu diệt một kẻ mang dã tâm (Careerist), kẻ kết liễu chỉ nhận 1 lá bài thưởng.
   - **Phạt ngộ sát (Friendly Fire):** Khi tiêu diệt một đồng minh cùng phe đã lộ diện, kẻ kết liễu lập tức bị xử phạt **vứt bỏ toàn bộ số bài trên tay và toàn bộ trang bị đang mặc**.
 - **🐉 Bọc Trăm Trứng (Lạc Long Quân - Phe Lạc):**
-  - Khi cần ra lá [Né] (bị Chém, Loạn Tiễn) hoặc lá [Chém] (trong Quyết Đấu, Dã Man), Chúa công Lạc Long Quân có thể phát động `Bọc Trăm Trứng` để mở khung yêu cầu đồng minh `ASK_BOC_TRAM_TRUNG_DODGE` hoặc `ASK_BOC_TRAM_TRUNG_SLASH`.
-  - Toàn bộ người chơi cùng phe Lạc còn sống sẽ được hỏi tuần tự theo hàng đợi xem có ai tình nguyện ra bài thay cho Chúa công hay không.
+  - **Chúa công kỹ (Kích Tướng):** CHỈ dùng cho lá [Chém], tuyệt đối **KHÔNG dùng cho lá [Né]**.
+  - **Chủ động trong lượt:** Lạc Long Quân có thể phát động Bọc Trăm Trứng chỉ định 1 kẻ địch trong tầm đánh, kêu gọi đồng minh phe Lạc ra [Chém] giùm (`ASK_BOC_TRAM_TRUNG_SLASH`). Nếu có đồng minh Chém giùm, đòn Chém tính là của Lạc Long Quân; nếu tất cả từ chối, Lạc Long Quân không mất lượt Chém tự thân.
+  - **Bị động khi cần [Chém]:** Trong Quyết Đấu (Duel), Dã Man Xâm Nhập (Barbarian) hoặc Mượn Đao Diệt Địch, khi bị yêu cầu ra lá [Chém], Lạc Long Quân có thể kêu gọi đồng minh phe Lạc ra [Chém] giùm qua `ASK_BOC_TRAM_TRUNG_SLASH`.
 - **👑 Tiên Phát (Lý Thường Kiệt - Phe Việt):**
-  - Khi Lý Thường Kiệt bị tấn công và cần dùng lá [Né], có thể phát động `Tiên Phát` tạo khung `ASK_TIEN_PHAT` để hỏi tuần tự các đồng minh phe Việt ra [Né] đỡ đòn giùm mình.
+  - Khi Lý Thường Kiệt bị tấn công và cần dùng lá [Né], có thể phát động `Tiên Phát` tạo khung `ASK_TIEN_PHAT` để hỏi tuần tự các đồng minh phe Việt ra [Né] đỡ đòn giùm mình (tương ứng kỹ năng Hộ Giá).
 - **🤝 Hậu Viện (Ngô Quyền - Phe Hà):**
   - Khi một người chơi phe Hà sử dụng lá [Đào] chủ động trong lượt, nếu Ngô Quyền đang bị thương (`hp < maxHp`), hệ thống sẽ mở khung `ASK_HAU_VIEN` hỏi người chơi đó có muốn nhường quả Đào này cho Ngô Quyền hay không. Nếu đồng ý, Ngô Quyền hồi 1 HP và người nhường Đào được rút thưởng 1 lá bài từ bộ bài.
 - **☯️ Cửa Sổ Can Thiệp Phán Xét (Pre-Judgement Intercept Window):**
@@ -442,15 +443,10 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
       - **[Đào]:** Tự hồi phục 1 HP (nếu chưa đầy máu).
       - **[Rượu]:** Uống Rượu kích hoạt cờ say rượu (`wineActive = true`), tăng +1 sát thương cho cú Chém tiếp theo.
       - **[Chém]:** Tung ra một đòn Chém ảo vào một mục tiêu đối địch trong tầm đánh, buộc đối thủ phải dùng [Né].
-- **🐉 Bọc Trăm Trứng — Chúa Công Kỹ Đồng Minh Trợ Chiến (Lord Skill: Allied Defense & Duel Support):**
-  - **Chúa Công Kỹ (Lord Skill):** Kỹ năng đặc quyền của Chúa Công phe Lạc.
-  - **Khi cần [Né] (đỡ Chém):**
-    - Lạc Long Quân có thể kêu gọi toàn bộ tướng đồng minh thuộc phe Lạc trên bàn cờ ra [Né] giùm mình (`ASK_BOC_TRAM_TRUNG_DODGE`).
-    - Lượt hỏi ưu tiên tuần tự qua từng đồng minh phe Lạc.
-    - Nếu có một đồng minh đánh ra lá [Né], cú Chém nhắm vào Lạc Long Quân lập tức bị vô hiệu hóa, Lạc Long Quân không mất bài hay máu.
-  - **Khi cần [Chém] (trong Quyết Đấu hoặc đối phó Nam Man Xâm Nhập):**
-    - Lạc Long Quân có thể kêu gọi đồng minh phe Lạc đánh ra lá [Chém] giùm mình (`ASK_BOC_TRAM_TRUNG_SLASH`).
-    - Khi đồng minh đánh [Chém] giùm, lượt Quyết Đấu tiếp tục chuyển lại cho đối thủ khiêu chiến.
+- **🐉 Bọc Trăm Trứng — Chúa Công Kỹ Đồng Minh Ra [Chém] Giùm (Lord Skill: Allied Slash Support):**
+  - **Chúa Công Kỹ (Lord Skill):** Kỹ năng đặc quyền của Chúa Công phe Lạc (tương ứng với kỹ năng Kích Tướng của Lưu Bị trong Tam Quốc Sát). CHỈ áp dụng cho lá **[Chém]**, tuyệt đối **KHÔNG dùng cho lá [Né]** (kêu gọi Né giùm là kỹ năng Tiên Phát của Lý Thường Kiệt phe Việt).
+  - **Chủ động tấn công:** Trong lượt đi, Lạc Long Quân phát động kỹ năng chỉ định 1 mục tiêu trong cự ly, kêu gọi đồng minh phe Lạc ra [Chém] giùm mình (`ASK_BOC_TRAM_TRUNG_SLASH`). Nếu không có đồng minh nào ra Chém, Lạc Long Quân không mất lượt Chém tự thân và vẫn có thể dùng bài bình thường.
+  - **Phản hồi phòng thủ (Khi cần Chém):** Khi đối mặt Quyết Đấu hoặc Dã Man Xâm Nhập, Lạc Long Quân có thể kêu gọi đồng minh phe Lạc đánh ra lá [Chém] thay mình qua `ASK_BOC_TRAM_TRUNG_SLASH`. Lượt hỏi ưu tiên duyệt tuần tự từng đồng minh Lạc còn sống.
 
 ---
 

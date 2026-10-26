@@ -342,7 +342,7 @@ export const LacLongQuan = {
       id: 'boc_tram_trung',
       name: 'Bọc Trăm Trứng',
       type: 'active',
-      description: 'Chủ Công Kỹ: Khi cần sử dụng hoặc đánh ra lá [Chém] (hoặc Né), tướng Lạc có thể ra bài giùm.'
+      description: 'Chủ Công Kỹ: Khi cần sử dụng hoặc đánh ra lá [Chém], tướng Lạc có thể ra bài giùm.'
     })
   ]
 };

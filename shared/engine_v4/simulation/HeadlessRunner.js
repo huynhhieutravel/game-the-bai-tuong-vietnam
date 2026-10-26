@@ -153,8 +153,6 @@ export class HeadlessRunner {
           TrickRules.respondNegate(state, actorId, reaction.negateCard);
         } else if (frame.type === 'ASK_CHANGE_JUDGE') {
           TrickRules.respondChangeJudge(state, actorId, null);
-        } else if (frame.type === 'ASK_BOC_TRAM_TRUNG_DODGE') {
-          CombatRules.respondBocTramTrungDodge(state, actorId, reaction.dodgeCard || null);
         } else if (frame.type === 'ASK_BOC_TRAM_TRUNG_SLASH') {
           CombatRules.respondBocTramTrungSlash(state, actorId, reaction.slashCard || null);
         } else if (frame.type === 'ASK_TIEN_PHAT') {

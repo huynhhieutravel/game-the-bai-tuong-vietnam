@@ -196,8 +196,6 @@ for (let g = 0; g < MATCH_COUNT; g++) {
           if (state.currentPhase === PHASES.JUDGE && state.priorityStack.isEmpty()) {
             stateMachine._completeJudgePhase();
           }
-        } else if (frame.type === 'ASK_BOC_TRAM_TRUNG_DODGE') {
-          CombatRules.respondBocTramTrungDodge(state, actorId, reaction.dodgeCard || null);
         } else if (frame.type === 'ASK_BOC_TRAM_TRUNG_SLASH') {
           CombatRules.respondBocTramTrungSlash(state, actorId, reaction.slashCard || null);
         } else if (frame.type === 'ASK_TIEN_PHAT') {

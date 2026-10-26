@@ -13,7 +13,7 @@ import { PlayerHand } from '../game/PlayerHand';
 
 describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến', () => {
   describe('1. DodgeModal - Kỹ năng Bọc Trăm Trứng & Tiên Phát trong Quốc Chiến', () => {
-    it('hiển thị nút Bọc Trăm Trứng cho Lạc Long Quân khi có đồng minh Lạc', () => {
+    it('không hiển thị nút Bọc Trăm Trứng trong DodgeModal vì Bọc Trăm Trứng chỉ dùng cho Chém', () => {
       const onConfirm = vi.fn();
       const gameState = {
         players: [
@@ -54,11 +54,8 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
 
       render(<DodgeModal req={req} gameState={gameState} onConfirm={onConfirm} />);
 
-      const bocTramTrungBtn = screen.getByText(/Kích Hoạt Bọc Trăm Trứng/i);
-      expect(bocTramTrungBtn).toBeTruthy();
-
-      fireEvent.click(bocTramTrungBtn);
-      expect(onConfirm).toHaveBeenCalledWith({ callBocTramTrung: true });
+      const bocTramTrungBtn = screen.queryByText(/Kích Hoạt Bọc Trăm Trứng/i);
+      expect(bocTramTrungBtn).toBeNull();
     });
 
     it('hiển thị nút Tiên Phát cho Lý Thường Kiệt trong Quốc Chiến (không cần isLord)', () => {
@@ -329,26 +326,26 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
     });
   });
 
-  describe('5. AskBocTramTrungDodgeModal & AskBocTramTrungSlashModal', () => {
-    it('lấy đúng bài của responderId khi được Lạc Long Quân gọi trợ chiến', () => {
+  describe('5. AskBocTramTrungSlashModal', () => {
+    it('lấy đúng bài của responderId khi được Lạc Long Quân gọi trợ chiến ra Chém', () => {
       const onConfirm = vi.fn();
       const gameState = {
         players: [
           { id: 0, name: 'Lạc Long Quân', isAlive: true, faction: 'lac', hand: [] },
-          { id: 1, name: 'Đồng Minh Âu Cơ', isAlive: true, faction: 'lac', hand: [{ id: 'ally_dodge_1', name: 'Né', suit: 'heart', rank: '10' }] }
+          { id: 1, name: 'Đồng Minh Âu Cơ', isAlive: true, faction: 'lac', hand: [{ id: 'ally_slash_1', name: 'Chém', suit: 'heart', rank: '10' }] }
         ]
       };
 
       const req = {
-        type: 'ask_boc_tram_trung_dodge',
+        type: 'ask_boc_tram_trung_slash',
         sourceId: 0,
         targetId: 0,
         responderId: 1
       };
 
-      render(<AskBocTramTrungDodgeModal req={req} gameState={gameState} onConfirm={onConfirm} />);
+      render(<AskBocTramTrungSlashModal req={req} gameState={gameState} onConfirm={onConfirm} />);
 
-      // Chọn option lá Né
+      // Chọn option lá Chém
       const select = screen.getByRole('combobox');
       fireEvent.change(select, { target: { value: '0' } });
 
@@ -358,7 +355,7 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
       fireEvent.click(helpBtn);
       expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({
         doProvide: true,
-        cardId: 'ally_dodge_1'
+        cardId: 'ally_slash_1'
       }));
     });
   });

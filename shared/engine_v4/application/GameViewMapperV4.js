@@ -167,15 +167,6 @@ export function toViewModel(state, mainPlayerId = 0) {
           ...frame.context,
           responderId: currentResponder
         };
-      } else if (frame.type === 'ASK_BOC_TRAM_TRUNG_DODGE') {
-        vm.waitingForResponse = {
-          id: frame.id,
-          type: 'ask_boc_tram_trung_dodge',
-          sourceId: frame.sourceId,
-          responderId: frame.currentActorId,
-          askQueue: [...(frame.priorityQueue || [])],
-          ...frame.context
-        };
       } else if (frame.type === 'ASK_BOC_TRAM_TRUNG_SLASH') {
         vm.waitingForResponse = {
           id: frame.id,

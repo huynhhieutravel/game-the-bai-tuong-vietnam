@@ -691,7 +691,7 @@ export class DispatcherV4 {
 
       case 'ASK_DODGE': {
         let dodgeCard = null;
-        if (!isCancelOrSkip && !data.useBagua && !data.doBagua && !data.callBocTramTrung && !data.doTienPhat && !data.doHoGia) {
+        if (!isCancelOrSkip && !data.useBagua && !data.doBagua && !data.doTienPhat && !data.doHoGia) {
           const hasDoiNui = globalHeroRegistry.hasSkill(player, 'doi_nui', true);
           const hasThinhChinh = globalHeroRegistry.hasSkill(player, 'thinh_chinh', true);
           const hasLinhGiam = globalHeroRegistry.hasSkill(player, 'linh_giam', true);
@@ -890,20 +890,6 @@ export class DispatcherV4 {
           player.hp = Math.min(player.maxHp, player.hp + 1);
           this.state.addLog(`${player.name} sử dụng [Đào], hồi phục 1 Máu (${player.hp}/${player.maxHp}).`);
         }
-        break;
-      }
-
-      case 'ASK_BOC_TRAM_TRUNG_DODGE': {
-        let dodgeCard = null;
-        if (!isCancelOrSkip && (data.doProvide || data.doReact)) {
-          const frame = this.state.priorityStack.peek();
-          if (frame && frame.sourceId !== undefined) {
-            const lord = this.state.getPlayer(frame.sourceId);
-            if (lord) this._ensureHeroRevealedForSkill(lord, 'boc_tram_trung', 'Bọc Trăm Trứng');
-          }
-          dodgeCard = this._resolveCard(player, data) || player.hand.find(c => c.type === 'dodge' || c.name === 'Né');
-        }
-        CombatRules.respondBocTramTrungDodge(this.state, playerId, dodgeCard);
         break;
       }
 

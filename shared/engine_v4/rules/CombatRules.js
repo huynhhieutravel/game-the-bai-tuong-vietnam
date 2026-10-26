@@ -365,33 +365,7 @@ export class CombatRules {
 
     const target = state.getPlayer(targetId);
 
-    // 0. Gọi đồng minh trợ chiến (Bọc Trăm Trứng / Tiên Phát)
-    if (options.callBocTramTrung) {
-      const allies = state.players.filter(p =>
-        p.id !== targetId &&
-        p.isAlive &&
-        !p.isDaTam &&
-        (p.revealedHeroes ? p.revealedHeroes.some(Boolean) : p.isRevealed !== false) &&
-        getCanonicalFaction(p.faction) === 'lac'
-      );
-      if (allies.length > 0) {
-        state.addLog(`🐉 ${target.name} phát động [Bọc Trăm Trứng], kêu gọi đồng minh hệ Lạc ra [Né] giùm!`);
-        state.priorityStack.push({
-          type: 'ASK_BOC_TRAM_TRUNG_DODGE',
-          sourceId: targetId,
-          targetId: targetId,
-          priorityQueue: allies.map(a => a.id),
-          currentActorId: allies[0].id,
-          context: {
-            allies: allies.map(a => a.id),
-            allyIndex: 0
-          }
-        });
-        return { calledAllies: true };
-      } else {
-        state.addLog(`🐉 Không có đồng minh hệ Lạc nào có thể ra [Né] giùm cho ${target.name}!`);
-      }
-    }
+    // 0. Gọi đồng minh trợ chiến Tiên Phát (Lý Thường Kiệt - Phe Việt)
 
     if (options.doTienPhat) {
       const allies = state.players.filter(p =>
@@ -542,56 +516,6 @@ export class CombatRules {
       }
       this.applyDamage(state, sourceId, targetId, damageAmount, damageType, false, frame.context?.card || null);
       return { dodged: false };
-    }
-  }
-
-  /**
-   * Phản hồi Bọc Trăm Trứng (Né giùm cho Lạc Long Quân)
-   */
-  static respondBocTramTrungDodge(state, allyId, dodgeCard = null) {
-    const frame = state.priorityStack.peek();
-    if (!frame || frame.type !== 'ASK_BOC_TRAM_TRUNG_DODGE') {
-      throw new Error(`[CombatRules] Không có yêu cầu Bọc Trăm Trứng Né nào đang chờ!`);
-    }
-
-    const ally = state.getPlayer(allyId);
-    const llq = state.getPlayer(frame.sourceId);
-
-    if (dodgeCard) {
-      state.priorityStack.pop(); // Giải phóng frame hỏi đồng minh
-      state.discardFromHand(allyId, [dodgeCard.id]);
-      state.addLog(`🐉 [Bọc Trăm Trứng] ${ally.name} đánh ra lá [Né] đỡ đòn thay cho ${llq.name}!`);
-
-      // Cập nhật frame ASK_DODGE bên dưới
-      const dodgeFrame = state.priorityStack.peek();
-      if (dodgeFrame && dodgeFrame.type === 'ASK_DODGE') {
-        dodgeFrame.context.dodgesProvided += 1;
-        if (dodgeFrame.context.dodgesProvided >= dodgeFrame.context.requiredDodges) {
-          state.priorityStack.pop();
-          state.addLog(`${llq.name} đã né thành công cú Chém nhờ đồng minh!`);
-          globalHeroRegistry.dispatchTrigger('ON_DODGE_SUCCESS', { sourceId: dodgeFrame.sourceId, targetId: llq.id, card: dodgeCard }, state);
-          return this._handlePostDodgeWeapons(state, dodgeFrame, llq);
-        }
-      }
-      return { defended: true };
-    } else {
-      // Đồng minh từ chối né giùm -> Chuyển sang đồng minh tiếp theo trong hàng đợi
-      frame.context.allyIndex = (frame.context.allyIndex || 0) + 1;
-      if (frame.context.allyIndex < frame.context.allies.length) {
-        const nextAllyId = frame.context.allies[frame.context.allyIndex];
-        frame.currentActorId = nextAllyId;
-        frame.priorityQueue = [nextAllyId];
-        return { continued: true, nextAllyId };
-      } else {
-        // Hết đồng minh trợ giúp -> Trả lại quyền quyết định cho Lạc Long Quân
-        state.priorityStack.pop();
-        const dodgeFrame = state.priorityStack.peek();
-        if (dodgeFrame && dodgeFrame.context) {
-          dodgeFrame.context.bocTramTrungFailed = true;
-        }
-        state.addLog(`🐉 Đồng minh hệ Lạc không có ai ra [Né] thay cho ${llq.name}!`);
-        return { defended: false };
-      }
     }
   }
 

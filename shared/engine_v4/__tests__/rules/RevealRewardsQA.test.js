@@ -260,31 +260,31 @@ describe('Cơ Chế Lộ Diện Tướng: Tiên Phong & Âm Dương Giao Hoà (Q
     expect(vm.players[1].subHeroId).toBeNull();
   });
 
-  it('10. Bọc Trăm Trứng / Tiên Phát: Không thể kêu gọi đồng minh khi đồng minh chưa lộ diện tướng', () => {
+  it('10. Tiên Phát: Không thể kêu gọi đồng minh khi đồng minh chưa lộ diện tướng', () => {
     const state = createTestGame();
-    const p0 = state.getPlayer(0); // LLQ (Phe Lạc)
-    p0.faction = 'lac';
-    p0.skills = ['boc_tram_trung'];
+    const p0 = state.getPlayer(0); // Lý Thường Kiệt (Phe Việt)
+    p0.faction = 'viet';
+    p0.skills = ['tien_phat'];
     p0.revealedHeroes = [true, false];
 
-    const p1 = state.getPlayer(1); // Đồng minh Lạc
-    p1.faction = 'lac';
+    const p1 = state.getPlayer(1); // Đồng minh Việt
+    p1.faction = 'viet';
     p1.hand = [{ id: 'd_1', name: 'Né', type: 'dodge' }];
     // p1 CHƯA lật tướng nào (đang ẩn danh)
     p1.revealedHeroes = [false, false];
 
-    // LLQ bị tấn công, đẩy frame ASK_DODGE vào stack
+    // Bị tấn công, đẩy frame ASK_DODGE vào stack
     state.priorityStack.push({
       type: 'ASK_DODGE',
-      sourceId: 1,
+      sourceId: 2,
       targetId: 0,
       currentActorId: 0,
       priorityQueue: [0],
       context: { requiredDodges: 1, dodgesProvided: 0, damageAmount: 1 }
     });
 
-    // LLQ kích hoạt Bọc Trăm Trứng khi bị tấn công
-    const result = CombatRules.respondDodge(state, 0, null, { callBocTramTrung: true });
+    // Kích hoạt Tiên Phát khi bị tấn công
+    const result = CombatRules.respondDodge(state, 0, null, { doTienPhat: true });
 
     // Vì đồng minh chưa lật tướng -> Không tìm thấy đồng minh hợp lệ nào!
     expect(result.calledAllies).toBeUndefined();

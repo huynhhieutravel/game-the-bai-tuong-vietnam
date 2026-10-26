@@ -31,7 +31,6 @@ import { KhoiNghiaModal } from './KhoiNghiaModal';
 import { NamQuocSonHaModal } from './NamQuocSonHaModal';
 import { ThuyToBonusModal } from './ThuyToBonusModal';
 import { ThuyToModal } from './ThuyToModal';
-import { AskBocTramTrungDodgeModal } from './AskBocTramTrungDodgeModal';
 import { TienPhatModal } from './TienPhatModal';
 import { TienPhongModal } from './TienPhongModal';
 import { TrungDungModal } from './TrungDungModal';
@@ -808,14 +807,6 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           return (
             <div style={modalStyle}>
               <AskBocTramTrungSlashModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
-            </div>
-          );
-        }
-
-        if (req.type === 'ask_boc_tram_trung_dodge' && req.responderId === me.id) {
-          return (
-            <div style={modalStyle}>
-              <AskBocTramTrungDodgeModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
             </div>
           );
         }

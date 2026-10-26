@@ -40,7 +40,6 @@ describe('Tầng 2 QA: ViewModel Contract Guard (Bảo vệ Hợp đồng Dữ l
     { type: 'ASK_HIEN_HAU', expectedType: 'ask_hien_hau' },
     { type: 'ASK_DUYEN_THO', expectedType: 'ask_duyen_tho' },
     { type: 'ASK_HOA_THAN_AN_TU', expectedType: 'ask_hoa_than_an_tu' },
-    { type: 'ASK_BOC_TRAM_TRUNG_DODGE', expectedType: 'ask_boc_tram_trung_dodge' },
     { type: 'ASK_BOC_TRAM_TRUNG_SLASH', expectedType: 'ask_boc_tram_trung_slash' }
   ];
 

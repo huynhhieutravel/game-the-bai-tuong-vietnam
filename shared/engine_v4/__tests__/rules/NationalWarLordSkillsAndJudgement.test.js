@@ -120,13 +120,14 @@ describe('NationalWarLordSkillsAndJudgement Test Suite', () => {
   });
 
   describe('2. Lạc Long Quân - Bọc Trăm Trứng', () => {
-    it('Bọc Trăm Trứng (Dodge): Lạc Long Quân bị Chém -> Kêu gọi đồng minh ra Né thay thế thành công', () => {
+    it('Bọc Trăm Trứng (Dodge invariant): Lạc Long Quân bị Chém KHÔNG THỂ phát động Bọc Trăm Trứng khi cần Né, phải tự dùng lá Né', () => {
       const llq = state.getPlayer(0);
       const lacAlly = state.getPlayer(1);
       const enemy = state.getPlayer(2);
       enemy.equipment.weapon = { id: 'wp_bow', name: 'Kỳ Lân Cung', range: 3 };
 
       lacAlly.hand = [{ id: 'dodge_1', name: 'Né', type: 'dodge' }];
+      llq.hand = [{ id: 'dodge_llq', name: 'Né', type: 'dodge' }];
       enemy.hand = [{ id: 'slash_1', name: 'Chém', type: 'slash' }];
 
       // Enemy Chém LLQ
@@ -134,39 +135,20 @@ describe('NationalWarLordSkillsAndJudgement Test Suite', () => {
 
       expect(state.priorityStack.peek().type).toBe('ASK_DODGE');
 
-      // LLQ kích hoạt Bọc Trăm Trứng
+      // LLQ tự đánh lá Né của mình (không có Bọc Trăm Trứng cho Né)
       dispatcher.dispatchAction({
         type: 'ACTION_REACT',
         payload: {
           playerId: llq.id,
           responseType: 'react',
-          data: { callBocTramTrung: true }
+          data: { cardId: 'dodge_llq' }
         }
       });
 
-      // Frame chuyển sang ASK_BOC_TRAM_TRUNG_DODGE gửi tới Lạc đồng minh
-      const frame = state.priorityStack.peek();
-      expect(frame.type).toBe('ASK_BOC_TRAM_TRUNG_DODGE');
-      expect(frame.currentActorId).toBe(lacAlly.id);
-
-      // ViewModel kiểm tra mapping UI sạch
-      const vm = toViewModel(state, lacAlly.id);
-      expect(vm.waitingForResponse.type).toBe('ask_boc_tram_trung_dodge');
-      expect(vm.waitingForResponse.responderId).toBe(lacAlly.id);
-
-      // Đồng minh ra Né
-      dispatcher.dispatchAction({
-        type: 'ACTION_REACT',
-        payload: {
-          playerId: lacAlly.id,
-          responseType: 'react',
-          data: { doProvide: true, cardId: 'dodge_1' }
-        }
-      });
-
-      // Đỡ đòn thành công, LLQ không mất máu, đồng minh mất lá Né
+      // Né thành công bằng chính bài của LLQ, đồng minh giữ nguyên bài
       expect(llq.hp).toBe(4);
-      expect(lacAlly.hand.length).toBe(0);
+      expect(llq.hand.length).toBe(0);
+      expect(lacAlly.hand.length).toBe(1);
       expect(state.priorityStack.isEmpty()).toBe(true);
     });
 

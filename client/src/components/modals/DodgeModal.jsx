@@ -28,8 +28,6 @@ export function DodgeModal({ req, gameState, onConfirm }) {
   const hasDoiNui = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'doi-nui');
   const hasThinhChinh = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'thinh-chinh');
 
-  const hasBocTramTrung = !me.isSkillsSuppressed && (hasSkillEvenIfHidden(me, 'boc-tram-trung') || hasSkillEvenIfHidden(me, 'boc_tram_trung') || me.heroes?.some(h => h.id === 'lac-long-quan'));
-  const canBocTramTrung = hasBocTramTrung && gameState.players.some(p => p.id !== me.id && p.isAlive && !p.isDaTam && (p.revealedHeroes ? p.revealedHeroes.some(Boolean) : p.isRevealed !== false) && (getPlayerFaction(p) === 'Lạc' || p.faction === 'Lạc' || p.faction === 'lac'));
 
   const hasTienPhat = !me.isSkillsSuppressed && (hasSkillEvenIfHidden(me, 'tien-phat') || hasSkillEvenIfHidden(me, 'tien_phat') || me.heroes?.some(h => h.id === 'ly-thuong-kiet'));
   const canTienPhat = hasTienPhat && gameState.players.some(p => p.id !== me.id && p.isAlive && !p.isDaTam && (p.revealedHeroes ? p.revealedHeroes.some(Boolean) : p.isRevealed !== false) && (getPlayerFaction(p) === 'Việt' || p.faction === 'Việt' || p.faction === 'viet'));
@@ -94,11 +92,6 @@ export function DodgeModal({ req, gameState, onConfirm }) {
         onCancel={() => onConfirm({ doReact: false })}
         extraButtons={
           <>
-            {canBocTramTrung && (
-              <button className="btn-action" style={{ backgroundColor: '#0284c7', color: '#fff', flex: '1 1 100%' }} onClick={() => onConfirm({ callBocTramTrung: true })}>
-                🐉 Kích Hoạt Bọc Trăm Trứng
-              </button>
-            )}
             {canTienPhat && (
               <button className="btn-action" style={{ backgroundColor: '#ec4899', color: '#fff', flex: '1 1 100%' }} onClick={() => onConfirm({ doTienPhat: true })}>
                 👑 Kích Hoạt Tiên Phát
