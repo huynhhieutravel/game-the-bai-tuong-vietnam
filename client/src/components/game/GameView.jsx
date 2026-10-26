@@ -1922,6 +1922,61 @@ export default function GameView(props = {}) {
         />
       )}
 
+      {/* Floating Toolbar khi tạm ẩn GameOverModal để xem lại bàn đấu */}
+      {gameState?.gameOver && isGameOverModalDismissed && (
+        <div 
+          style={{
+            position: 'fixed',
+            bottom: '12px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'rgba(15, 23, 42, 0.94)',
+            border: '1.5px solid var(--color-gold)',
+            borderRadius: '24px',
+            padding: '5px 14px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.85), 0 0 16px rgba(245, 158, 11, 0.4)',
+            backdropFilter: 'blur(8px)'
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setIsGameOverModalDismissed(false)}
+            style={{
+              background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+              color: '#ffffff',
+              border: '1px solid #fef08a',
+              borderRadius: '16px',
+              padding: '5px 14px',
+              fontSize: '0.8rem',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            🏆 Mở Bảng Kết Quả
+          </button>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: '#cbd5e1',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '16px',
+              padding: '5px 14px',
+              fontSize: '0.8rem',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            🔄 Chơi Lại Ván Mới
+          </button>
+        </div>
+      )}
+
       <ChatWidget style={{ position: 'absolute', top: '100px', left: '20px', zIndex: 90, height: '300px', width: '280px' }} />
     </div>
   );
