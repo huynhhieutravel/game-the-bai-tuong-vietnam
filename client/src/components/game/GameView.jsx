@@ -102,6 +102,17 @@ export default function GameView(props = {}) {
   const [targetSession, setTargetSession] = useState(null);
   const [toastQueue, setToastQueue] = useState([]);
   const [phaseBanner, setPhaseBanner] = useState(null);
+  const [directImpactAlert, setDirectImpactAlert] = useState(null);
+  const directImpactTimerRef = useRef(null);
+  const [gamePace, setGamePace] = useState(() => {
+    try {
+      return (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.getItem === 'function')
+        ? (window.localStorage.getItem('viet_sat_game_pace') || 'normal')
+        : 'normal';
+    } catch (_) {
+      return 'normal';
+    }
+  });
   const [heroPopup, setHeroPopup] = useState(null);
   const [popupTab, setPopupTab] = useState('heroes');
   const [cardPopup, setCardPopup] = useState(null);
@@ -109,6 +120,26 @@ export default function GameView(props = {}) {
   const toastTimerRef = useRef(null);
   const isUserScrolledUpRef = useRef(false);
   const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
+
+  const triggerDirectImpactAlert = useCallback((alertData) => {
+    if (directImpactTimerRef.current) clearTimeout(directImpactTimerRef.current);
+    setDirectImpactAlert(alertData);
+    directImpactTimerRef.current = setTimeout(() => {
+      setDirectImpactAlert(null);
+    }, 3200); // 3.2s để người chơi dễ đọc và nhận biết rõ ràng
+  }, []);
+
+  const handlePaceChange = useCallback((newPace) => {
+    setGamePace(newPace);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.setItem === 'function') {
+        window.localStorage.setItem('viet_sat_game_pace', newPace);
+      }
+    } catch (_) {}
+    if (gameAPI && typeof gameAPI.setBotPace === 'function') {
+      gameAPI.setBotPace(newPace);
+    }
+  }, [gameAPI]);
 
   useEffect(() => {
     if (heroPopup) {
@@ -119,6 +150,7 @@ export default function GameView(props = {}) {
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (directImpactTimerRef.current) clearTimeout(directImpactTimerRef.current);
     };
   }, []);
 
@@ -378,12 +410,71 @@ export default function GameView(props = {}) {
     const newLogsCount = currentLogs.length - processedLogsCount.current;
     
     if (newLogsCount > 0 && processedLogsCount.current > 0) { // Đừng kêu loạn xạ khi mới load game
+        const myPlayer = gameState.players?.find(p => p.id === mainPlayerId) || gameState.players?.[0];
+        const myPlayerName = myPlayer?.name || 'Bạn';
+
         // Xử lý tất cả các log mới
         for (let i = processedLogsCount.current; i < currentLogs.length; i++) {
             const log = currentLogs[i];
             const logText = log?.text || log?.message || (typeof log === 'string' ? log : '');
             if (logText) {
                 const text = logText.toLowerCase();
+
+                // 1. Kiểm tra sự kiện tác động trực tiếp lên Bạn (Direct Impact Alert)
+                const isImpactOnMe = 
+                  (log.victimId !== undefined && log.victimId === mainPlayerId) ||
+                  (log.targetId !== undefined && log.targetId === mainPlayerId) ||
+                  (myPlayerName && (logText.includes(`của ${myPlayerName}`) || logText.includes(`lên ${myPlayerName}`) || logText.includes(`${myPlayerName} chịu`))) ||
+                  logText.includes("của Bạn") || logText.includes("lên Bạn") || logText.includes("Bạn chịu");
+
+                if (isImpactOnMe) {
+                  if (log.type === 'STEAL_CARD' || text.includes("đã cướp 1 lá bài") || text.includes("đã cướp")) {
+                    const thief = gameState.players?.find(p => p.id === log.thiefId);
+                    const thiefName = thief?.name || 'Đối thủ';
+                    const cardInfo = log.cardName ? `lá [${log.cardName}${log.cardSuit ? ' ' + log.cardSuit : ''}${log.cardRank ? log.cardRank : ''}]` : '1 lá bài';
+                    const fromZone = log.fromZoneDesc || 'trên tay';
+                    triggerDirectImpactAlert({
+                      icon: '🤏',
+                      title: 'BỊ CƯỚP BÀI!',
+                      message: `${thiefName} đã cướp ${cardInfo} (${fromZone}) của Bạn!`,
+                      type: 'danger'
+                    });
+                  } else if (log.type === 'DISMANTLE_CARD' || text.includes("đã tước 1 lá bài") || text.includes("đã tước")) {
+                    const thief = gameState.players?.find(p => p.id === log.thiefId);
+                    const thiefName = thief?.name || 'Đối thủ';
+                    const cardInfo = log.cardName ? `lá [${log.cardName}${log.cardSuit ? ' ' + log.cardSuit : ''}${log.cardRank ? log.cardRank : ''}]` : '1 lá bài';
+                    const fromZone = log.fromZoneDesc || 'trên tay';
+                    triggerDirectImpactAlert({
+                      icon: '💥',
+                      title: 'BỊ TƯỚC BÀI!',
+                      message: `${thiefName} đã tước ${cardInfo} (${fromZone}) của Bạn!`,
+                      type: 'danger'
+                    });
+                  } else if (text.includes("sát thương") || (text.includes("mất") && text.includes("sinh lực"))) {
+                    triggerDirectImpactAlert({
+                      icon: '🩸',
+                      title: 'BỊ THƯƠNG!',
+                      message: logText,
+                      type: 'danger'
+                    });
+                  } else if (text.includes("quyết đấu")) {
+                    triggerDirectImpactAlert({
+                      icon: '⚔️',
+                      title: 'BỊ ÉP QUYẾT ĐẤU!',
+                      message: logText,
+                      type: 'warning'
+                    });
+                  } else if (text.includes("khu phán xét")) {
+                    triggerDirectImpactAlert({
+                      icon: '⚖️',
+                      title: 'BỊ GẮN PHÁN XÉT!',
+                      message: logText,
+                      type: 'warning'
+                    });
+                  }
+                }
+
+                // 2. Xử lý âm thanh và banner thông báo chung cho toàn bàn
                 if (text.includes("lập công") || text.includes("tiêu diệt kẻ địch") || text.includes("thưởng rút")) {
                     sfx.playDrawCard();
                     showPhaseBanner(logText.startsWith("🎁") ? logText : `🎁 ${logText}`);
@@ -435,7 +526,7 @@ export default function GameView(props = {}) {
         }
     }
     processedLogsCount.current = currentLogs.length;
-  }, [gameState?.logs, sfx]);
+  }, [gameState?.logs, sfx, mainPlayerId, triggerDirectImpactAlert]);
 
   const prevNeedsDiscard = useRef(false);
   useEffect(() => {
@@ -621,6 +712,25 @@ export default function GameView(props = {}) {
              📜 Log {gameState.logs?.length > 0 && <span className="mobile-log-count">{gameState.logs.length}</span>}
           </button>
           <button 
+             onClick={() => setShowGameMenu(true)}
+             title="Tùy chọn nhịp độ trận đấu"
+             style={{
+               background: 'rgba(255, 255, 255, 0.08)',
+               border: '1px solid rgba(255, 255, 255, 0.2)',
+               color: gamePace === 'slow' ? '#38bdf8' : gamePace === 'fast' ? '#f59e0b' : '#a3e635',
+               padding: '2px 8px',
+               borderRadius: '6px',
+               fontSize: '0.74rem',
+               fontWeight: 'bold',
+               cursor: 'pointer',
+               display: 'inline-flex',
+               alignItems: 'center',
+               gap: '2px'
+             }}
+          >
+             {gamePace === 'slow' ? '🐢 Chậm' : gamePace === 'fast' ? '⚡ Nhanh' : '⚖️ Chuẩn'}
+          </button>
+          <button 
              className="game-menu-btn"
              onClick={() => setShowGameMenu(true)}
              title="Tùy chọn & Menu trận đấu"
@@ -643,17 +753,140 @@ export default function GameView(props = {}) {
         </div>
       </div>
       
-      {/* Quick Ticker trên Mobile */}
-      {isMobile && gameState.logs && gameState.logs.length > 0 && (
+      {/* Live Combat Action Ticker (Desktop & Mobile) */}
+      {gameState.logs && gameState.logs.length > 0 && (
         <div 
-          className="mobile-log-ticker" 
+          className="live-combat-ticker" 
           onClick={() => setShowMobileLog(true)}
+          style={{
+            background: 'rgba(15, 23, 42, 0.88)',
+            backdropFilter: 'blur(8px)',
+            borderBottom: '1px solid rgba(245, 158, 11, 0.25)',
+            padding: isMobile ? '4px 10px' : '5px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            zIndex: 40,
+            fontSize: isMobile ? '0.75rem' : '0.84rem',
+            color: '#cbd5e1',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+            userSelect: 'none',
+            transition: 'background 0.2s ease'
+          }}
+          title="Nhấp để mở chi tiết Nhật Ký Trận Đấu"
         >
-          <span className="ticker-icon">📜</span>
-          <span className="ticker-text">
-            {gameState.logs[gameState.logs.length - 1].text || gameState.logs[gameState.logs.length - 1].message}
-          </span>
-          <span className="ticker-more">›</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+            <span style={{ 
+              fontSize: '0.65rem', 
+              fontWeight: '800', 
+              background: 'linear-gradient(to right, #f59e0b, #d97706)',
+              color: '#0f172a',
+              padding: '1px 6px',
+              borderRadius: '4px',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              flexShrink: 0
+            }}>
+              Mới nhất
+            </span>
+            <span style={{ 
+              color: '#f8fafc', 
+              fontWeight: '600',
+              overflow: 'hidden', 
+              textOverflow: 'ellipsis'
+            }}>
+              {gameState.logs[gameState.logs.length - 1].text || gameState.logs[gameState.logs.length - 1].message}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, color: '#94a3b8', fontSize: '0.74rem' }}>
+            <span>📜 Nhật ký</span>
+            <span style={{ fontSize: '0.9rem', color: '#f59e0b' }}>›</span>
+          </div>
+        </div>
+      )}
+
+      {/* Direct Impact Alert Banner (Cảnh Báo Nổi Bật Dành Cho Bạn - Không bị xóa bởi waitingForResponse) */}
+      {directImpactAlert && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: isMobile ? '82px' : '96px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1200,
+            minWidth: isMobile ? '92%' : '440px',
+            maxWidth: '680px',
+            background: directImpactAlert.type === 'danger'
+              ? 'linear-gradient(135deg, rgba(185, 28, 28, 0.96) 0%, rgba(127, 29, 29, 0.98) 100%)'
+              : 'linear-gradient(135deg, rgba(217, 119, 6, 0.96) 0%, rgba(180, 83, 9, 0.98) 100%)',
+            border: '2px solid #f59e0b',
+            borderRadius: '14px',
+            padding: '12px 18px',
+            boxShadow: '0 0 30px rgba(245, 158, 11, 0.7), 0 10px 30px rgba(0,0,0,0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            backdropFilter: 'blur(10px)',
+            color: '#ffffff',
+            boxSizing: 'border-box'
+          }}
+          onClick={() => setDirectImpactAlert(null)}
+          title="Nhấn để đóng cảnh báo"
+        >
+          <div style={{
+            fontSize: '2rem',
+            lineHeight: 1,
+            filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.6))',
+            flexShrink: 0
+          }}>
+            {directImpactAlert.icon || '⚠️'}
+          </div>
+          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+            <div style={{
+              fontSize: '0.75rem',
+              fontWeight: '800',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: '#fef08a',
+              marginBottom: '2px'
+            }}>
+              {directImpactAlert.title || 'CẢNH BÁO TÁC ĐỘNG'}
+            </div>
+            <div style={{
+              fontSize: isMobile ? '0.88rem' : '0.98rem',
+              fontWeight: '700',
+              lineHeight: 1.35,
+              textShadow: '0 1px 3px rgba(0,0,0,0.8)'
+            }}>
+              {directImpactAlert.message}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDirectImpactAlert(null);
+            }}
+            style={{
+              background: 'rgba(255,255,255,0.18)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: '50%',
+              width: '28px',
+              height: '28px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: 'bold',
+              flexShrink: 0
+            }}
+            title="Đóng cảnh báo"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -1846,6 +2079,63 @@ export default function GameView(props = {}) {
               >
                 ▶️ Tiếp Tục Trận Đấu
               </button>
+
+              {/* Tùy Chọn Nhịp Độ Trận Đấu (Bot Pace) */}
+              <div style={{
+                background: 'rgba(0,0,0,0.3)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '12px',
+                padding: '10px 12px',
+                textAlign: 'left'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#f59e0b' }}>
+                    ⏱️ NHỊP ĐỘ TRẬN ĐẤU (BOT SPEED)
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                    {gamePace === 'slow' ? '1800ms' : gamePace === 'fast' ? '700ms' : '1300ms'}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                  {[
+                    { id: 'slow', label: '🐢 Chậm', desc: '1.8s' },
+                    { id: 'normal', label: '⚖️ Chuẩn', desc: '1.3s' },
+                    { id: 'fast', label: '⚡ Nhanh', desc: '0.7s' }
+                  ].map(item => {
+                    const isActive = gamePace === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handlePaceChange(item.id)}
+                        style={{
+                          background: isActive 
+                            ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
+                            : 'rgba(255,255,255,0.06)',
+                          border: isActive ? '1px solid #fbbf24' : '1px solid rgba(255,255,255,0.12)',
+                          borderRadius: '8px',
+                          padding: '7px 4px',
+                          color: isActive ? '#0f172a' : '#cbd5e1',
+                          fontWeight: isActive ? '800' : '600',
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '2px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span>{item.label}</span>
+                        <span style={{ fontSize: '0.66rem', opacity: isActive ? 0.9 : 0.6 }}>{item.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.68rem', color: '#94a3b8', textAlign: 'center' }}>
+                  Điều chỉnh thời gian chờ suy nghĩ và phản hồi của Bot
+                </p>
+              </div>
 
               <button 
                 onClick={sfx.toggleMute}

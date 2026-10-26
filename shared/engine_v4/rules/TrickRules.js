@@ -833,7 +833,16 @@ export class TrickRules {
 
     if (stolenCard) {
       source.hand.push(stolenCard);
-      state.addLog(`🤏 ${source.name} đã cướp 1 lá bài (${fromZoneDesc}) của ${target.name}.`);
+      state.addLog(`🤏 ${source.name} đã cướp 1 lá bài (${fromZoneDesc}) của ${target.name}.`, {
+        type: 'STEAL_CARD',
+        victimId: targetId,
+        thiefId: sourceId,
+        cardId: stolenCard.id,
+        cardName: stolenCard.name,
+        cardSuit: stolenCard.suit,
+        cardRank: stolenCard.rank,
+        fromZoneDesc
+      });
       if (fromZoneDesc.startsWith('trang bị')) {
         globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId, card: stolenCard }, state);
       }
@@ -903,7 +912,16 @@ export class TrickRules {
 
     if (removedCard) {
       state.discardPile.push(removedCard);
-      state.addLog(`💥 ${source.name} đã tước 1 lá bài (${fromZoneDesc}) của ${target.name}.`);
+      state.addLog(`💥 ${source.name} đã tước 1 lá bài (${fromZoneDesc}) của ${target.name}.`, {
+        type: 'DISMANTLE_CARD',
+        victimId: targetId,
+        thiefId: sourceId,
+        cardId: removedCard.id,
+        cardName: removedCard.name,
+        cardSuit: removedCard.suit,
+        cardRank: removedCard.rank,
+        fromZoneDesc
+      });
       if (fromZoneDesc.startsWith('trang bị')) {
         globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId, card: removedCard }, state);
       }

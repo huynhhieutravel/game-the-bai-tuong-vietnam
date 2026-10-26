@@ -1097,7 +1097,7 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
       fireEvent.click(personalTab);
 
       // Phải thấy log liên quan đến Nguyễn Trãi
-      expect(screen.getByText(/Nguyễn Trãi mất 1 sinh lực/i)).toBeTruthy();
+      expect(screen.getAllByText(/Nguyễn Trãi mất 1 sinh lực/i).length).toBeGreaterThan(0);
       // Không thấy log chỉ dành cho Trần Hưng Đạo và Người chơi 3
       expect(screen.queryByText(/Trần Hưng Đạo dùng \[Sát\] lên Người chơi 3/i)).toBeNull();
     });

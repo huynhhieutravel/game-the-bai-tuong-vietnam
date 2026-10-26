@@ -8,11 +8,56 @@
 import { BotBrain } from '../ai/BotBrain.js';
 import { PHASES } from '../../constants/phases.js';
 
+export const BOT_PACE_CONFIG = {
+  slow: {
+    action: 1800,
+    reaction: 1200,
+    draw: 600,
+    discard: 700,
+    end: 500,
+    draft: 800
+  },
+  normal: { // Mặc định mới: nhịp độ thong thả, rõ ràng
+    action: 1300,
+    reaction: 900,
+    draw: 450,
+    discard: 500,
+    end: 400,
+    draft: 500
+  },
+  fast: { // Tốc độ tiêu chuẩn ban đầu của game
+    action: 700,
+    reaction: 600,
+    draw: 300,
+    discard: 400,
+    end: 300,
+    draft: 500
+  }
+};
+
+const DEFAULT_PACE = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') ? 'fast' : 'normal';
+
 export class BotRunnerV4 {
-  constructor(gameAPI) {
+  constructor(gameAPI, pace = DEFAULT_PACE) {
     this.gameAPI = gameAPI;
     this.timerId = null;
     this.isProcessing = false;
+    this.pace = BOT_PACE_CONFIG[pace] ? pace : DEFAULT_PACE;
+  }
+
+  setPace(pace) {
+    if (BOT_PACE_CONFIG[pace]) {
+      this.pace = pace;
+    }
+  }
+
+  getPace() {
+    return this.pace;
+  }
+
+  getDelay(type) {
+    const config = BOT_PACE_CONFIG[this.pace] || BOT_PACE_CONFIG.normal;
+    return config[type] ?? BOT_PACE_CONFIG.normal[type] ?? 1000;
   }
 
   _clearTimer() {
@@ -64,7 +109,7 @@ export class BotRunnerV4 {
           } finally {
             this.isProcessing = false;
           }
-        }, 500);
+        }, this.getDelay('draft'));
       }
       return;
     }
@@ -155,7 +200,7 @@ export class BotRunnerV4 {
             } finally {
               this.isProcessing = false;
             }
-          }, 600);
+          }, this.getDelay('reaction'));
           return;
         }
       }
@@ -227,7 +272,7 @@ export class BotRunnerV4 {
           } finally {
             this.isProcessing = false;
           }
-        }, 700);
+        }, this.getDelay('action'));
       } else if (currentPhase === 'DRAW') {
         this._clearTimer();
         this.isProcessing = true;
@@ -243,7 +288,7 @@ export class BotRunnerV4 {
           } finally {
             this.isProcessing = false;
           }
-        }, 300);
+        }, this.getDelay('draw'));
       } else if (currentPhase === 'DISCARD') {
         this._clearTimer();
         this.isProcessing = true;
@@ -290,7 +335,7 @@ export class BotRunnerV4 {
           } finally {
             this.isProcessing = false;
           }
-        }, 400);
+        }, this.getDelay('discard'));
       } else if (currentPhase === 'END') {
         this._clearTimer();
         this.isProcessing = true;
@@ -306,7 +351,7 @@ export class BotRunnerV4 {
           } finally {
             this.isProcessing = false;
           }
-        }, 300);
+        }, this.getDelay('end'));
       }
     }
   }

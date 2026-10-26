@@ -140,6 +140,12 @@ export class GameAPIV4 {
       this.dispatcher.addLog(message, type);
     }
   }
+
+  setBotPace(pace) {
+    if (this.botRunner && typeof this.botRunner.setPace === 'function') {
+      this.botRunner.setPace(pace);
+    }
+  }
 }
 
 export { GameAPIV4 as GameAPI };

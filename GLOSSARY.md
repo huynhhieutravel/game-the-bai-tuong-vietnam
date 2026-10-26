@@ -1362,6 +1362,33 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
 - **🛡️ Bộ Kiểm Định Chống Thiên Kiến Dữ Liệu Giả (`TricksComprehensiveAntiSyntheticQA`):**
   - **Khái niệm:** Bộ test tự động [TricksComprehensiveAntiSyntheticQA.test.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/__tests__/rules/TricksComprehensiveAntiSyntheticQA.test.js) sử dụng 100% lá bài cẩm nang thật lấy trực tiếp từ `CardDeck.getStandardDeck()`, kiểm chứng thành công toàn diện các kịch bản: chặn trùng Sấm Sét/Hỗn Loạn thật, chuỗi Hóa Giải đa tầng với ID tiếng Việt, AOE Loạn Tiễn/Dã Man thật, và Xiềng Xích rèn lại/xích mục tiêu.
 
+---
+
+## 88. ĐIỀU KHIỂN NHỊP ĐỘ TRẬN ĐẤU, CẢNH BÁO TÁC ĐỘNG TRỰC TIẾP & TICKER DIỄN BIẾN (GAME PACING, DIRECT IMPACT ALERTS & LIVE COMBAT TICKER)
+
+- **⏱️ Game Pacing (Nhịp Độ Trận Đấu Động):**
+  - **Khái niệm:** Hệ thống điều phối nhịp độ suy nghĩ và phản hồi của Bot AI theo [ADR 0097](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/docs/adr/0097-game-pacing-direct-impact-alerts-and-live-ticker.md). Thay vì delay mặc định quá nhanh (~600ms - 700ms) khiến người chơi không kịp theo dõi diễn biến trận đấu, nhịp độ mặc định mới được nâng cấp lên mức chuẩn **1300ms** (Action) / **900ms** (Reaction).
+  - **3 Cấp độ nhịp độ:**
+    - `🐢 Chậm (Slow)`: Action 1800ms, Reaction 1200ms, Draw 600ms, Discard 700ms, End 500ms, Draft 800ms. Thích hợp cho tân thủ và người thích đọc kỹ thẻ bài.
+    - `⚖️ Chuẩn (Normal)` *(Mặc định)*: Action 1300ms, Reaction 900ms, Draw 450ms, Discard 500ms, End 400ms, Draft 500ms. Cân bằng hoàn hảo giữa tính chiến thuật và độ mượt mà.
+    - `⚡ Nhanh (Fast)`: Action 700ms, Reaction 600ms, Draw 300ms, Discard 400ms, End 300ms, Draft 500ms. Dành cho người chơi tốc chiến hoặc môi trường chạy unit test.
+  - **Lưu trữ & Đồng bộ:** Tùy chọn được lưu vào `localStorage ('viet_sat_game_pace')`, đồng bộ thời gian thực qua `gameAPI.setBotPace(pace)` mà không cần reload trang.
+
+- **🚨 Direct Impact Alert Banner (Banner Cảnh Báo Tác Động Trực Tiếp):**
+  - **Khái niệm:** Hệ thống cảnh báo chuyên biệt dành riêng cho Người chơi chính (Bạn) khi chịu các tác động có tính sát thương, mất mát hoặc cưỡng chế từ đối thủ (bị cướp bài, bị tước bài, bị chém/sát thương, bị ép Quyết Đấu, bị gắn cẩm nang phán xét).
+  - **Đặc tính bất biến:**
+    - **Không bị xóa đè:** Tuyệt đối không bị xóa sổ khi xuất hiện khung yêu cầu phản hồi `gameState.waitingForResponse` (giải quyết triệt để lỗi người chơi chỉ thấy mất bài mà không kịp đọc thông báo).
+    - **Tồn tại 3.2 giây:** Đủ thời gian để người chơi quan sát rõ ràng nguyên nhân trước khi tự động đóng hoặc có thể nhấp đóng thủ công bằng nút ✕.
+    - **Giao diện nổi bật:** Thiết kế viền sáng kim sắc (`border: 2px solid #f59e0b`), hiệu ứng gradient cảnh báo đỏ/hổ phách, font chữ to rõ ràng, icon trực quan thu hút sự chú ý.
+
+- **🎴 Lost Card Feedback (Minh Bạch Thẻ Bài Bị Mất):**
+  - **Khái niệm:** Cơ chế thông tin minh bạch trong `TrickRules.resolveSteal` và `TrickRules.resolveDismantle`. Khi bài trên tay của Bạn bị đối thủ cướp hoặc tước, hệ thống tự động đính kèm metadata `{ cardName, cardSuit, cardRank, victimId, thiefId, fromZoneDesc }` vào log trận đấu.
+  - **Hiển thị cho nạn nhân:** Thay vì chỉ thông báo chung chung "1 lá bài", Banner Cảnh báo của Bạn lập tức hiển thị đích danh lá bài vừa bị mất (ví dụ: `⚠️ [Bot 1] đã cướp lá [Chém ♠10] (trên tay) của Bạn!`), giúp người chơi luôn nắm quyền kiểm soát chiến thuật.
+
+- **📜 Live Combat Action Ticker (Dải Diễn Biến Chiến Trận Thời Gian Thực):**
+  - **Khái niệm:** Thanh trạng thái mờ trang nhã (`combat-action-ticker`) hiển thị ngay dưới thanh Top Bar trên cả giao diện Desktop và Mobile, hiển thị 1-2 hành động mới nhất của trận đấu với nhãn `Mới nhất` màu vàng đồng nổi bật.
+  - Người chơi có thể theo dõi từng nước đi của toàn bộ đối thủ trên bàn cờ mà không cần mở Modal Nhật ký to. Nhấp trực tiếp vào Ticker sẽ mở ngay bảng Nhật ký Trận đấu chi tiết.
+
 
 
 

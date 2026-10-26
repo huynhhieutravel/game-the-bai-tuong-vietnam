@@ -52,7 +52,18 @@ export function GameProvider({ children, playerCount = 4 }) {
       // Đây là engine state rồi → wrap vào Dispatcher
       const dispatcher = new Dispatcher(newState);
       const api = new GameAPI(dispatcher);
-      const runner = new BotRunner(api);
+      const savedPace = (() => {
+        try {
+          return (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.getItem === 'function')
+            ? (window.localStorage.getItem('viet_sat_game_pace') || 'normal')
+            : 'normal';
+        } catch (_) {
+          return 'normal';
+        }
+      })();
+      const runner = new BotRunner(api, savedPace);
+      api.botRunner = runner;
+      api.setBotPace = (pace) => runner.setPace(pace);
       
       dispatcherRef.current = dispatcher;
       gameAPIRef.current = api;
