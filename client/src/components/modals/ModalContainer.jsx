@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useGameState, useGameAPI } from '../../contexts/GameProvider';
 import { getFullPlayerName, getPlayerFaction } from "shared/utils/playerHelpers";
 import { hasSkill, getEffectiveSuit, getEffectiveColor } from "shared/engine_v4/application/index.js";
+import { isEquip } from 'shared/utils/translationHelper.js';
 import { CardSelector } from './CardSelector';
 
 import { AskBocTramTrungSlashModal } from './AskBocTramTrungSlashModal';
@@ -93,6 +94,24 @@ export function ModalContainer({ mainPlayerId = 0 }) {
        }
      }
   }, [isAskNegate, req?.lastNegaterId, askNegateValidCards, mainPlayerId, gameAPI]);
+
+  // Auto-trigger Bát Quái khi dính Loạn Tiễn (van-tien)
+  const isVanTienDodge = req?.type === 'ask_dodge' && req?.reason === 'van-tien' && req?.responderId === me?.id;
+  const meEquips = Array.isArray(me?.equipment) ? me.equipment : Object.values(me?.equipment || {}).filter(Boolean);
+  const hasPassiveBagua = me && hasSkill(me, 'than-giap') && !meEquips.some(c => c.name === 'Bát Quái' || c.name === 'Hắc Thuẫn' || isEquip(c, 'bat_quai') || isEquip(c, 'hac_thuan'));
+  const hasBaguaVanTien = hasPassiveBagua || meEquips.some(e => e.name === 'Bát Quái' || isEquip(e, 'bat_quai'));
+  const canBaguaVanTien = isVanTienDodge && hasBaguaVanTien && req?.baguaAvailable !== false;
+
+  const autoBaguaVanTienKeyRef = useRef(null);
+  useEffect(() => {
+    if (canBaguaVanTien) {
+      const key = `${req.id || ''}_van_tien_${req.responderId}`;
+      if (autoBaguaVanTienKeyRef.current !== key) {
+        autoBaguaVanTienKeyRef.current = key;
+        gameAPI.respond({ playerId: mainPlayerId, doBagua: true });
+      }
+    }
+  }, [canBaguaVanTien, req?.id, req?.responderId, mainPlayerId, gameAPI]);
 
   // Client-Side Watchdog Timer (Timeline badge - Tạm dừng auto-skip để người chơi thực chiến thoải mái)
   const [timeLeft, setTimeLeft] = useState(15);
@@ -1078,12 +1097,36 @@ export function ModalContainer({ mainPlayerId = 0 }) {
              };
           });
 
+          if (canBaguaVanTien) {
+            return (
+              <div style={modalStyle}>
+                <div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: 'var(--color-gold)' }}>
+                  🏹 Trúng [Loạn Tiễn]!
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '20px', background: 'rgba(0,0,0,0.35)', borderRadius: '8px', border: '1px solid rgba(139, 92, 246, 0.4)' }}>
+                  <div style={{ fontSize: '2.5rem' }}>☯️</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: '#c084fc' }}>
+                    Đang tự động phán xét [Bát Quái Trận] né Loạn Tiễn...
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                    Rút bài phán xét: <span style={{ color: '#ef4444', fontWeight: 'bold' }}>Đỏ = Né thành công</span>, <span style={{ color: '#e2e8f0' }}>Đen = Thất bại (cần dùng Né / Hóa Giải)</span>.
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: 'var(--color-gold)' }}>
                 ⚠️ Trúng {req.card?.name || 'Cẩm nang'}!
               </div>
               <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-lg)' }}>
+                {req.baguaAvailable === false && hasBaguaVanTien && reqCardName === 'Né' && (
+                  <div style={{ color: '#ef4444', fontWeight: 'bold', marginBottom: '8px' }}>
+                    ❌ Bát Quái phán xét ĐEN (Thất bại)!
+                  </div>
+                )}
                 {sourceName} dùng <strong>[{req.card?.name || 'Cẩm nang'}]</strong>. Bạn phải ra lá <strong>[{reqCardName}]</strong> hoặc dùng <strong>[Hóa Giải]</strong> để tự bảo vệ mình!
               </div>
               <CardSelector 

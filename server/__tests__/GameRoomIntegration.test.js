@@ -101,11 +101,19 @@ describe('Server RoomManager & GameRoom Integration with Engine v4', () => {
     expect(room.gameState.players[0].isBot).toBe(false);
     expect(room.gameState.players[1].isBot).toBe(false);
 
-    // 2. Người chơi 1 chọn tướng draft (chọn tướng không có trigger trong pha Rút bài để vào thẳng ACTION phase)
-    const drawTriggerHeroes = ['trieu_quang_phuc', 'phung_hung', 'do_doc_bao'];
+    // 2. Người chơi 1 chọn tướng draft (chọn cặp tướng cùng phe không có trigger trong pha Bắt đầu / Rút bài để vào thẳng ACTION phase)
+    const triggerHeroes = ['trieu_quang_phuc', 'phung_hung', 'do_doc_bao', 'lang_lieu', 'nguyen_phi_y_lan', 'ly_thuong_kiet'];
     const p1Draft = room.gameState.players[0].draftHeroes;
-    const hero1A = p1Draft.find(h => !drawTriggerHeroes.includes(h.id)) || p1Draft[0];
-    const hero1B = p1Draft.find(h => h.id !== hero1A.id && !drawTriggerHeroes.includes(h.id)) || p1Draft[1];
+    const byFaction = {};
+    for (const h of p1Draft) {
+      if (!triggerHeroes.includes(h.id)) {
+        byFaction[h.faction] = byFaction[h.faction] || [];
+        byFaction[h.faction].push(h);
+      }
+    }
+    const safeFaction = Object.keys(byFaction).find(f => byFaction[f].length >= 2);
+    const hero1A = safeFaction ? byFaction[safeFaction][0] : p1Draft[0];
+    const hero1B = safeFaction ? byFaction[safeFaction][1] : p1Draft[1];
     room.handleDraftSelect('socket_1', hero1A.id, hero1B.id);
     expect(room.gameState.phase).toBe('draft');
     expect(room.dispatcher).toBeNull(); // Chưa xong draft vì người 2 chưa chọn

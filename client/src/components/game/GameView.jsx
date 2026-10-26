@@ -1012,9 +1012,113 @@ export default function GameView(props = {}) {
              ✕ Thoát
            </button>
         </div>
-        <div className="game-log-tabs" style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '6px 16px', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.08)', WebkitTextSizeAdjust: '100%', textSizeAdjust: '100%', touchAction: 'manipulation' }}>
-           <div className={`game-log-tab ${logTab === 'all' ? 'active' : ''}`} onClick={() => setLogTab('all')} style={{ width: '130px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: logTab === 'all' ? 'bold' : 'normal', background: logTab === 'all' ? 'var(--color-gold)' : 'rgba(255,255,255,0.06)', color: logTab === 'all' ? '#111827' : '#94a3b8', transition: 'all 0.2s', WebkitTextSizeAdjust: '100%', textSizeAdjust: '100%', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none' }}>Tất cả</div>
-           <div className={`game-log-tab ${logTab === 'personal' ? 'active' : ''}`} onClick={() => setLogTab('personal')} style={{ width: '130px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: logTab === 'personal' ? 'bold' : 'normal', background: logTab === 'personal' ? 'var(--color-gold)' : 'rgba(255,255,255,0.06)', color: logTab === 'personal' ? '#111827' : '#94a3b8', transition: 'all 0.2s', WebkitTextSizeAdjust: '100%', textSizeAdjust: '100%', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none' }}>Cá nhân</div>
+        <div 
+          className="game-log-tabs" 
+          style={{ 
+            display: 'flex', 
+            justifyContent: 'flex-start', 
+            gap: '6px', 
+            padding: '6px 12px', 
+            background: 'rgba(0,0,0,0.3)', 
+            borderBottom: '1px solid rgba(255,255,255,0.08)', 
+            overflowX: 'auto',
+            whiteSpace: 'nowrap',
+            scrollbarWidth: 'thin',
+            WebkitTextSizeAdjust: '100%', 
+            textSizeAdjust: '100%', 
+            touchAction: 'manipulation' 
+          }}
+        >
+           <div 
+             className={`game-log-tab ${logTab === 'all' ? 'active' : ''}`} 
+             onClick={() => setLogTab('all')} 
+             style={{ 
+               flexShrink: 0,
+               padding: '0 12px', 
+               height: '30px', 
+               display: 'inline-flex', 
+               alignItems: 'center', 
+               justifyContent: 'center', 
+               borderRadius: '6px', 
+               fontSize: '0.82rem', 
+               cursor: 'pointer', 
+               fontWeight: logTab === 'all' ? 'bold' : 'normal', 
+               background: logTab === 'all' ? 'var(--color-gold)' : 'rgba(255,255,255,0.06)', 
+               color: logTab === 'all' ? '#111827' : '#94a3b8', 
+               transition: 'all 0.2s', 
+               WebkitTextSizeAdjust: '100%', 
+               textSizeAdjust: '100%', 
+               touchAction: 'manipulation', 
+               WebkitTapHighlightColor: 'transparent', 
+               userSelect: 'none', 
+               WebkitUserSelect: 'none' 
+             }}
+           >
+             Tất cả
+           </div>
+           <div 
+             className={`game-log-tab ${logTab === 'personal' ? 'active' : ''}`} 
+             onClick={() => setLogTab('personal')} 
+             style={{ 
+               flexShrink: 0,
+               padding: '0 12px', 
+               height: '30px', 
+               display: 'inline-flex', 
+               alignItems: 'center', 
+               justifyContent: 'center', 
+               borderRadius: '6px', 
+               fontSize: '0.82rem', 
+               cursor: 'pointer', 
+               fontWeight: logTab === 'personal' ? 'bold' : 'normal', 
+               background: logTab === 'personal' ? 'var(--color-gold)' : 'rgba(255,255,255,0.06)', 
+               color: logTab === 'personal' ? '#111827' : '#94a3b8', 
+               transition: 'all 0.2s', 
+               WebkitTextSizeAdjust: '100%', 
+               textSizeAdjust: '100%', 
+               touchAction: 'manipulation', 
+               WebkitTapHighlightColor: 'transparent', 
+               userSelect: 'none', 
+               WebkitUserSelect: 'none' 
+             }}
+           >
+             Cá nhân
+           </div>
+           {gameState.players?.filter(p => p.id !== mainPlayerId).map(p => {
+             const isTabActive = String(logTab) === String(p.id);
+             const label = p.name || `Người chơi ${p.id + 1}`;
+
+             return (
+               <div 
+                 key={p.id}
+                 className={`game-log-tab ${isTabActive ? 'active' : ''}`} 
+                 onClick={() => setLogTab(p.id)} 
+                 style={{ 
+                   flexShrink: 0,
+                   padding: '0 12px', 
+                   height: '30px', 
+                   display: 'inline-flex', 
+                   alignItems: 'center', 
+                   justifyContent: 'center', 
+                   borderRadius: '6px', 
+                   fontSize: '0.82rem', 
+                   cursor: 'pointer', 
+                   fontWeight: isTabActive ? 'bold' : 'normal', 
+                   background: isTabActive ? 'var(--color-gold)' : 'rgba(255,255,255,0.06)', 
+                   color: isTabActive ? '#111827' : '#94a3b8', 
+                   transition: 'all 0.2s', 
+                   WebkitTextSizeAdjust: '100%', 
+                   textSizeAdjust: '100%', 
+                   touchAction: 'manipulation', 
+                   WebkitTapHighlightColor: 'transparent', 
+                   userSelect: 'none', 
+                   WebkitUserSelect: 'none' 
+                 }}
+                 title={`Xem nhật ký của ${label}`}
+               >
+                 {label}
+               </div>
+             );
+           })}
         </div>
         <div 
           className="game-log" 
@@ -1028,23 +1132,50 @@ export default function GameView(props = {}) {
           style={{ flex: 1, overflowY: 'auto', padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: '5px', WebkitTextSizeAdjust: '100%', textSizeAdjust: '100%', touchAction: 'manipulation' }}
         >
           {(() => {
-            const mePlayer = gameState.players.find(p => p.id === mainPlayerId);
-            const myHeroNames = mePlayer?.heroes?.map(h => h?.name).filter(Boolean) || [];
-            const myPlayerName = `Người chơi ${mainPlayerId + 1}`;
-
             const filteredLogs = gameState.logs?.filter(log => {
               if (logTab === 'all') return true;
               const text = log.text || log.message || '';
-              return text.includes("Bạn") || 
-                     text.includes(myPlayerName) || 
-                     (mePlayer?.name && text.includes(mePlayer.name)) ||
-                     myHeroNames.some(hn => text.includes(hn));
+
+              if (logTab === 'personal') {
+                const mePlayer = gameState.players.find(p => p.id === mainPlayerId);
+                const myHeroNames = mePlayer?.heroes?.map(h => h?.name).filter(Boolean) || [];
+                const myPlayerName = `Người chơi ${mainPlayerId + 1}`;
+                return log.turnPlayerId === mainPlayerId ||
+                       log.sourceId === mainPlayerId ||
+                       log.targetId === mainPlayerId ||
+                       log.playerId === mainPlayerId ||
+                       text.includes("Bạn") || 
+                       text.includes(myPlayerName) || 
+                       (mePlayer?.name && text.includes(mePlayer.name)) ||
+                       myHeroNames.some(hn => text.includes(hn));
+              }
+
+              const targetPlayer = gameState.players?.find(p => String(p.id) === String(logTab));
+              if (targetPlayer) {
+                const pPlayerName = `Người chơi ${targetPlayer.id + 1}`;
+                const pHeroNames = targetPlayer.heroes?.map(h => h?.name).filter(Boolean) || [];
+                return log.turnPlayerId === targetPlayer.id ||
+                       log.sourceId === targetPlayer.id ||
+                       log.targetId === targetPlayer.id ||
+                       log.playerId === targetPlayer.id ||
+                       (targetPlayer.name && text.includes(targetPlayer.name)) ||
+                       text.includes(pPlayerName) ||
+                       pHeroNames.some(hn => text.includes(hn));
+              }
+
+              return true;
             }) || [];
 
             if (filteredLogs.length === 0) {
+              const currentTabPlayer = gameState.players?.find(p => String(p.id) === String(logTab));
+              const emptyMessage = logTab === 'personal' 
+                ? 'Chưa có nhật ký cá nhân nào.' 
+                : logTab === 'all' 
+                  ? 'Chưa có nhật ký trận đấu.' 
+                  : `Chưa có nhật ký cho ${currentTabPlayer?.name || `Người chơi ${currentTabPlayer ? currentTabPlayer.id + 1 : ''}`}.`;
               return (
                 <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.82rem', padding: '24px 10px', fontStyle: 'italic', WebkitTextSizeAdjust: '100%', textSizeAdjust: '100%' }}>
-                  {logTab === 'personal' ? 'Chưa có nhật ký cá nhân nào.' : 'Chưa có nhật ký trận đấu.'}
+                  {emptyMessage}
                 </div>
               );
             }

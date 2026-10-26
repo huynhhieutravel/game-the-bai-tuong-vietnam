@@ -420,6 +420,8 @@ export class CombatRules {
       }
     }
 
+    const aoe = frame.context?.aoeResult;
+
     // 1. Phán xét Bát Quái / Thần Giáp (Rùa Vàng)
     if (options.useBagua || options.doBagua) {
       const hasBaguaArmor = target.equipment?.armor && (
@@ -455,8 +457,14 @@ export class CombatRules {
 
         if (frame.context.dodgesProvided >= frame.context.requiredDodges) {
           state.priorityStack.pop();
-          state.addLog(`${target.name} đã né thành công cú Chém nhờ [Bát Quái]!`);
+          state.addLog(`${target.name} đã né thành công ${frame.context?.reason === 'van-tien' ? '[Loạn Tiễn]' : 'cú Chém'} nhờ [Bát Quái]!`);
           globalHeroRegistry.dispatchTrigger('ON_DODGE_SUCCESS', { sourceId: frame.sourceId, targetId, card: judgeCard }, state);
+          if (aoe) {
+            aoe.defended.push(`${target.name} (Bát Quái)`);
+            if (aoe.defended.length + aoe.damaged.length >= aoe.total) {
+              state.addLog(`🏹 [Loạn Tiễn] Kết thúc: ${aoe.defended.length > 0 ? aoe.defended.join(', ') + ' né thành công; ' : ''}${aoe.damaged.length > 0 ? aoe.damaged.join(', ') + ' mất máu!' : 'không ai mất máu!'}`);
+            }
+          }
           const postResult = this._handlePostDodgeWeapons(state, frame, target);
           return { ...postResult, baguaSuccess: true };
         }
@@ -466,8 +474,6 @@ export class CombatRules {
         return { dodged: false, baguaSuccess: false };
       }
     }
-
-    const aoe = frame.context?.aoeResult;
 
     if (dodgeCard) {
       const isNegate = (isTrick(dodgeCard, 'hoa_giai') ||
