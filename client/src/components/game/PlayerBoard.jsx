@@ -40,7 +40,8 @@ export function PlayerBoard({
 }) {
     const isTargetable = targetSession?.validTargets.includes(player.id);
     const isSelected = targetSession?.selectedTargets.includes(player.id);
-    const isDead = player.isAlive === false || (typeof player.hp === 'number' && player.hp <= 0);
+    const isDead = player.isAlive === false;
+    const isDying = player.isAlive !== false && typeof player.hp === 'number' && player.hp <= 0;
 
     // Support both Array and Object equipment structures
     const getEquipCard = (slotType) => {
@@ -184,31 +185,11 @@ export function PlayerBoard({
                );
             })()}
 
-            {/* Header: Player Name + Faction Badge */}
-            <div className="player-header-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '4px', marginBottom: '2px' }}>
-              <div className="player-name" style={{ fontSize: '0.75rem', fontWeight: 'bold', color: isCurrentTurn ? 'var(--color-gold)' : (isDead ? '#94a3b8' : '#f8fafc'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
+            {/* Header: Player Name (Toàn bộ chiều rộng, không bị badge che khuất) */}
+            <div className="player-header-bar" style={{ display: 'flex', alignItems: 'center', width: '100%', marginBottom: '2px' }}>
+              <div className="player-name" style={{ fontSize: '0.75rem', fontWeight: 'bold', color: isCurrentTurn ? 'var(--color-gold)' : (isDead ? '#94a3b8' : (isDying ? '#fca5a5' : '#f8fafc')), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
                 {player.name}
                 {isCurrentTurn && ' 🎯'}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
-                {isDead ? (
-                  <span className="player-dead-badge" style={{ fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)', color: '#fef08a', fontWeight: 'bold', border: '1px solid #ef4444', boxShadow: '0 0 6px rgba(239,68,68,0.5)', whiteSpace: 'nowrap' }}>
-                    💀 TỬ TRẬN
-                  </span>
-                ) : !player.isRevealed ? (
-                  <span className="player-faction-badge unrevealed" style={{ fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', background: '#334155', color: '#cbd5e1', fontWeight: 'bold' }}>
-                    ẨN
-                  </span>
-                ) : (
-                  <span className={`player-faction-badge ${player.faction?.toLowerCase()}`} style={{ fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', background: getFactionColor(player.faction, player.isDaTam), color: 'white', fontWeight: 'bold' }}>
-                    {player.isDaTam ? 'DÃ TÂM' : player.faction?.toUpperCase()}
-                  </span>
-                )}
-                {!isDead && player.isRevealed && me.faction && player.faction && (
-                  <span style={{ fontSize: '0.52rem', color: (isSameFaction(me, player) && !me.isDaTam && !player.isDaTam) ? '#10b981' : '#f87171', fontWeight: 'bold' }}>
-                    {(isSameFaction(me, player) && !me.isDaTam && !player.isDaTam) ? '🤝' : '⚔️'}
-                  </span>
-                )}
               </div>
             </div>
 
@@ -224,12 +205,38 @@ export function PlayerBoard({
                 background: 'rgba(0, 0, 0, 0.45)', 
                 padding: '3px', 
                 borderRadius: '6px', 
-                border: `1.2px solid ${isDead ? '#ef4444' : (player.isRevealed ? getFactionColor(player.faction, player.isDaTam) : 'rgba(255,255,255,0.18)')}`, 
+                border: `1.2px solid ${isDead ? '#ef4444' : (isDying ? '#f97316' : (player.isRevealed ? getFactionColor(player.faction, player.isDaTam) : 'rgba(255,255,255,0.18)'))}`, 
                 boxSizing: 'border-box',
-                filter: isDead ? 'grayscale(70%) opacity(0.55)' : 'none'
+                filter: isDead ? 'grayscale(70%) opacity(0.55)' : (isDying ? 'sepia(30%)' : 'none')
               }}
             >
-              {/* Overlay TỬ TRẬN cực kỳ nổi bật khi người chơi chết */}
+              {/* Badge Phe / Tử Trận / Hấp Hối nằm ở góc phải bên ngoài khung tướng */}
+              <div style={{ position: 'absolute', top: '-8px', right: '3px', zIndex: 26, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                {isDead ? (
+                  <span className="player-dead-badge" style={{ fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)', color: '#fef08a', fontWeight: 'bold', border: '1px solid #ef4444', boxShadow: '0 0 6px rgba(239,68,68,0.5)', whiteSpace: 'nowrap' }}>
+                    💀 TỬ TRẬN
+                  </span>
+                ) : isDying ? (
+                  <span className="player-dying-badge" style={{ fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', background: 'linear-gradient(135deg, #ea580c 0%, #b45309 100%)', color: '#fef08a', fontWeight: 'bold', border: '1px solid #f97316', boxShadow: '0 0 6px rgba(249,115,22,0.7)', whiteSpace: 'nowrap', animation: 'pulse 1.2s infinite' }}>
+                    ⚠️ HẤP HỐI
+                  </span>
+                ) : !player.isRevealed ? (
+                  <span className="player-faction-badge unrevealed" style={{ fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', background: '#334155', color: '#cbd5e1', fontWeight: 'bold' }}>
+                    ẨN
+                  </span>
+                ) : (
+                  <span className={`player-faction-badge ${player.faction?.toLowerCase()}`} style={{ fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', background: getFactionColor(player.faction, player.isDaTam), color: 'white', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                    {player.isDaTam ? 'DÃ TÂM' : player.faction?.toUpperCase()}
+                    {me.faction && player.faction && (
+                      <span style={{ fontSize: '0.52rem' }}>
+                        {(isSameFaction(me, player) && !me.isDaTam && !player.isDaTam) ? '🤝' : '⚔️'}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+
+              {/* Overlay TỬ TRẬN khi người chơi thực sự chết */}
               {isDead && (
                 <div 
                   style={{ 
@@ -264,6 +271,45 @@ export function PlayerBoard({
                     }}
                   >
                     💀 TỬ TRẬN
+                  </div>
+                </div>
+              )}
+
+              {/* Overlay HẤP HỐI khi sinh lực <= 0 nhưng còn sống chờ cứu */}
+              {isDying && (
+                <div 
+                  style={{ 
+                    position: 'absolute', 
+                    top: 0, 
+                    left: 0, 
+                    width: '100%', 
+                    height: '100%', 
+                    background: 'rgba(69, 10, 10, 0.75)', 
+                    backdropFilter: 'blur(1.5px)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    zIndex: 35, 
+                    borderRadius: '5px' 
+                  }}
+                >
+                  <div 
+                    style={{ 
+                      background: 'linear-gradient(135deg, #dc2626 0%, #b45309 100%)', 
+                      border: '1.5px solid #f59e0b', 
+                      color: '#fef08a', 
+                      padding: '3px 8px', 
+                      borderRadius: '4px', 
+                      fontSize: '0.70rem', 
+                      fontWeight: '900', 
+                      letterSpacing: '1px', 
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.9), 0 0 10px rgba(245,158,11,0.7)', 
+                      textTransform: 'uppercase', 
+                      transform: 'rotate(-5deg)',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    ⚠️ HẤP HỐI
                   </div>
                 </div>
               )}

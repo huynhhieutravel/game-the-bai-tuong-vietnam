@@ -31,7 +31,8 @@ export default function MyHeroBar(props) {
     
     const isTargetable = targetSession?.validTargets.includes(me.id);
     const isSelected = targetSession?.selectedTargets.includes(me.id);
-    const isDead = me?.isAlive === false || (typeof me?.hp === 'number' && me.hp <= 0);
+    const isDead = me?.isAlive === false;
+    const isDying = me?.isAlive !== false && typeof me?.hp === 'number' && me.hp <= 0;
     
     const onAvatarClick = (e) => {
         if (e) e.stopPropagation();
@@ -154,6 +155,10 @@ export default function MyHeroBar(props) {
                          <div className="my-hero-faction-tag" style={{ background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)', border: '1px solid #ef4444', color: '#fef08a', fontWeight: '900', boxShadow: '0 0 8px rgba(239,68,68,0.6)' }}>
                            💀 TỬ TRẬN
                          </div>
+                       ) : isDying ? (
+                         <div className="my-hero-faction-tag" style={{ background: 'linear-gradient(135deg, #ea580c 0%, #b45309 100%)', border: '1px solid #f97316', color: '#fef08a', fontWeight: '900', boxShadow: '0 0 8px rgba(249,115,22,0.7)', animation: 'pulse 1.2s infinite' }}>
+                           ⚠️ HẤP HỐI
+                         </div>
                        ) : !me.isRevealed ? (
                          <div className="my-hero-faction-tag unrevealed">
                            PHE ẨN
@@ -181,7 +186,7 @@ export default function MyHeroBar(props) {
                {/* 3. Khung thẻ Tướng: Nằm ở dưới cùng */}
                <div className="my-hero-dock">
                    <div className="my-hero-dock-body" style={{ position: 'relative' }}>
-                       {/* Overlay BẠN ĐÃ TỬ TRẬN nổi bật */}
+                       {/* Overlay BẠN ĐÃ TỬ TRẬN nổi bật khi thực sự chết */}
                        {isDead && (
                          <div 
                            style={{ 
@@ -219,8 +224,46 @@ export default function MyHeroBar(props) {
                            </div>
                          </div>
                        )}
+                       {/* Overlay BẠN ĐANG HẤP HỐI khi sinh lực <= 0 */}
+                       {isDying && (
+                         <div 
+                           style={{ 
+                             position: 'absolute', 
+                             top: 0, 
+                             left: 0, 
+                             width: '100%', 
+                             height: '100%', 
+                             background: 'rgba(69, 10, 10, 0.78)', 
+                             backdropFilter: 'blur(2px)', 
+                             display: 'flex', 
+                             alignItems: 'center', 
+                             justifyContent: 'center', 
+                             zIndex: 35, 
+                             borderRadius: '8px' 
+                           }}
+                         >
+                           <div 
+                             style={{ 
+                               background: 'linear-gradient(135deg, #dc2626 0%, #b45309 100%)', 
+                               border: '2px solid #f59e0b', 
+                               color: '#fef08a', 
+                               padding: '4px 12px', 
+                               borderRadius: '5px', 
+                               fontSize: '0.82rem', 
+                               fontWeight: '900', 
+                               letterSpacing: '1px', 
+                               boxShadow: '0 4px 16px rgba(0,0,0,0.9), 0 0 14px rgba(245,158,11,0.8)', 
+                               textTransform: 'uppercase', 
+                               transform: 'rotate(-3deg)',
+                               whiteSpace: 'nowrap'
+                             }}
+                           >
+                             ⚠️ BẠN ĐANG HẤP HỐI
+                           </div>
+                         </div>
+                       )}
                        {/* Avatars */}
-                       <div className="my-hero-avatars" style={{ filter: isDead ? 'grayscale(70%) opacity(0.55)' : 'none' }}>
+                       <div className="my-hero-avatars" style={{ filter: isDead ? 'grayscale(70%) opacity(0.55)' : (isDying ? 'sepia(30%)' : 'none') }}>
                            {/* Avatar 1 */}
                            <div className={`my-hero-avatar-card ${isTargetable ? 'targetable' : ''} ${isSelected ? 'selected' : ''}`} onClick={onAvatarClick}>
                                <div className="judgement-area my-hero-judgement-area" style={{ display: 'flex', gap: '4px', position: 'absolute', top: '4px', left: '4px', zIndex: 15 }}>

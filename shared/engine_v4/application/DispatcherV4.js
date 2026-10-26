@@ -737,6 +737,13 @@ export class DispatcherV4 {
             (data.doSave ? player.hand.find(c => c.type === 'peach' || c.name === 'Đào' || (playerId === frame.targetId && (c.type === 'wine' || c.name === 'Rượu')) || (hasNamDuoc && isRed(c))) : null);
         }
         CombatRules.respondPeach(this.state, playerId, peachCard);
+        if (this.state.currentPhase === PHASES.JUDGE && this.state.priorityStack.isEmpty()) {
+          this.stateMachine._completeJudgePhase();
+        } else if (this.state.currentPhase === PHASES.DRAW && this.state.priorityStack.isEmpty()) {
+          this.stateMachine._completeDrawPhase();
+        } else if (this.state.currentPhase === PHASES.BEGIN && this.state.priorityStack.isEmpty()) {
+          this.stateMachine._completeBeginPhase();
+        }
         break;
       }
 

@@ -110,7 +110,12 @@ export class StateMachine {
 
   _completeJudgePhase() {
     const player = this.state.getCurrentPlayer();
-    if (!player || !player.isAlive) return;
+    if (!player || !player.isAlive) {
+      if (!this.state.gameOver) {
+        this.nextTurn();
+      }
+      return;
+    }
 
     // Nếu còn cẩm nang trì hoãn khác cần phán xét tiếp
     if (player.judgementArea && player.judgementArea.length > 0) {
@@ -120,7 +125,12 @@ export class StateMachine {
       }
     }
 
-    if (!player.isAlive) return;
+    if (!player.isAlive) {
+      if (!this.state.gameOver) {
+        this.nextTurn();
+      }
+      return;
+    }
 
     this._runPhaseDraw();
   }
@@ -143,7 +153,12 @@ export class StateMachine {
 
   _completeDrawPhase() {
     const player = this.state.getCurrentPlayer();
-    if (!player || !player.isAlive) return;
+    if (!player || !player.isAlive) {
+      if (!this.state.gameOver) {
+        this.nextTurn();
+      }
+      return;
+    }
 
     if (!player.temporaryFlags?.skipDrawPhase) {
       const drawCount = player.temporaryFlags?.drawCardCount ?? 2;
@@ -166,6 +181,13 @@ export class StateMachine {
   }
 
   _completeBeginPhase() {
+    const player = this.state.getCurrentPlayer();
+    if (!player || !player.isAlive) {
+      if (!this.state.gameOver) {
+        this.nextTurn();
+      }
+      return;
+    }
     this._runPhaseJudge();
   }
 
