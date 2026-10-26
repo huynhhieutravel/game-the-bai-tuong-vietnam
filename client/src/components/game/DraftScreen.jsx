@@ -19,7 +19,7 @@ import { ChatWidget } from './ChatWidget';
 export function DraftScreen(props) {
     const { gameState, me, gameController } = props;
     const [draftSelection, setDraftSelection] = useState([]);
-    const [draftTimer, setDraftTimer] = useState(30);
+    const [draftTimer, setDraftTimer] = useState(60);
     const [showVipModal, setShowVipModal] = useState(false);
     const [inspectedHero, setInspectedHero] = useState(null);
 

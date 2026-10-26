@@ -922,9 +922,9 @@ body {
 
 .hand-cards .card {
   transition: 
-    transform var(--transition-slow),
-    box-shadow var(--transition-base),
-    margin var(--transition-base);
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+  margin: 0;
 }
 
 .hand-cards:hover .card {
@@ -932,9 +932,15 @@ body {
 }
 
 .hand-cards .card:hover {
-  transform: translateY(-20px) scale(1.1);
-  margin-left: 10px;
-  margin-right: 10px;
+  transform: translateY(-16px) scale(1.06);
+  z-index: 30;
+  /* Giữ nguyên margin = 0 cố định, tuyệt đối không đổi margin để tránh lỗi hover chattering / jitter vòng lặp */
+}
+
+.hand-cards .card.unplayable:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
 }
 
 /* ============================================
@@ -1670,6 +1676,20 @@ body {
     transform: translateY(-16px) scale(1.06) !important;
     z-index: 10 !important;
     box-shadow: 0 0 14px rgba(212, 168, 67, 0.85) !important;
+  }
+
+  .hand-cards .card:hover {
+    transform: translateY(-10px) scale(1.04) !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    z-index: 30 !important;
+  }
+
+  .hand-cards .card.unplayable:hover {
+    transform: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-shadow: none !important;
   }
   
   .player-hand-area {

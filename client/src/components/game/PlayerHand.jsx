@@ -277,7 +277,14 @@ export function PlayerHand(props) {
                     <div
                         key={`${card.id}-${originalIndex}-inline`}
                         className={`card ${card.type} ${targetSession?.cardIndex === originalIndex ? 'selected' : ''} ${selectedDiscards.includes(originalIndex) ? 'selected' : ''} ${!isPlayable ? 'unplayable' : ''}`}
-                        style={getCardBg(card.name) ? { backgroundImage: `url(${getCardBg(card.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', opacity: !isPlayable ? 0.4 : 1, cursor: !isPlayable ? 'not-allowed' : 'pointer' } : { opacity: !isPlayable ? 0.4 : 1, cursor: !isPlayable ? 'not-allowed' : 'pointer' }}
+                        style={{
+                            ...(getCardBg(card.name) ? { backgroundImage: `url(${getCardBg(card.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' } : {}),
+                            opacity: !isPlayable ? 0.4 : 1,
+                            cursor: !isPlayable ? 'not-allowed' : 'pointer',
+                            margin: 0,
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none'
+                        }}
                         onClick={(e) => {
                             e.stopPropagation();
                             if (needsDiscard) {
