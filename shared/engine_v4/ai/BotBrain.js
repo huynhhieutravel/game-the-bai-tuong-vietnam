@@ -225,7 +225,7 @@ export class BotBrain {
           p.hp > bot.hp && 
           (p.hand?.length || 0) > 0
         );
-        const sortedEnemies = this._sortTargetsByPriority(bot, higherHpEnemies);
+        const sortedEnemies = this._sortTargetsByPriority(bot, higherHpEnemies, state);
         if (sortedEnemies.length > 0) {
           return {
             type: 'USE_SKILL',
@@ -250,7 +250,7 @@ export class BotBrain {
           !this._isKnownAlly(bot, p) && 
           ((p.hand && p.hand.length > 0) || (p.equipment && Object.values(p.equipment).some(Boolean)) || (p.judgementArea && p.judgementArea.length > 0))
         );
-        const sortedVictims = this._sortTargetsByPriority(bot, potentialVictims);
+        const sortedVictims = this._sortTargetsByPriority(bot, potentialVictims, state);
         if (sortedVictims.length > 0) {
           return {
             type: 'USE_SKILL',
@@ -273,7 +273,7 @@ export class BotBrain {
           !hasSkill(p, 'nghe_an_ke') &&
           (!p.judgementArea || !p.judgementArea.some(j => j.name === 'Hỗn Loạn' || j.idKey === 'hon_loan'))
         );
-        const sortedEnemies = this._sortTargetsByPriority(bot, targetsWithoutChaos);
+        const sortedEnemies = this._sortTargetsByPriority(bot, targetsWithoutChaos, state);
         if (sortedEnemies.length > 0) {
           return {
             type: 'USE_SKILL',
@@ -289,7 +289,8 @@ export class BotBrain {
     if ((hasSkill(bot, 'hoa_than_huyen_tran') || hasSkill(bot, 'hoa_than')) && !bot.skillUsage?.hoa_than?.usedThisTurn && bot.hand?.length > 0) {
       const maleEnemies = this._sortTargetsByPriority(
         bot,
-        alivePlayers.filter(p => p.id !== bot.id && getPlayerGender(p) === 'male' && !this._isKnownAlly(bot, p) && !(hasSkill(p, 'dam_bac') && (!p.hand || p.hand.length === 0)))
+        alivePlayers.filter(p => p.id !== bot.id && getPlayerGender(p) === 'male' && !this._isKnownAlly(bot, p) && !(hasSkill(p, 'dam_bac') && (!p.hand || p.hand.length === 0))),
+        state
       );
       if (maleEnemies.length >= 2) {
         const discardCard = this._pickLowestValueCard(bot);
@@ -341,7 +342,7 @@ export class BotBrain {
           !this._isKnownAlly(bot, p) && 
           !(hasSkill(p, 'dam_bac') && (!p.hand || p.hand.length === 0))
         );
-        const sortedEnemies = this._sortTargetsByPriority(bot, validEnemies);
+        const sortedEnemies = this._sortTargetsByPriority(bot, validEnemies, state);
         if (sortedEnemies.length > 0) {
           return {
             type: 'USE_SKILL',
@@ -364,7 +365,7 @@ export class BotBrain {
           !this._isKnownAlly(bot, p) && 
           RangeSystem.inSlashRange(bot, p, alivePlayers)
         );
-        const sortedEnemies = this._sortTargetsByPriority(bot, enemiesInRange);
+        const sortedEnemies = this._sortTargetsByPriority(bot, enemiesInRange, state);
         if (sortedEnemies.length > 0 && (sortedEnemies[0].hp <= 2 || hasWeapon)) {
           return {
             type: 'USE_SKILL',
@@ -383,7 +384,8 @@ export class BotBrain {
     if (hasSkill(bot, 'tam_cong') && !bot.skillUsage?.tam_cong?.usedThisTurn && (bot.hand?.length || 0) > 0) {
       const targetEnemies = this._sortTargetsByPriority(
         bot,
-        alivePlayers.filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p))
+        alivePlayers.filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p)),
+        state
       );
       if (targetEnemies.length > 0) {
         return {
@@ -400,7 +402,8 @@ export class BotBrain {
       if (hasHighRank) {
         const targetEnemies = this._sortTargetsByPriority(
           bot,
-          alivePlayers.filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p) && p.hand?.length > 0)
+          alivePlayers.filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p) && p.hand?.length > 0),
+          state
         );
         if (targetEnemies.length > 0) {
           return {
@@ -434,7 +437,8 @@ export class BotBrain {
       if (clubCard) {
         const unchainedEnemies = this._sortTargetsByPriority(
           bot,
-          alivePlayers.filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p) && !p.chained)
+          alivePlayers.filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p) && !p.chained),
+          state
         );
         if (unchainedEnemies.length > 0) {
           const targets = unchainedEnemies.slice(0, 2).map(p => p.id);
@@ -592,7 +596,7 @@ export class BotBrain {
             .map(id => state.getPlayer(id))
             .filter(p => p && !this._isKnownAlly(bot, p));
           if (validVictims.length > 0) {
-            const sortedVictims = this._sortTargetsByPriority(bot, validVictims);
+            const sortedVictims = this._sortTargetsByPriority(bot, validVictims, state);
             return {
               type: 'PLAY_CARD',
               cardId: card.id,
@@ -618,7 +622,7 @@ export class BotBrain {
 
         if (validCandidates.length === 0) continue;
 
-        const sortedEnemies = this._sortTargetsByPriority(bot, validCandidates);
+        const sortedEnemies = this._sortTargetsByPriority(bot, validCandidates, state);
         if (sortedEnemies.length === 0) continue;
 
         // Ràng buộc riêng của Hỏa Công: Bot phải có ít nhất 1 lá bài khác trên tay để sẵn sàng bỏ
@@ -647,7 +651,7 @@ export class BotBrain {
           !this._isKnownAlly(bot, p) && 
           (p.hand && p.hand.length > 0)
         );
-        const sortedVictims = this._sortTargetsByPriority(bot, potentialVictims);
+        const sortedVictims = this._sortTargetsByPriority(bot, potentialVictims, state);
         if (sortedVictims.length > 0) {
           return {
             type: 'PLAY_CARD',
@@ -705,7 +709,7 @@ export class BotBrain {
       return true;
     });
 
-    const sortedEnemies = this._sortTargetsByPriority(bot, validEnemies);
+    const sortedEnemies = this._sortTargetsByPriority(bot, validEnemies, state);
     if (sortedEnemies.length === 0) return null;
 
     // Rượu buff trước khi Chém nếu chưa uống và có Rượu trên tay
@@ -778,19 +782,122 @@ export class BotBrain {
   }
 
   /**
-   * Sắp xếp mục tiêu theo độ ưu tiên: Kẻ địch lộ diện (máu thấp trước) -> Người chơi ẩn -> Tuyệt đối không đánh đồng minh
+   * Tính toán điểm đe dọa (Threat Score) của mục tiêu đối với Bot
+   * Dựa trên cán cân thế lực Quốc Chiến và nguyên tắc Liên Minh Ngầm (Implicit Truce)
    */
-  static _sortTargetsByPriority(bot, candidates) {
+  static calculateThreatScore(bot, target, state = null) {
+    if (!target || !target.isAlive) return -9999;
+    if (this._isKnownAlly(bot, target)) return -9999;
+
+    let score = 0;
+    const isTargetRevealed = Boolean(target.revealedHeroes?.some(Boolean));
+    const targetFaction = getCanonicalFaction(target.faction);
+    const botFaction = getCanonicalFaction(bot.faction);
+
+    // 1. Phân Tích Cán Cân Quân Số Phe Phái (Balance of Power & Dominant Faction)
+    const alivePlayers = state?.getAlivePlayers ? state.getAlivePlayers() : (state?.players?.filter(p => p.isAlive) || []);
+    
+    // Đếm số lượng thành viên còn sống theo từng phe đã lộ diện
+    const factionCounts = {};
+    alivePlayers.forEach(p => {
+      const pRevealed = Boolean(p.revealedHeroes?.some(Boolean));
+      if (pRevealed && !p.isDaTam) {
+        const fac = getCanonicalFaction(p.faction);
+        if (fac && fac !== 'none') {
+          factionCounts[fac] = (factionCounts[fac] || 0) + 1;
+        }
+      }
+    });
+
+    // Tìm quy mô phe lớn nhất trên bàn cờ
+    let maxFactionSize = 0;
+    let dominantFaction = null;
+    for (const [fac, count] of Object.entries(factionCounts)) {
+      if (count > maxFactionSize) {
+        maxFactionSize = count;
+        dominantFaction = fac;
+      }
+    }
+
+    const targetFactionSize = (!isTargetRevealed || target.isDaTam) ? 1 : (factionCounts[targetFaction] || 1);
+
+    // GIAO THỨC QUỐC CHIẾN: KÌM HÃM PHE ÁP ĐẢO (ANTI-DOMINANT FACTION PROTOCOL)
+    // Nếu có một phe có từ 2 thành viên trở lên và phe đó đang dẫn đầu quân số
+    if (maxFactionSize >= 2 && dominantFaction) {
+      if (isTargetRevealed && targetFaction === dominantFaction) {
+        // Target thuộc Phe Áp Đảo -> Điểm đe dọa cực cao (+100 điểm)
+        score += 100 + (targetFactionSize * 25);
+      } else if (isTargetRevealed && targetFaction !== dominantFaction && botFaction !== dominantFaction) {
+        // Cả Bot và Target đều là phe yếu thế/cô độc trước Phe Áp Đảo
+        // -> Kích hoạt Liên Minh Ngầm (Implicit Truce): Giảm mạnh ưu tiên đánh phe yếu (-80 điểm)
+        // Trừ khi mục tiêu chỉ còn 1 HP hấp hối để dứt điểm dọn bàn
+        if (target.hp > 1) {
+          score -= 80;
+        }
+      }
+    } else {
+      // Khi chưa có phe nào áp đảo: Ưu tiên kẻ địch đã lộ diện hơn người chơi ẩn (+30 điểm)
+      if (isTargetRevealed) {
+        score += 30;
+      }
+    }
+
+    // 2. Chức Vị & Thưởng Cắm Cờ (Role & Bounty Threat)
+    if (target.isLord || target.hasViceSeal || target.isViceGeneral) {
+      score += 25; // Phó Ấn hoặc Chúa công
+    }
+
+    // 3. Cơ Hội Dứt Điểm Mục Tiêu Máu Thấp (Finishing Low HP Enemies)
+    if (target.hp === 1) {
+      score += 50;
+    } else if (target.hp === 2) {
+      score += 20;
+    } else if (target.hp >= 4) {
+      score -= 10;
+    }
+
+    // 4. Tài Nguyên Bài Trên Tay (Hand Card Threat)
+    const handCount = Array.isArray(target.hand) ? target.hand.length : (target.handCount || 0);
+    score += handCount * 4;
+
+    // 5. Năng Lực Tác Chiến & Trang Bị Sát Thương (Combat Potency)
+    if (target.equipment?.weapon) score += 12;
+    if (target.equipment?.horse_attack) score += 8;
+    if (target.equipment?.armor) score -= 8;
+
+    // 6. Khoảng Cách Cự Ly (Proximity Penalty)
+    if (state && typeof RangeSystem?.getDistance === 'function') {
+      try {
+        const dist = RangeSystem.getDistance(bot, target, state);
+        if (dist !== null && dist !== undefined) {
+          score -= dist * 6;
+        }
+      } catch (_) {}
+    }
+
+    return score;
+  }
+
+  /**
+   * Sắp xếp mục tiêu theo Threat Score đa chiều, tôn trọng cán cân thế lực và liên minh ngầm
+   */
+  static _sortTargetsByPriority(bot, candidates, state = null) {
     const nonAllies = candidates.filter(t => !this._isKnownAlly(bot, t) && (t.hp === undefined || t.hp > 0));
-    if (nonAllies.length === 0) return [];
+    if (nonAllies.length <= 1) return nonAllies;
 
-    const knownEnemies = nonAllies.filter(t => this._isKnownEnemy(bot, t));
-    const hiddenPlayers = nonAllies.filter(t => !this._isKnownEnemy(bot, t));
+    nonAllies.sort((a, b) => {
+      const scoreA = this.calculateThreatScore(bot, a, state);
+      const scoreB = this.calculateThreatScore(bot, b, state);
+      if (scoreB !== scoreA) {
+        return scoreB - scoreA;
+      }
+      if (a.hp !== b.hp) {
+        return a.hp - b.hp;
+      }
+      return a.id - b.id;
+    });
 
-    knownEnemies.sort((a, b) => a.hp - b.hp);
-    hiddenPlayers.sort((a, b) => a.hp - b.hp);
-
-    return [...knownEnemies, ...hiddenPlayers];
+    return nonAllies;
   }
 
   /**
@@ -1037,7 +1144,8 @@ export class BotBrain {
           const discardCard = this._pickLowestValueCard(bot);
           const aliveEnemies = this._sortTargetsByPriority(
             bot,
-            state.getAlivePlayers().filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p))
+            state.getAlivePlayers().filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p)),
+            state
           );
           if (aliveEnemies.length > 0 && discardCard) {
             return {
@@ -1129,7 +1237,7 @@ export class BotBrain {
           return { type: 'ACTION_REACT', virtualCardName: 'Rượu' };
         }
         const validSlashTargets = RangeSystem.getValidSlashTargets(bot, state.getAlivePlayers(), { name: 'Chém', virtual: true });
-        const validEnemies = this._sortTargetsByPriority(bot, validSlashTargets.filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p)));
+        const validEnemies = this._sortTargetsByPriority(bot, validSlashTargets.filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p)), state);
         if (validEnemies.length > 0) {
           return { type: 'ACTION_REACT', virtualCardName: 'Chém', targetId: validEnemies[0].id };
         }
@@ -1148,7 +1256,7 @@ export class BotBrain {
       case 'ASK_TU_CHU': {
         // Khúc Thừa Dụ đấu điểm: Chọn lá bài lớn nhất
         const highestCard = [...bot.hand].sort((a, b) => rankToNumber(b.rank) - rankToNumber(a.rank))[0];
-        const enemies = this._sortTargetsByPriority(bot, state.getAlivePlayers().filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p)));
+        const enemies = this._sortTargetsByPriority(bot, state.getAlivePlayers().filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p)), state);
         return {
           type: 'ACTION_REACT',
           cardId: highestCard ? highestCard.id : null,
@@ -1213,7 +1321,7 @@ export class BotBrain {
 
       case 'ASK_HOA_THAN_AN_TU': {
         const diamondCard = (bot.hand || []).find(c => c.suit === 'diamond' || c.suit === '♦');
-        const enemies = this._sortTargetsByPriority(bot, state.getAlivePlayers().filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p)));
+        const enemies = this._sortTargetsByPriority(bot, state.getAlivePlayers().filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p)), state);
         if (diamondCard && enemies[0]) {
           return {
             type: 'ACTION_REACT',
@@ -1242,7 +1350,7 @@ export class BotBrain {
           allowedTargetIds.includes(p.id) && 
           !this._isKnownAlly(bot, p)
         );
-        const sortedEnemies = this._sortTargetsByPriority(bot, candidateEnemies);
+        const sortedEnemies = this._sortTargetsByPriority(bot, candidateEnemies, state);
         const lowestCard = this._pickLowestValueCard(bot);
         if (sortedEnemies.length > 0 && lowestCard) {
           return {
@@ -1256,7 +1364,7 @@ export class BotBrain {
 
       case 'ASK_DUONG_QUAN_1': {
         // Dương Đình Nghệ bỏ qua Phán xét & Rút bài để Chém không giới hạn cự ly
-        const enemies = this._sortTargetsByPriority(bot, state.getAlivePlayers().filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p) && !(hasSkill(p, 'dam_bac') && (!p.hand || p.hand.length === 0))));
+        const enemies = this._sortTargetsByPriority(bot, state.getAlivePlayers().filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p) && !(hasSkill(p, 'dam_bac') && (!p.hand || p.hand.length === 0))), state);
         if (enemies.length > 0 && bot.hp > 1) {
           return {
             type: 'ACTION_REACT',
@@ -1270,7 +1378,7 @@ export class BotBrain {
 
       case 'ASK_DUONG_QUAN_2': {
         // Dương Đình Nghệ bỏ trang bị để Chém kết thúc pha ra bài
-        const enemies = this._sortTargetsByPriority(bot, state.getAlivePlayers().filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p) && !(hasSkill(p, 'dam_bac') && (!p.hand || p.hand.length === 0))));
+        const enemies = this._sortTargetsByPriority(bot, state.getAlivePlayers().filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p) && !(hasSkill(p, 'dam_bac') && (!p.hand || p.hand.length === 0))), state);
         const equipCard = (bot.hand && bot.hand.find(c => c.type === 'equip' || ['weapon', 'armor', 'horse_attack', 'horse_defense'].includes(c.type))) ||
           Object.values(bot.equipment || {}).find(Boolean);
         if (enemies.length > 0 && equipCard) {
@@ -1286,7 +1394,7 @@ export class BotBrain {
 
       case 'ASK_DUONG_QUAN_3': {
         // Dương Đình Nghệ úp mặt bỏ qua bỏ bài để Chém không giới hạn cự ly
-        const enemies = this._sortTargetsByPriority(bot, state.getAlivePlayers().filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p)));
+        const enemies = this._sortTargetsByPriority(bot, state.getAlivePlayers().filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p)), state);
         const excess = (bot.hand?.length || 0) - bot.hp;
         if (enemies.length > 0 && (excess >= 2 || enemies[0].hp <= 1)) {
           return {
@@ -1344,7 +1452,8 @@ export class BotBrain {
         // Huyền Trân Công Chúa ép 2 tướng nam Quyết Đấu
         const maleEnemies = this._sortTargetsByPriority(
           bot,
-          state.getAlivePlayers().filter(p => p.id !== bot.id && getPlayerGender(p) === 'male' && !this._isKnownAlly(bot, p))
+          state.getAlivePlayers().filter(p => p.id !== bot.id && getPlayerGender(p) === 'male' && !this._isKnownAlly(bot, p)),
+          state
         );
         const lowestCard = this._pickLowestValueCard(bot);
         if (maleEnemies.length >= 2 && lowestCard) {

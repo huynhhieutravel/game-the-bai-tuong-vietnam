@@ -1389,7 +1389,32 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
   - **Khái niệm:** Thanh trạng thái mờ trang nhã (`combat-action-ticker`) hiển thị ngay dưới thanh Top Bar trên cả giao diện Desktop và Mobile, hiển thị 1-2 hành động mới nhất của trận đấu với nhãn `Mới nhất` màu vàng đồng nổi bật.
   - Người chơi có thể theo dõi từng nước đi của toàn bộ đối thủ trên bàn cờ mà không cần mở Modal Nhật ký to. Nhấp trực tiếp vào Ticker sẽ mở ngay bảng Nhật ký Trận đấu chi tiết.
 
+---
 
+## 89. HỆ THỐNG CHẤM ĐIỂM ĐE DỌA THẾ LỰC & LIÊN MINH NGẦM QUỐC CHIẾN (FACTION THREAT SCORING & IMPLICIT TRUCE AI)
 
+- **⚖️ Nhận Diện Phe Áp Đảo Bàn Cờ (Dominant Faction Detection):**
+  - **Khái niệm:** Thuật toán phân tích cán cân quân số thời gian thực trong [BotBrain.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/ai/BotBrain.js) theo [ADR 0098](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/docs/adr/0098-multi-dimensional-faction-threat-scoring-and-implicit-truce-ai.md). Khi một phe phái (khác phe trung lập/Dã Tâm) sở hữu từ 2 thành viên còn sống trở lên trên bàn cờ ($\text{size} \ge 2$) và dẫn đầu về quân số, phe này được gắn nhãn là **Phe Áp Đảo (Dominant Faction)**.
+  - Giải quyết triệt để lỗi logic cũ khi Bot chỉ sắp xếp mục tiêu theo `hp - hp` đơn giản hoặc giữ nguyên thứ tự mảng (`Player 0` luôn bị Bot 2 dồn đánh bất chấp đối thủ khác có 2 người cùng phe).
 
+- **🤝 Giao Thức Liên Minh Ngầm Chống Phe Áp Đảo (Anti-Dominant Faction Implicit Truce):**
+  - **Khái niệm:** Quy tắc chiến thuật tối thượng của thể thức Quốc Chiến: Khi trên bàn cờ xuất hiện một Phe Áp Đảo (ví dụ: Phe Hà có 2 người), các người chơi thuộc các phe thiểu số đơn độc (ví dụ: Bạn thuộc Phe Lạc chỉ có 1 người, Bot 2 thuộc Phe Việt chỉ có 1 người) sẽ tự động kích hoạt **Liên Minh Ngầm (Implicit Truce)**.
+  - **Cơ chế điểm số:**
+    - Bot thuộc phe thiểu số sẽ dồn toàn bộ hỏa lực vào các thành viên Phe Áp Đảo (ưu tiên cộng từ **+150 đến +175 điểm đe dọa**).
+    - Bot áp dụng mức phạt **-80 điểm đe dọa** khi cân nhắc nhắm vào đối thủ phe thiểu số khác còn nhiều máu (`HP > 1`), ngăn chặn hoàn toàn việc các phe yếu tự tàn sát lẫn nhau giúp phe đông quân số hưởng lợi.
+    - **Ngoại lệ dứt điểm:** Khi đối thủ phe thiểu số chỉ còn 1 HP hấp hối, hình phạt -80 được gỡ bỏ và cộng thêm +50 điểm dứt điểm để Bot dọn dẹp bàn cờ nếu tình huống cho phép.
 
+- **📊 Ma Trận Chấm Điểm Đe Dọa Đa Chiều (Multi-Dimensional Threat Scoring Engine):**
+  - **Khái niệm:** Hàm `BotBrain.calculateThreatScore(bot, target, state)` thay thế toàn bộ logic so sánh HP thô sơ cũ bằng ma trận tính toán 6 chiều:
+    1. **Thế lực Quốc Chiến:** Thuộc Phe Áp Đảo (+100 điểm + size * 25 điểm). Phe yếu thế trong thời kỳ áp đảo (-80 điểm khi HP > 1). Đã lộ diện thông thường (+30 điểm).
+    2. **Chức vị & Giá trị Tiêu diệt:** Chúa công (`isLord`) hoặc sở hữu Phó Ấn (`hasViceSeal` / `isViceGeneral`) (+25 điểm).
+    3. **Ngưỡng máu dứt điểm:** HP = 1 (+50 điểm), HP = 2 (+20 điểm), HP $\ge$ 4 (-10 điểm).
+    4. **Tài nguyên bài trên tay:** Mỗi lá bài trên tay mục tiêu (+4 điểm/lá).
+    5. **Uy lực trang bị sát thương:** Trang bị vũ khí (+12 điểm), trang bị ngựa công (+8 điểm), trang bị áo giáp phòng thủ (-8 điểm).
+    6. **Cự ly khoảng cách:** Trừ 6 điểm cho mỗi đơn vị khoảng cách (`- dist * 6`).
+
+- **🎯 Tái Định Tuyến Cẩm Nang Chiến Thuật (Strategic Trick Retargeting):**
+  - Toàn bộ các lá bài cẩm nang đơn mục tiêu (`Quyết Đấu`, `Cướp Bài`, `Tước Bài`, `Hỏa Công`, `Hỗn Loạn`, `Mượn Đao`) và các kỹ năng chủ động chiến đấu (như `Hòa Thân`, `Tâm Công`, `Vân Đồn`, `Tiên Duyên`) đều dùng chung ma trận `calculateThreatScore`, đảm bảo Bot sử dụng tài nguyên công kích chuẩn xác và thống nhất với quyết định đánh [Chém].
+
+- **🐺 Giao Thức Kẻ Cô Độc / Tướng Dã Tâm (Careerist / Lone Wolf Protocol):**
+  - Khi Bot mang thân phận Dã Tâm (`isDaTam = true`), Bot vẫn tuân thủ nguyên tắc cân bằng thế lực: tuyệt đối không tiếp tay cho phe đông quân số. Bot Dã Tâm sẽ ưu tiên tiêu diệt các thành viên Phe Áp Đảo trước để đưa ván cờ về thế cờ tàn solo 1v1 cân sức.
