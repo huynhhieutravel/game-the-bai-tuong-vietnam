@@ -156,6 +156,33 @@ export function toViewModel(state, mainPlayerId = 0) {
           ...frame.context,
           responderId: frame.currentActorId
         };
+      } else if (frame.type === 'ASK_JUDGEMENT_ROLL') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_judgement_roll',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          delayedCard: frame.context?.delayedCard,
+          cardKey: frame.context?.cardKey,
+          cardName: frame.context?.cardName,
+          ...frame.context,
+          responderId: frame.currentActorId
+        };
+      } else if (frame.type === 'ASK_JUDGEMENT_RESULT') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_judgement_result',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          delayedCard: frame.context?.delayedCard,
+          judgeCard: frame.context?.judgeCard,
+          cardKey: frame.context?.cardKey,
+          cardName: frame.context?.cardName,
+          isSuccess: frame.context?.isSuccess,
+          resultMessage: frame.context?.resultMessage,
+          ...frame.context,
+          responderId: frame.currentActorId
+        };
       } else if (frame.type === 'ASK_HAU_VIEN') {
         const currentResponder = frame.currentActorId ?? frame.sourceId;
         vm.waitingForResponse = {

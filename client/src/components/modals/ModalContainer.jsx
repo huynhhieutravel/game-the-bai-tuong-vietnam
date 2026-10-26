@@ -7,6 +7,7 @@ import { CardSelector } from './CardSelector';
 
 import { AskBocTramTrungSlashModal } from './AskBocTramTrungSlashModal';
 import { AskChangeJudgeModal } from './AskChangeJudgeModal';
+import { JudgementRollModal } from './JudgementRollModal';
 import { HauVienModal } from './HauVienModal';
 import { AskSnatchDismantleModal } from './AskSnatchDismantleModal';
 import { AskWeaponSkillModal } from './AskWeaponSkillModal';
@@ -295,6 +296,14 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           return (
             <div style={modalStyle}>
               <AskChangeJudgeModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
+            </div>
+          );
+        }
+
+        if ((req.type === 'ask_judgement_roll' || req.type === 'ask_judgement_result') && req.responderId === me.id) {
+          return (
+            <div style={modalStyle}>
+              <JudgementRollModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
             </div>
           );
         }

@@ -3,6 +3,7 @@ import { GameState } from '../../core/GameState.js';
 import { StateMachine, PHASES } from '../../core/StateMachine.js';
 import { CombatRules } from '../../rules/CombatRules.js';
 import { TrickRules } from '../../rules/TrickRules.js';
+import { DispatcherV4 } from '../../application/DispatcherV4.js';
 
 describe('Xiềng Xích, Truyền Sát Thương & Cẩm Nang Trì Hoãn (Engine v4)', () => {
   const createMockGame = (playerCount = 3) => {
@@ -121,8 +122,17 @@ describe('Xiềng Xích, Truyền Sát Thương & Cẩm Nang Trì Hoãn (Engine 
     // Đặt lá bài phán xét là Bích (không phải Cơ)
     state.drawPile.push({ id: 'judge_spade', name: 'Sát thủ', suit: 'spade', color: 'black' });
 
-    const sm = new StateMachine(state);
-    sm.startTurn(0);
+    const dispatcher = new DispatcherV4(state);
+    dispatcher.stateMachine.startTurn(0);
+
+    // Dừng lại chờ người chơi bấm rút bài
+    expect(state.priorityStack.peek().type).toBe('ASK_JUDGEMENT_ROLL');
+    dispatcher.dispatch({ type: 'ACTION_REACT', playerId: 0, doRoll: true });
+
+    // Hiển thị kết quả phán xét thất bại (không phải Cơ)
+    expect(state.priorityStack.peek().type).toBe('ASK_JUDGEMENT_RESULT');
+    expect(state.priorityStack.peek().context.isSuccess).toBe(false);
+    dispatcher.dispatch({ type: 'ACTION_REACT', playerId: 0, confirmResult: true });
 
     // Bị mất Pha Ra Bài (ACTION): Chuyển thẳng sang DISCARD và tạo frame đòi bỏ bài
     expect(state.currentPhase).toBe(PHASES.DISCARD);
@@ -141,8 +151,17 @@ describe('Xiềng Xích, Truyền Sát Thương & Cẩm Nang Trì Hoãn (Engine 
     // Đặt lá bài phán xét là Cơ (♥)
     state.drawPile.push({ id: 'judge_heart', name: 'Đào', suit: 'heart', color: 'red' });
 
-    const sm = new StateMachine(state);
-    sm.startTurn(0);
+    const dispatcher = new DispatcherV4(state);
+    dispatcher.stateMachine.startTurn(0);
+
+    // Dừng lại chờ rút bài
+    expect(state.priorityStack.peek().type).toBe('ASK_JUDGEMENT_ROLL');
+    dispatcher.dispatch({ type: 'ACTION_REACT', playerId: 0, doRoll: true });
+
+    // Kết quả phán xét thành công (chất Cơ)
+    expect(state.priorityStack.peek().type).toBe('ASK_JUDGEMENT_RESULT');
+    expect(state.priorityStack.peek().context.isSuccess).toBe(true);
+    dispatcher.dispatch({ type: 'ACTION_REACT', playerId: 0, confirmResult: true });
 
     // Thoát Hỗn Loạn thành công -> Vào Pha ACTION bình thường
     expect(state.currentPhase).toBe(PHASES.ACTION);

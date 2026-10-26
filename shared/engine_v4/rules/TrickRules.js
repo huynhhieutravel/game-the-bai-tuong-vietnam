@@ -263,11 +263,26 @@ export class TrickRules {
             state.discardPile.push(delayedCard);
             state.addLog(`🛡️ [${delayedCard.name}] đã bị [Hóa Giải] vô hiệu hóa thành công, hủy bỏ phán xét!`);
             if (player && player.judgementArea && player.judgementArea.length > 0) {
-              this.resolveJudgementPhase(state, player.id);
+              this.resolveJudgementPhase(state, player.id, { interactiveRoll: frame.context.interactiveRoll });
             }
             return { negated: true, resolved: true };
           } else {
-            this._executeJudgementRoll(state, player, delayedCard);
+            if (frame.context.interactiveRoll) {
+              state.priorityStack.push({
+                type: 'ASK_JUDGEMENT_ROLL',
+                sourceId: player.id,
+                targetId: player.id,
+                currentActorId: player.id,
+                context: {
+                  delayedCard,
+                  cardKey: normalizeCardKey(delayedCard),
+                  cardName: delayedCard.name,
+                  interactiveRoll: true
+                }
+              });
+              return { negated: false, resolved: false };
+            }
+            this._executeJudgementRoll(state, player, delayedCard, false);
             return { negated: false, resolved: true };
           }
         }
@@ -1046,20 +1061,53 @@ export class TrickRules {
           delayedCard,
           isJudgementNegate: true,
           reason: 'judgement',
-          negateCount: 0
+          negateCount: 0,
+          interactiveRoll: options.interactiveRoll === true
         }
       });
       return;
     }
 
-    // Không ai có Hóa Giải -> Phán xét trực tiếp
-    this._executeJudgementRoll(state, player, delayedCard);
+    // Không ai có Hóa Giải -> Nếu là tương tác, đẩy frame ASK_JUDGEMENT_ROLL
+    if (options.interactiveRoll) {
+      state.priorityStack.push({
+        type: 'ASK_JUDGEMENT_ROLL',
+        sourceId: player.id,
+        targetId: player.id,
+        currentActorId: player.id,
+        context: {
+          delayedCard,
+          cardKey: normalizeCardKey(delayedCard),
+          cardName: delayedCard.name,
+          interactiveRoll: true
+        }
+      });
+      return;
+    }
+
+    // Fallback đồng bộ cho các test headless không truyền options.interactiveRoll
+    this._executeJudgementRoll(state, player, delayedCard, false);
+  }
+
+  /**
+   * Phản hồi hành động Rút Bài Phán Xét (Judgement Roll)
+   */
+  static respondJudgementRoll(state, responderId, data = {}) {
+    const frame = state.priorityStack.peek();
+    if (!frame || frame.type !== 'ASK_JUDGEMENT_ROLL') return;
+    state.priorityStack.pop();
+
+    const { delayedCard } = frame.context;
+    const player = state.getPlayer(responderId);
+    if (!player || !player.isAlive) return;
+
+    this._executeJudgementRoll(state, player, delayedCard, true);
   }
 
   /**
    * Thực hiện lật bài phán xét và xử lý đổi bài phán xét
    */
-  static _executeJudgementRoll(state, player, delayedCard) {
+  static _executeJudgementRoll(state, player, delayedCard, interactive = false) {
     const cardKey = normalizeCardKey(delayedCard);
 
     state.addLog(`⚖️ Bắt đầu phán xét [${delayedCard.name}] cho ${player.name}...`);
@@ -1070,10 +1118,12 @@ export class TrickRules {
       state.addLog(`Không còn bài để phán xét! Bỏ qua [${delayedCard.name}].`);
       state.discardPile.push(delayedCard);
       if (player.judgementArea && player.judgementArea.length > 0 && player.isAlive) {
-        this.resolveJudgementPhase(state, player.id);
+        this.resolveJudgementPhase(state, player.id, { interactiveRoll: interactive });
       }
       return;
     }
+
+    state.addLog(`🎲 ${player.name} lật mở lá bài phán xét: [${judgeCard.name} ${judgeCard.suit || ''} ${judgeCard.rank || ''}]!`);
 
     // Kiểm tra xem có người chơi nào có kỹ năng đổi phán xét (Mạc Đĩnh Chi - Ứng Biến, Đinh Điền - Quân Cơ)
     const candidateIds = state.players
@@ -1097,15 +1147,16 @@ export class TrickRules {
           judgeCard,
           reason: cardKey,
           candidateIds,
-          candidateIndex: 0
+          candidateIndex: 0,
+          interactiveRoll: interactive
         }
       });
       return; // Dừng lại chờ phản hồi từ người đổi phán xét
     }
 
-    // Không có ai đổi bài -> Xử lý kết quả phán xét trực tiếp
-    this._finalizeDelayedJudgement(state, player, delayedCard, judgeCard);
-    if (player.judgementArea && player.judgementArea.length > 0 && player.isAlive) {
+    // Không có ai đổi bài -> Xử lý kết quả phán xét
+    this._finalizeDelayedJudgement(state, player, delayedCard, judgeCard, interactive);
+    if (!interactive && player.judgementArea && player.judgementArea.length > 0 && player.isAlive) {
       this.resolveJudgementPhase(state, player.id);
     }
   }
@@ -1120,7 +1171,7 @@ export class TrickRules {
     }
 
     const responder = state.getPlayer(responderId);
-    const { delayedCard, candidateIds, candidateIndex = 0 } = frame.context;
+    const { delayedCard, candidateIds, candidateIndex = 0, interactiveRoll = false } = frame.context;
     let finalJudgeCard = frame.context.judgeCard;
     const player = state.getPlayer(frame.targetId);
 
@@ -1140,8 +1191,8 @@ export class TrickRules {
       finalJudgeCard = replaceCard;
       const skillName = hasUngBien ? 'Ứng Biến' : 'Quân Cơ';
       state.addLog(`☯️ [${skillName}] ${responder.name} đánh ra lá [${replaceCard.name} ${replaceCard.suit || ''}] thay thế lá phán xét!`);
-      this._finalizeDelayedJudgement(state, player, delayedCard, finalJudgeCard);
-      if (player && player.judgementArea && player.judgementArea.length > 0 && player.isAlive) {
+      this._finalizeDelayedJudgement(state, player, delayedCard, finalJudgeCard, interactiveRoll);
+      if (!interactiveRoll && player && player.judgementArea && player.judgementArea.length > 0 && player.isAlive) {
         this.resolveJudgementPhase(state, player.id);
       }
       return { changed: true, newCard: replaceCard };
@@ -1157,8 +1208,8 @@ export class TrickRules {
       } else {
         // Hết người muốn đổi -> Chốt phán xét với lá ban đầu
         state.priorityStack.pop();
-        this._finalizeDelayedJudgement(state, player, delayedCard, finalJudgeCard);
-        if (player && player.judgementArea && player.judgementArea.length > 0 && player.isAlive) {
+        this._finalizeDelayedJudgement(state, player, delayedCard, finalJudgeCard, interactiveRoll);
+        if (!interactiveRoll && player && player.judgementArea && player.judgementArea.length > 0 && player.isAlive) {
           this.resolveJudgementPhase(state, player.id);
         }
         return { changed: false, finalCard: finalJudgeCard };
@@ -1167,14 +1218,31 @@ export class TrickRules {
   }
 
   /**
+   * Phản hồi xác nhận kết quả Phán Xét (Judgement Result Confirmation)
+   */
+  static respondJudgementResult(state, responderId, data = {}) {
+    const frame = state.priorityStack.peek();
+    if (!frame || frame.type !== 'ASK_JUDGEMENT_RESULT') return;
+    state.priorityStack.pop();
+
+    const player = state.getPlayer(responderId);
+    if (player && player.judgementArea && player.judgementArea.length > 0 && player.isAlive) {
+      this.resolveJudgementPhase(state, player.id, { interactiveRoll: true });
+    }
+  }
+
+  /**
    * Thực thi kết quả phán xét cuối cùng cho Cẩm nang Trì hoãn
    */
-  static _finalizeDelayedJudgement(state, player, delayedCard, judgeCard) {
+  static _finalizeDelayedJudgement(state, player, delayedCard, judgeCard, interactive = false) {
     const cardKey = normalizeCardKey(delayedCard);
     state.discardPile.push(judgeCard);
 
     // Kích hoạt phản ứng phán xét (Ngọc Hân Công Chúa - Thông Ngôn...)
     globalHeroRegistry.dispatchTrigger('ON_JUDGED', { targetId: player.id, judgeCard }, state);
+
+    let isSuccess = false;
+    let resultMessage = '';
 
     if (cardKey === 'sam_set') {
       const isSpade = normalizeSuit(judgeCard.suit).code === 'spade';
@@ -1182,11 +1250,15 @@ export class TrickRules {
       const isExploded = isSpade && rank >= 2 && rank <= 9;
 
       if (isExploded) {
-        state.addLog(`🌩️⚡ [Sấm Sét] NỔ TRÚNG ${player.name} (${judgeCard.name} chất Bích ${rank})! Nhận 3 sát thương lôi hỏa!`);
+        isSuccess = false;
+        resultMessage = `🌩️⚡ [Sấm Sét] NỔ TRÚNG ${player.name} (${judgeCard.name} chất Bích ${rank})! Nhận 3 sát thương lôi hỏa!`;
+        state.addLog(resultMessage);
         state.discardPile.push(delayedCard);
         CombatRules.applyDamage(state, null, player.id, 3, 'lightning');
       } else {
-        state.addLog(`⚡ [Sấm Sét] Không nổ (${judgeCard.name} ${judgeCard.suit} ${judgeCard.rank || ''})!`);
+        isSuccess = true;
+        resultMessage = `⚡ [Sấm Sét] Không nổ (${judgeCard.name} ${judgeCard.suit} ${judgeCard.rank || ''})!`;
+        state.addLog(resultMessage);
         const alive = state.getAlivePlayers();
         const currIdx = alive.findIndex(p => p.id === player.id);
         let nextPlayer = null;
@@ -1212,25 +1284,50 @@ export class TrickRules {
       state.discardPile.push(delayedCard);
 
       if (!isHeart) {
-        state.addLog(`🌀 [Hỗn Loạn] Phán xét KHÔNG PHẢI CƠ (${judgeCard.name} chất ${judgeCard.suit || judgeCard.color})! ${player.name} bị mất Giai đoạn Ra bài!`);
+        isSuccess = false;
+        resultMessage = `🌀 [Hỗn Loạn] Phán xét KHÔNG PHẢI CƠ (${judgeCard.name} chất ${judgeCard.suit || judgeCard.color})! ${player.name} bị mất Giai đoạn Ra bài!`;
+        state.addLog(resultMessage);
         player.temporaryFlags = player.temporaryFlags || {};
         player.temporaryFlags.skipActionPhase = true;
       } else {
-        state.addLog(`✨ [Hỗn Loạn] Phán xét ra CƠ (${judgeCard.name})! ${player.name} thoát khỏi Hỗn Loạn thành công.`);
+        isSuccess = true;
+        resultMessage = `✨ [Hỗn Loạn] Phán xét ra CƠ (${judgeCard.name})! ${player.name} thoát khỏi Hỗn Loạn thành công.`;
+        state.addLog(resultMessage);
       }
     } else if (cardKey === 'binh_luong' || cardKey === 'binh-luong') {
       const isClub = normalizeSuit(judgeCard.suit).code === 'club';
       state.discardPile.push(delayedCard);
 
       if (!isClub) {
-        state.addLog(`🌾 [Binh Lương Thốn Đoạn] Phán xét KHÔNG PHẢI NHÉP (${judgeCard.name} chất ${judgeCard.suit || judgeCard.color})! ${player.name} bị mất Pha Rút Bài!`);
+        isSuccess = false;
+        resultMessage = `🌾 [Binh Lương Thốn Đoạn] Phán xét KHÔNG PHẢI NHÉP (${judgeCard.name} chất ${judgeCard.suit || judgeCard.color})! ${player.name} bị mất Pha Rút Bài!`;
+        state.addLog(resultMessage);
         player.temporaryFlags = player.temporaryFlags || {};
         player.temporaryFlags.skipDrawPhase = true;
       } else {
-        state.addLog(`✨ [Binh Lương Thốn Đoạn] Phán xét ra NHÉP (${judgeCard.name})! ${player.name} thoát khỏi Binh Lương thành công.`);
+        isSuccess = true;
+        resultMessage = `✨ [Binh Lương Thốn Đoạn] Phán xét ra NHÉP (${judgeCard.name})! ${player.name} thoát khỏi Binh Lương thành công.`;
+        state.addLog(resultMessage);
       }
     } else {
       state.discardPile.push(delayedCard);
+    }
+
+    if (interactive) {
+      state.priorityStack.push({
+        type: 'ASK_JUDGEMENT_RESULT',
+        sourceId: player.id,
+        targetId: player.id,
+        currentActorId: player.id,
+        context: {
+          delayedCard,
+          judgeCard,
+          cardKey,
+          cardName: delayedCard.name,
+          isSuccess,
+          resultMessage
+        }
+      });
     }
   }
 

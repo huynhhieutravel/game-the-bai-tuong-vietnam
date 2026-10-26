@@ -259,10 +259,22 @@ export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCa
               const alive = s.getAlivePlayers ? s.getAlivePlayers() : (s.players || []).filter(x => x.isAlive);
               return alive.filter(x => {
                 if (x.id === p.id) return false;
-                if (Array.isArray(x.equipment)) {
-                  return x.equipment.some(e => e.type === 'weapon');
-                }
-                return Boolean(x.equipment?.weapon);
+                // Kiểm tra vũ khí trên người đối thủ (tương thích cả cấu trúc object x.equipment.weapon lẫn mảng x.equipment)
+                const hasWeapon = Boolean(x.equipment?.weapon) || (Array.isArray(x.equipment) && x.equipment.some(e => 
+                  e && (
+                    e.type === 'weapon' || 
+                    e.subtype === 'weapon' || 
+                    e.subType === 'weapon' || 
+                    e.subtype === 'equip_weapon' || 
+                    e.subType === 'equip_weapon' ||
+                    e.slot === 'weapon' ||
+                    Boolean(RangeSystem.getWeaponRange(e.name || e.idKey || ''))
+                  )
+                ));
+                if (!hasWeapon) return false;
+                // Người bị mượn đao phải có ít nhất 1 mục tiêu khác để Chém tới
+                const validVictims = RangeSystem.getValidSlashTargets(x, alive).filter(v => v.id !== x.id);
+                return validVictims.length > 0;
               });
             }
           },

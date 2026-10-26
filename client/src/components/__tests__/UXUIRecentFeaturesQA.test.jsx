@@ -7,7 +7,7 @@ import { DodgeModal } from '../modals/DodgeModal';
 import { TienPhatModal } from '../modals/TienPhatModal';
 import { AskChangeJudgeModal } from '../modals/AskChangeJudgeModal';
 import { HauVienModal } from '../modals/HauVienModal';
-import { AskBocTramTrungDodgeModal } from '../modals/AskBocTramTrungDodgeModal';
+import { JudgementRollModal } from '../modals/JudgementRollModal';
 import { AskBocTramTrungSlashModal } from '../modals/AskBocTramTrungSlashModal';
 import { PlayerHand } from '../game/PlayerHand';
 
@@ -357,6 +357,82 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
         doProvide: true,
         cardId: 'ally_slash_1'
       }));
+    });
+  });
+
+  describe('5.1. JudgementRollModal - Rút bài Phán xét & Lật mở kết quả trực quan', () => {
+    const defaultState = {
+      players: [
+        { id: 0, name: 'Bạn', isAlive: true, faction: 'viet', hand: [] },
+        { id: 1, name: 'Đối thủ', isAlive: true, faction: 'han', hand: [] }
+      ]
+    };
+
+    it('hiển thị modal chuẩn bị rút bài Hỗn Loạn và gửi doRoll khi nhấn Rút Bài Phán Xét', () => {
+      const onConfirm = vi.fn();
+      const req = {
+        type: 'ask_judgement_roll',
+        sourceId: 1,
+        targetId: 0,
+        responderId: 0,
+        cardKey: 'hon_loan',
+        cardName: 'Hỗn Loạn'
+      };
+
+      render(<JudgementRollModal req={req} gameState={defaultState} onConfirm={onConfirm} />);
+
+      expect(screen.getByText(/SỰ KIỆN PHÁN XÉT: \[HỖN LOẠN\]/i)).toBeTruthy();
+      expect(screen.getByText(/Rút ra chất CƠ ♥ để giải trừ Hỗn Loạn!/i)).toBeTruthy();
+
+      const rollBtn = screen.getByRole('button', { name: /RÚT BÀI PHÁN XÉT/i });
+      fireEvent.click(rollBtn);
+
+      expect(onConfirm).toHaveBeenCalledWith({ doRoll: true });
+    });
+
+    it('hiển thị kết quả phán xét Thoát Hiểm Thành Công khi rút ra bài hợp lệ', () => {
+      const onConfirm = vi.fn();
+      const req = {
+        type: 'ask_judgement_result',
+        sourceId: 1,
+        targetId: 0,
+        responderId: 0,
+        cardKey: 'hon_loan',
+        cardName: 'Hỗn Loạn',
+        isSuccess: true,
+        judgeCard: { name: 'Đào', suit: 'heart', rank: '7', color: 'red' },
+        resultMessage: 'Lá phán xét là ♥ (Đào)! Bạn đã thoát khỏi Hỗn Loạn.'
+      };
+
+      render(<JudgementRollModal req={req} gameState={defaultState} onConfirm={onConfirm} />);
+
+      expect(screen.getByText(/THOÁT HIỂM THÀNH CÔNG!/i)).toBeTruthy();
+      expect(screen.getByText(/Lá phán xét là ♥ \(Đào\)!/i)).toBeTruthy();
+
+      const nextBtn = screen.getByRole('button', { name: /Tiếp tục ➔/i });
+      fireEvent.click(nextBtn);
+
+      expect(onConfirm).toHaveBeenCalledWith({ confirmResult: true });
+    });
+
+    it('hiển thị kết quả phán xét Thất Bại khi trúng Sấm Sét', () => {
+      const onConfirm = vi.fn();
+      const req = {
+        type: 'ask_judgement_result',
+        sourceId: 0,
+        targetId: 0,
+        responderId: 0,
+        cardKey: 'sam_set',
+        cardName: 'Sấm Sét',
+        isSuccess: false,
+        judgeCard: { name: 'Chém', suit: 'spade', rank: '5', color: 'black' },
+        resultMessage: 'Sấm Sét nổ trúng! Bạn chịu 3 sát thương Lôi Hỏa.'
+      };
+
+      render(<JudgementRollModal req={req} gameState={defaultState} onConfirm={onConfirm} />);
+
+      expect(screen.getByText(/PHÁN XÉT THẤT BẠI!/i)).toBeTruthy();
+      expect(screen.getByText(/Sấm Sét nổ trúng!/i)).toBeTruthy();
     });
   });
 

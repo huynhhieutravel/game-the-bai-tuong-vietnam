@@ -876,6 +876,22 @@ export class DispatcherV4 {
         break;
       }
 
+      case 'ASK_JUDGEMENT_ROLL': {
+        TrickRules.respondJudgementRoll(this.state, playerId, data);
+        if (this.state.currentPhase === PHASES.JUDGE && this.state.priorityStack.isEmpty()) {
+          this.stateMachine._completeJudgePhase();
+        }
+        break;
+      }
+
+      case 'ASK_JUDGEMENT_RESULT': {
+        TrickRules.respondJudgementResult(this.state, playerId, data);
+        if (this.state.currentPhase === PHASES.JUDGE && this.state.priorityStack.isEmpty()) {
+          this.stateMachine._completeJudgePhase();
+        }
+        break;
+      }
+
       case 'ASK_HAU_VIEN': {
         this.state.priorityStack.pop();
         if (!isCancelOrSkip && data.doReact && data.targetId !== undefined) {

@@ -100,7 +100,7 @@ export class StateMachine {
 
     // Xử lý cẩm nang trong khu phán xét (Sấm Sét, Hỗn Loạn)
     if (player.judgementArea && player.judgementArea.length > 0) {
-      TrickRules.resolveJudgementPhase(this.state, player.id);
+      TrickRules.resolveJudgementPhase(this.state, player.id, { interactiveRoll: true });
     }
 
     if (this.state.priorityStack.isEmpty()) {
@@ -119,7 +119,7 @@ export class StateMachine {
 
     // Nếu còn cẩm nang trì hoãn khác cần phán xét tiếp
     if (player.judgementArea && player.judgementArea.length > 0) {
-      TrickRules.resolveJudgementPhase(this.state, player.id);
+      TrickRules.resolveJudgementPhase(this.state, player.id, { interactiveRoll: true });
       if (!this.state.priorityStack.isEmpty()) {
         return;
       }

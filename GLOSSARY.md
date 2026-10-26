@@ -188,6 +188,11 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
   - Khi một cẩm nang trì hoãn (Sấm Sét, Hỗn Loạn) đến giai đoạn phán xét, lá bài phán xét được rút tạm từ đỉnh bộ bài rút nhưng **chưa được áp dụng ngay**.
   - Hệ thống quét tất cả người chơi còn sống xem có ai sở hữu kỹ năng can thiệp phán xét như **Mạc Đĩnh Chi** (`Ứng Biến` - dùng bài bất kỳ trên tay) hoặc **Đinh Điền** (`Quân Cơ` - dùng bài đen trên tay) hay không.
   - Người chơi hợp lệ sẽ nhận được khung `ASK_CHANGE_JUDGE`. Nếu chấp thuận, lá bài phán xét cũ bị thay thế bởi lá bài được chọn từ tay người can thiệp, qua đó có thể trực tiếp cứu đồng minh thoát khỏi Sấm Sét nổ hoặc ép kẻ thù nổ lôi hỏa.
+- **🎲 Sự Kiện Rút Bài Phán Xét (Judgement Roll Event Window):**
+  - Khi một người chơi dính cẩm nang trì hoãn (Hỗn Loạn, Sấm Sét, Binh Lương Thốn Đoạn) bước vào Pha Phán Xét:
+  - Nếu không bị [Hóa Giải], hệ thống mở khung tương tác sự kiện `ASK_JUDGEMENT_ROLL` (`ask_judgement_roll`) hiển thị rõ ràng điều kiện thoát hiểm (Hỗn Loạn cần Cơ ♥, Binh Lương cần Nhép ♣, Sấm Sét né Bích ♠ 2-9).
+  - Người chơi trực tiếp bấm nút "🎲 Rút Bài Phán Xét" để lật mở lá bài phán xét từ bộ bài.
+  - Kết quả được hiển thị lật mở trực quan trên bàn đấu qua khung `ASK_JUDGEMENT_RESULT` (`ask_judgement_result`) minh bạch chất bài và trạng thái Thoát nạn / Thất bại, ngăn chặn việc hệ thống tự rút tự đóng trong âm thầm khiến người chơi mơ hồ.
 - **📊 Giới Hạn Bài Trên Tay Động (Dynamic Max Hand Limit Invariant):**
   - Mặc định, giới hạn bài trên tay tối đa trong Pha Bỏ bài bằng lượng HP hiện tại.
   - Tuy nhiên, kỹ năng **Khai Quốc** của Nguyễn Bặc cộng thêm **+2 Max Hand cho mỗi đồng minh Sơn còn sống**.

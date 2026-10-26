@@ -1536,6 +1536,14 @@ export class BotBrain {
         return { type: 'ACTION_REACT', canceled: true };
       }
 
+      case 'ASK_JUDGEMENT_ROLL': {
+        return { type: 'ACTION_REACT', doRoll: true, doReact: true };
+      }
+
+      case 'ASK_JUDGEMENT_RESULT': {
+        return { type: 'ACTION_REACT', confirmResult: true, doReact: true };
+      }
+
       case 'ASK_HAU_VIEN': {
         // Ngô Quyền nhường Đào cho đồng minh bị thương và rút 1 bài
         const woundedAlly = state.getAlivePlayers().find(p => p.id !== bot.id && this._isKnownAlly(bot, p) && p.hp < p.maxHp);

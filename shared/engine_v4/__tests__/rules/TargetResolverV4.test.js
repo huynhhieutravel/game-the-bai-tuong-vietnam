@@ -118,6 +118,14 @@ describe('TargetResolverV4 Unit Test Suite', () => {
     const borrowStep0 = getAvailableTargets(state, 0, 'Mượn Đao', 'c_borrow_0', []);
     expect(borrowStep0).toEqual([1]);
 
+    // Kiểm tra tương thích với ViewModel dạng Array equipment của Client
+    const p1 = state.getPlayer(1);
+    const savedEq = p1.equipment;
+    p1.equipment = [{ id: 'thanh-long-dao-vm', name: 'Thanh Long Đao', type: 'equip', subtype: 'equip_weapon' }];
+    const borrowStep0VM = getAvailableTargets(state, 0, 'Mượn Đao', 'c_borrow_0', []);
+    expect(borrowStep0VM).toEqual([1]);
+    p1.equipment = savedEq;
+
     // Bước 1: Sau khi chọn P1, mục tiêu trong tầm đánh của P1 (vũ khí tầm 3)
     const borrowStep1 = getAvailableTargets(state, 0, 'Mượn Đao', 'c_borrow_0', [1]);
     expect(borrowStep1).toContain(0); // P1 có thể chém P0
