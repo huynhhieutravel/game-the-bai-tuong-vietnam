@@ -101,8 +101,21 @@ export class BotBrain {
   /**
    * Quyết định lật mặt tướng chủ động (Proactive Hero Reveal)
    */
+  /**
+   * Quyết định lật mặt tướng chiến thuật (Intelligent Proactive Hero Reveal Policy)
+   * Nâng cấp toàn diện theo chuẩn Quốc Chiến:
+   * 1. Tiên Phong Cắm Cờ: Lật đầu tiên nhận 2 lá bài thưởng.
+   * 2. Hội Quân Đồng Minh: Lập tức lật tướng khi có đồng minh cùng phe đã lộ diện để tránh Friendly Fire.
+   * 3. Sẵn Sàng Tham Chiến (Combat / Battle-Ready):
+   *    - Khi Bot có ý định tấn công kẻ địch (có Chém, Quyết Đấu, Hỏa Công, Cướp Bài, Tước Bài trong tầm).
+   *    - Khi Bot có Kỹ năng (chủ động, kích hoạt, tỏa định, buff) cần mở khóa.
+   *    - Từ Vòng 2 trở đi khi đã có trang bị hoặc tài nguyên dồi dào (trừ khi đang hấp hối trước phe địch áp đảo).
+   * 4. Lật Phó Tướng:
+   *    - Nhận thưởng Âm Dương Giao Hòa (+1 bài khi tổng máu lẻ).
+   *    - Hoặc mở khóa toàn bộ kỹ năng của Phó Tướng khi vào giai đoạn chiến đấu.
+   */
   static _decideHeroReveal(state, bot) {
-    if (!bot.revealedHeroes) return null;
+    if (!bot || !bot.revealedHeroes) return null;
     const hasHeroAssigned = Boolean(bot.mainHeroId || bot.heroId || (bot.heroes && bot.heroes.length > 0));
     if (!hasHeroAssigned) return null;
 
@@ -111,22 +124,18 @@ export class BotBrain {
     if (!bot.revealedHeroes[1]) unrevealed.push(1);
     if (unrevealed.length === 0) return null;
 
-    // Danh sách các kỹ năng chủ động / chiến đấu cần hiển lộ tướng để kích hoạt
-    const activeSkillIds = [
-      'dieu_duoc', 'bach_dang', 'ky_tap', 'can_gian', 'hoa_than_an_tu',
-      'hoa_than', 'hoa_than_huyen_tran', 'binh_loan', 'pha_thanh',
-      'tien_phong', 'tien_phong_nguyen_lu', 'tam_cong', 'van_don',
-      'duyen_tho', 'tien_duyen_chu_dong_tu', 'doi_nui', 'khai_thien',
-      'no_than_cao_lo', 'thiet_ma', 'dinh_quoc', 'lan_sau', 'tu_chu',
-      'thinh_chinh', 'than_hoa', 'thuy_to', 'chuong_duong', 'linh_giam',
-      'duong_quan', 'trung_dung'
-    ];
+    const alivePlayers = state?.getAlivePlayers ? state.getAlivePlayers() : (state?.players?.filter(p => p.isAlive) || []);
+    const mainHeroId = bot.mainHeroId || bot.heroId;
+    const subHeroId = bot.subHeroId;
+    const mainHero = globalHeroRegistry.getHero(mainHeroId);
+    const subHero = globalHeroRegistry.getHero(subHeroId);
 
-    // QUY TẮC QUỐC CHIẾN BẮT BUỘC:
-    // Tướng đầu tiên lật mở BẮT BUỘC phải là Tướng Chính (slot 0).
-    // Tuyệt đối không được phép lật Phó Tướng (slot 1) khi Tướng Chính chưa lộ diện.
+    // =========================================================================
+    // PHẦN 1: TƯỚNG CHÍNH CHƯA LẬT (SLOT 0)
+    // Quy tắc Quốc Chiến: Tướng đầu tiên lật mở BẮT BUỘC phải là Tướng Chính (slot 0)
+    // =========================================================================
     if (!bot.revealedHeroes[0]) {
-      // 1. Nhận Thưởng Tiên Phong Cắm Cờ: Lật Tướng Chính
+      // 1. Tranh Thưởng Tiên Phong Cắm Cờ: Người đầu tiên lật tướng nhận 2 lá bài
       if (!state.hasPioneerRewardClaimed) {
         return {
           type: 'REVEAL_HERO',
@@ -134,21 +143,56 @@ export class BotBrain {
         };
       }
 
-      // 2. Kích hoạt Kỹ Năng Chủ Động: Nếu Tướng Chính HOẶC Phó Tướng có skill cần dùng,
-      // Bot bắt buộc phải lật Tướng Chính trước làm tiền đề lộ diện!
-      const mainHeroId = bot.mainHeroId || bot.heroId;
-      const subHeroId = bot.subHeroId;
-      const mainHero = globalHeroRegistry.getHero(mainHeroId);
-      const subHero = globalHeroRegistry.getHero(subHeroId);
-      const hasAnyActiveSkill = [mainHero, subHero].some(hero => {
-        if (!hero || !Array.isArray(hero.skills)) return false;
-        return hero.skills.some(s => {
-          const sId = (s.id || s).replace(/-/g, '_').toLowerCase();
-          return activeSkillIds.includes(sId);
-        });
+      // 2. Hội Quân Đồng Minh: Nếu trên bàn cờ đã có người chơi cùng phe lộ diện
+      // Bắt buộc phải lật Tướng Chính để:
+      // - Đồng minh nhận diện ra Bot, ngăn chặn việc đánh nhầm (Friendly Fire)
+      // - Cùng hưởng lợi thế phe phái và các kỹ năng phối hợp
+      const hasRevealedAlly = alivePlayers.some(p => 
+        p.id !== bot.id && 
+        p.revealedHeroes?.some(Boolean) && 
+        isSameFaction(bot, p) &&
+        !bot.isDaTam && !p.isDaTam
+      );
+      if (hasRevealedAlly) {
+        return {
+          type: 'REVEAL_HERO',
+          heroIndex: 0
+        };
+      }
+
+      // 3. Kích Hoạt Kỹ Năng: Bất kỳ tướng nào sở hữu kỹ năng (chủ động, kích hoạt, tỏa định, buff)
+      // Bot cần mở Tướng Chính để bước vào trạng thái vận hành kỹ năng
+      const hasAnySkill = [mainHero, subHero].some(h => h && Array.isArray(h.skills) && h.skills.length > 0);
+
+      // 4. Sẵn Sàng Tấn Công (Aggression / Combat Intent):
+      // Nếu Bot đang có vũ khí, hoặc có lá Chém / Cẩm nang công kích nhắm vào kẻ địch
+      const hasCombatCards = (bot.hand || []).some(c => {
+        if (!c) return false;
+        const name = c.name || '';
+        const subtype = c.subtype || '';
+        return subtype === 'slash' || name === 'Chém' || 
+               name === 'Quyết Đấu' || name === 'Hỏa Công' || 
+               name === 'Nam Man Xâm Nhập' || name === 'Vạn Tiễn Quy Tâm' ||
+               name === 'Cướp Bài' || name === 'Tước Bài';
       });
 
-      if (hasAnyActiveSkill) {
+      // 5. Kiểm tra Cán Cân Thế Lực (Balance of Power):
+      // Nếu phe địch đang quá áp đảo (>= 2 người phe địch đã lộ mặt) mà Bot chỉ còn <= 2 HP:
+      // Tạm thời núp lùm thêm để tránh bị dồn sát thương hội đồng
+      const enemiesRevealedCount = alivePlayers.filter(p => 
+        p.id !== bot.id && 
+        p.revealedHeroes?.some(Boolean) && 
+        !isSameFaction(bot, p)
+      ).length;
+      const isDangerousUnderdog = (bot.hp <= 2 && enemiesRevealedCount >= 2 && !hasRevealedAlly);
+
+      // Nếu không rơi vào thế nguy cấp, và Bot có Kỹ năng hoặc có Bài Tấn Công hoặc đã qua Vòng 1 (turn >= 2):
+      // Lập tức lật Tướng Chính xuất kích!
+      const currentTurnNumber = state.turn || 1;
+      const hasEquipWeapon = Boolean(bot.equipment?.weapon);
+      const isBattleReady = hasCombatCards || hasEquipWeapon || (bot.hand && bot.hand.length >= 3) || currentTurnNumber >= 2;
+
+      if (!isDangerousUnderdog && (hasAnySkill || isBattleReady)) {
         return {
           type: 'REVEAL_HERO',
           heroIndex: 0
@@ -158,21 +202,36 @@ export class BotBrain {
       return null;
     }
 
-    // Khi Tướng Chính đã lộ diện (bot.revealedHeroes[0] === true), lúc này mới xét lật Phó Tướng (slot 1)
+    // =========================================================================
+    // PHẦN 2: TƯỚNG CHÍNH ĐÃ LẬT, XÉT LẬT PHÓ TƯỚNG (SLOT 1)
+    // =========================================================================
     if (!bot.revealedHeroes[1]) {
-      const subHeroId = bot.subHeroId;
-      const subHero = globalHeroRegistry.getHero(subHeroId);
-      if (subHero && Array.isArray(subHero.skills)) {
-        const hasActiveSkill = subHero.skills.some(s => {
-          const sId = (s.id || s).replace(/-/g, '_').toLowerCase();
-          return activeSkillIds.includes(sId);
-        });
-        if (hasActiveSkill) {
+      // 1. Thưởng Âm Dương Giao Hoà: Tổng máu gốc lẻ -> Nhận ngay 1 lá bài thưởng!
+      if (!bot.hasReceivedYinYangReward && mainHero && subHero) {
+        const h1Hp = mainHero.maxHp || mainHero.hp || 4;
+        const h2Hp = subHero.maxHp || subHero.hp || 4;
+        if ((h1Hp + h2Hp) % 2 !== 0) {
           return {
             type: 'REVEAL_HERO',
             heroIndex: 1
           };
         }
+      }
+
+      // 2. Phó Tướng có kỹ năng hữu dụng
+      if (subHero && Array.isArray(subHero.skills) && subHero.skills.length > 0) {
+        return {
+          type: 'REVEAL_HERO',
+          heroIndex: 1
+        };
+      }
+
+      // 3. Tham Chiến Toàn Lực: Đã đến lượt thứ 2 trở đi hoặc khi máu giảm
+      if ((state.turn || 1) >= 2 || bot.hp < bot.maxHp) {
+        return {
+          type: 'REVEAL_HERO',
+          heroIndex: 1
+        };
       }
     }
 

@@ -943,8 +943,12 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
 
 ## 14. TRÍ TUỆ NHÂN TẠO BOTAI & BẤT BIẾN TẦNG ỨNG DỤNG (BOTAI TACTICAL ENGINE & APPLICATION INVARIANTS)
 
-- **🤖 Proactive Hero Reveal Policy (Chính Sách Chủ Động Hiển Lộ Tướng Của Bot):**
-  - **Khái niệm:** Thuật toán đánh giá trạng thái đầu lượt của Bot trong `BotBrain._decideHeroReveal`. Bot chủ động hiển lộ tướng nếu vị tướng sở hữu kỹ năng kích hoạt chủ động trong pha hành động (`lan_sau`, `tu_chu`, `thinh_chinh`, `than_hoa`, `thuy_to`, `chuong_duong`, `linh_giam`, `duong_quan`, `trung_dung`) để mở khóa chuỗi combo chiến thuật thay vì ẩn mình thụ động.
+- **🤖 Proactive Hero Reveal Policy (Chính Sách Chủ Động Hiển Lộ Tướng Chiến Thuật Của Bot):**
+  - **Khái niệm:** Thuật toán đánh giá trạng thái và cục diện bàn cờ trong `BotBrain._decideHeroReveal` theo chuẩn Quốc Chiến ([ADR 0104](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/docs/adr/0104-intelligent-bot-hero-reveal-policy.md)). Bot loại bỏ hoàn toàn hiện tượng núp lùm thụ động suốt trận đấu bằng 4 trụ cột chiến thuật:
+    1. *Tiên Phong Cắm Cờ:* Lật đầu tiên toàn ván nhận 2 lá bài thưởng.
+    2. *Hội Quân Đồng Minh:* Lập tức lật Tướng Chính khi có đồng minh cùng phe đã lộ diện để tránh Friendly Fire và mở khóa hiệp lực.
+    3. *Sẵn Sàng Tham Chiến:* Lật Tướng Chính khi có bài công kích ([Chém], [Quyết Đấu], [Hỏa Công]...), khi lắp vũ khí, hoặc khi bước sang Lượt 2 trở đi.
+    4. *Âm Dương Giao Hòa & Kích Hoạt Phó Tướng:* Lật tiếp Phó Tướng để lấy 1 lá bài thưởng nếu tổng máu gốc lẻ, hoặc mở khóa toàn bộ sức mạnh song tướng.
 - **🔄 Virtual Card Routing Precedence (Độ Ưu Tiên Định Tuyến Thẻ Bài Ảo):**
   - **Khái niệm:** Nguyên lý phân tách định tuyến trong `DispatcherV4._handlePlayCard`. Khi một lá bài được chuyển đổi bởi kỹ năng tướng (như `thinh_chinh` thành `Đào`, `than_hoa` thành `Hỏa Công`, `tien_duyen_chu_dong_tu` thành `Xiềng Xích`), thuộc tính `virtualCardName` được gán quyền ưu tiên cao hơn kiểu thẻ bài vật lý (`cardType`). Mọi lá bài chuyển đổi không phải Chém (`isConvertedNonSlash`) đều bị loại trừ khỏi luồng `CombatRules.playSlash`, ngăn chặn tuyệt đối lỗi tự chém vào bản thân khi hồi phục máu hoặc thiêu đốt.
 - **🛡️ Locked Passive Target Immunity (Bất Biến Miễn Nhiễm Tỏa Định Kỹ):**

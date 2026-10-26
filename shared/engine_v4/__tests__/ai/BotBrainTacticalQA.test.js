@@ -404,6 +404,52 @@ describe('QA Toàn Diện Bộ Não Chiến Thuật Bot AI (BotBrain Tactical De
       expect(action.type).toBe('REVEAL_HERO');
       expect(action.heroIndex).toBe(0);
     });
+
+    it('3.4. Hội quân đồng minh: Tự động lật Tướng Chính khi có đồng minh cùng phe đã lộ diện', () => {
+      const state = createMockState();
+      state.hasPioneerRewardClaimed = true; // Đã mất tiên phong cắm cờ
+      const p0 = state.getPlayer(0); // Bot phe Việt
+      p0.faction = 'viet';
+      p0.mainHeroId = 'tran_hung_dao'; // Tướng bị động không có active skill trong list cũ
+      p0.subHeroId = 'yet_kieu';
+      p0.revealedHeroes = [false, false];
+
+      const p1 = state.getPlayer(1); // Đồng minh cùng phe Việt đã lộ diện
+      p1.faction = 'viet';
+      p1.revealedHeroes = [true, false];
+
+      const action = BotBrain.decideAction(state, 0);
+      expect(action.type).toBe('REVEAL_HERO');
+      expect(action.heroIndex).toBe(0);
+    });
+
+    it('3.5. Sẵn sàng tham chiến: Tự động lật Tướng Chính khi có trang bị vũ khí hoặc từ lượt 2', () => {
+      const state = createMockState();
+      state.hasPioneerRewardClaimed = true;
+      state.turn = 2; // Đã qua vòng 1 thăm dò
+      const p0 = state.getPlayer(0);
+      p0.mainHeroId = 'hai_ba_trung';
+      p0.revealedHeroes = [false, false];
+      p0.equipment.weapon = { id: 'wp_kiem', name: 'Gươm', type: 'equip' };
+
+      const action = BotBrain.decideAction(state, 0);
+      expect(action.type).toBe('REVEAL_HERO');
+      expect(action.heroIndex).toBe(0);
+    });
+
+    it('3.6. Âm Dương Giao Hòa: Tự động lật tiếp Phó Tướng khi tổng máu gốc lẻ để nhận +1 bài thưởng', () => {
+      const state = createMockState();
+      const p0 = state.getPlayer(0);
+      // Tướng chính 4 máu (Lạc Long Quân), Tướng phó 3 máu (Thánh Gióng) -> Tổng 7 máu lẻ
+      p0.mainHeroId = 'lac_long_quan';
+      p0.subHeroId = 'thanh_giong';
+      p0.revealedHeroes = [true, false]; // Tướng chính đã lật, phó tướng chưa lật
+      p0.hasReceivedYinYangReward = false;
+
+      const action = BotBrain.decideAction(state, 0);
+      expect(action.type).toBe('REVEAL_HERO');
+      expect(action.heroIndex).toBe(1); // Lật phó tướng nhận thưởng Âm Dương Giao Hòa
+    });
   });
 
   describe('4. Xử Lý Phản Hồi Chuyên Biệt Các Priority Frame (Specialized Reaction Stack)', () => {
