@@ -153,5 +153,42 @@ describe('QA Hero: Ngọc Hân Công Chúa (ngoc_han_cong_chua) — Hiền Hậu
       // Ngọc Hân nhận sát thương (3 -> 2 HP)
       expect(ngocHan.hp).toBe(2);
     });
+
+    it('TỰ ĐỘNG MINH KHAI: Khi Ngọc Hân đang ẩn [false, false] và kích hoạt Hiền Hậu, tướng BẮT BUỘC phải lật mở chân dung', () => {
+      const { state, dispatcher } = setupGame();
+      const ngocHan = state.getPlayer(0);
+      const target = state.getPlayer(1);
+
+      // Đặt Ngọc Hân ở trạng thái Tướng Đang Ẩn (như tình huống Người chơi 4 của user)
+      ngocHan.revealedHeroes = [false, false];
+      ngocHan.heroes = [
+        globalHeroRegistry.getHero('ngoc_han_cong_chua'),
+        null
+      ];
+
+      // Kẻ tấn công 2 gây 1 sát thương lên Ngọc Hân (ví dụ từ Vạn Tiễn / Loạn Tiễn)
+      CombatRules.applyDamage(state, 2, 0, 1, 'arrow_rain');
+
+      // Frame ASK_HIEN_HAU xuất hiện
+      expect(state.priorityStack.peek().type).toBe('ASK_HIEN_HAU');
+
+      // Ngọc Hân chọn dùng Hiền Hậu, phản đòn lên target 1
+      dispatcher.dispatchAction({
+        type: 'ACTION_REACT',
+        playerId: 0,
+        doUse: true,
+        targetId: 1,
+        cardId: 'heart_1',
+        option: 2
+      });
+
+      // TƯỚNG PHẢI ĐƯỢC TỰ ĐỘNG MINH KHAI!
+      expect(ngocHan.revealedHeroes[0]).toBe(true);
+      // Phe của người chơi được minh khai thành Hà
+      expect(ngocHan.faction).toBe('Hà');
+      // Sát thương bị cản và mục tiêu bị mất 1 HP
+      expect(ngocHan.hp).toBe(3);
+      expect(target.hp).toBe(2);
+    });
   });
 });

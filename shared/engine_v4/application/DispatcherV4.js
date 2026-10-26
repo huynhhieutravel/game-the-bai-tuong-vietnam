@@ -167,14 +167,20 @@ export class DispatcherV4 {
     const isRedCard = effColor ? effColor === 'red' : Boolean(card.color === 'red' || getSuitColor(card.suit) === 'red');
     const isNonTargetedRedCard = ['dodge', 'peach', 'wine', 'equip'].includes(cardType) || ['Né', 'Đào', 'Rượu'].includes(card.name);
     const isTargetingOther = targetIds.length > 0 && targetIds[0] !== sourceId;
-    const hasDoiNuiSlash = globalHeroRegistry.hasSkill(player, 'doi_nui', true) && (virtualCardName === 'Chém' || payload.asSlash || (isTargetingOther && (cardType === 'dodge' || card.name === 'Né')));
-    const hasKhaiThien = globalHeroRegistry.hasSkill(player, 'khai_thien', true) && isRedCard && (virtualCardName === 'Chém' || payload.asSlash || (isTargetingOther && isNonTargetedRedCard));
+    const hasDoiNuiSlash = (globalHeroRegistry.hasSkill(player, 'doi_nui') || player.skills?.includes('doi_nui')) && (virtualCardName === 'Chém' || payload.asSlash || (isTargetingOther && (cardType === 'dodge' || card.name === 'Né')));
+    const hasKhaiThien = (globalHeroRegistry.hasSkill(player, 'khai_thien') || player.skills?.includes('khai_thien')) && isRedCard && (virtualCardName === 'Chém' || payload.asSlash || (isTargetingOther && isNonTargetedRedCard));
 
     // 1. Chém (Slash) - Chỉ xử lý khi bài thực sự là Chém hoặc biến đổi thành Chém, KHÔNG xử lý khi virtualCardName là Đào/Rượu/Cẩm nang
     const isConvertedNonSlash = virtualCardName && virtualCardName !== 'Chém';
     const isSlashAction = !isConvertedNonSlash && (cardName === 'Chém' || (!virtualCardName && cardType === 'slash') || hasDoiNuiSlash || hasKhaiThien);
 
     if (isSlashAction) {
+      if (hasDoiNuiSlash && (cardType === 'dodge' || card.name === 'Né')) {
+        this._ensureHeroRevealedForSkill(player, 'doi_nui', 'Dời Núi');
+      } else if (hasKhaiThien && isNonTargetedRedCard) {
+        this._ensureHeroRevealedForSkill(player, 'khai_thien', 'Khai Thiên');
+      }
+
       if (player.temporaryFlags?.vanDonWin && targetIds.length > 1) {
         const targets = targetIds.slice(0, 2);
         this.state.discardFromHand(sourceId, [card.id]);
@@ -290,6 +296,7 @@ export class DispatcherV4 {
       const targetId = targetIds[0];
       if (targetId === undefined) throw new Error('Vui lòng chọn mục tiêu để Quyết Đấu!');
       if (hasPhaThanhDuel) {
+        this._ensureHeroRevealedForSkill(player, 'pha_thanh', 'Phá Thành');
         this.state.discardFromHand(sourceId, [card.id]);
         this.state.addLog(`⚡ [Phá Thành] ${player.name} sử dụng lá [${card.name}] màu ${isRedCard ? 'Đỏ' : 'Đen'} như [Quyết Đấu]!`);
         TrickRules.playDuel(this.state, sourceId, targetId, { ...card, name: 'Quyết Đấu', virtual: true });
@@ -303,6 +310,7 @@ export class DispatcherV4 {
     if (cardName === 'Tước Bài' || hasKyTap) {
       const targetId = targetIds[0];
       if (hasKyTap) {
+        this._ensureHeroRevealedForSkill(player, 'ky_tap', 'Kỳ Tập');
         this.state.discardFromHand(sourceId, [card.id]);
         this.state.addLog(`⚡ [Kỳ Tập] ${player.name} sử dụng lá bài Đen [${card.name}] như [Tước Bài]!`);
         TrickRules.playDismantle(this.state, sourceId, targetId, { ...card, name: 'Tước Bài', idKey: 'tuoc_bai', virtual: true }, { interactive: isInteractive });
@@ -342,6 +350,7 @@ export class DispatcherV4 {
       const targetId = targetIds[0];
       if (targetId === undefined) throw new Error('Vui lòng chọn mục tiêu để đặt Hỗn Loạn!');
       if (hasHoaThanAnTu) {
+        this._ensureHeroRevealedForSkill(player, 'hoa_than_an_tu', 'Hòa Thân');
         this.state.addLog(`🌺 [Hòa Thân] ${player.name} sử dụng lá bài Rô [${card.name}] như [Hỗn Loạn]!`);
         TrickRules.playChaos(this.state, sourceId, targetId, { ...card, name: 'Hỗn Loạn', idKey: 'hon_loan', virtual: true });
         return;
@@ -358,6 +367,9 @@ export class DispatcherV4 {
     const isClub = card && normalizeSuit(card.suit).code === 'club';
     const hasTienDuyenChain = globalHeroRegistry.hasSkill(player, 'tien_duyen_chu_dong_tu', true) && isClub && (virtualCardName === 'Xiềng Xích' || payload.asChain);
     if (cardName === 'Xiềng Xích' || card.idKey === 'xieng_xich' || hasTienDuyenChain) {
+      if (hasTienDuyenChain) {
+        this._ensureHeroRevealedForSkill(player, 'tien_duyen_chu_dong_tu', 'Tiên Duyên');
+      }
       const chainCard = hasTienDuyenChain ? { ...card, name: 'Xiềng Xích', idKey: 'xieng_xich', virtual: true } : card;
       const isReforgeMode = Boolean(payload.reforge || payload.isReforge);
       TrickRules.playIronChain(this.state, sourceId, targetIds, chainCard, { isIronChain: true, reforge: isReforgeMode });
@@ -374,6 +386,9 @@ export class DispatcherV4 {
     }
     const hasThanHoa = globalHeroRegistry.hasSkill(player, 'than_hoa', true) && isRedCard && (virtualCardName === 'Hỏa Công' || payload.asFireAttack);
     if (cardName === 'Hỏa Công' || cardName === 'Hỏa công' || card.idKey === 'hoa_cong' || hasThanHoa) {
+      if (hasThanHoa) {
+        this._ensureHeroRevealedForSkill(player, 'than_hoa', 'Thần Hỏa');
+      }
       const targetId = targetIds[0];
       if (targetId === undefined) throw new Error('Vui lòng chọn mục tiêu để Hỏa Công!');
       const fireCard = hasThanHoa ? { ...card, name: 'Hỏa Công', idKey: 'hoa_cong', virtual: true } : card;
@@ -857,6 +872,7 @@ export class DispatcherV4 {
       case 'ASK_HAU_VIEN': {
         this.state.priorityStack.pop();
         if (!isCancelOrSkip && data.doReact && data.targetId !== undefined) {
+          this._ensureHeroRevealedForSkill(player, 'hau_vien', 'Hậu Viện');
           const target = this.state.getPlayer(data.targetId);
           if (target && target.isAlive) {
             target.hp = Math.min(target.maxHp, target.hp + 1);
@@ -873,6 +889,7 @@ export class DispatcherV4 {
       case 'ASK_BOC_TRAM_TRUNG_DODGE': {
         let dodgeCard = null;
         if (!isCancelOrSkip && (data.doProvide || data.doReact)) {
+          this._ensureHeroRevealedForSkill(player, 'boc_tram_trung', 'Bọc Trăm Trứng');
           dodgeCard = this._resolveCard(player, data) || player.hand.find(c => c.type === 'dodge' || c.name === 'Né');
         }
         CombatRules.respondBocTramTrungDodge(this.state, playerId, dodgeCard);
@@ -882,6 +899,7 @@ export class DispatcherV4 {
       case 'ASK_BOC_TRAM_TRUNG_SLASH': {
         let slashCard = null;
         if (!isCancelOrSkip && (data.doProvide || data.doReact)) {
+          this._ensureHeroRevealedForSkill(player, 'boc_tram_trung', 'Bọc Trăm Trứng');
           slashCard = this._resolveCard(player, data) || player.hand.find(c => c.type === 'slash' || c.name === 'Chém');
         }
         CombatRules.respondBocTramTrungSlash(this.state, playerId, slashCard);
@@ -891,6 +909,7 @@ export class DispatcherV4 {
       case 'ASK_TIEN_PHAT': {
         let dodgeCard = null;
         if (!isCancelOrSkip && (data.doProvide || data.doReact || data.cardId || data.card)) {
+          this._ensureHeroRevealedForSkill(player, 'tien_phat', 'Tiên Phát');
           dodgeCard = this._resolveCard(player, data) || player.hand.find(c => c.type === 'dodge' || c.name === 'Né');
         }
         CombatRules.respondTienPhat(this.state, playerId, dodgeCard);
@@ -1375,6 +1394,9 @@ export class DispatcherV4 {
       case 'ASK_HIEN_HAU': {
         this.state.priorityStack.pop();
         if (!isCancelOrSkip && data.doUse && data.targetId !== undefined) {
+          // Bắt buộc Minh Khai tướng sở hữu kỹ năng Hiền Hậu (Ngọc Hân Công Chúa) nếu đang ẩn
+          this._ensureHeroRevealedForSkill(player, 'hien_hau', 'Hiền Hậu');
+
           const cardId = data.cardId || (player.hand[data.cardIdx] && player.hand[data.cardIdx].id);
           const card = player.hand.find(c => c.id === cardId) || player.hand[0];
           if (card) {
@@ -1815,6 +1837,11 @@ export class DispatcherV4 {
     const player = this.state.getPlayer(effectivePlayerId);
     if (!player) return;
     playerId = effectivePlayerId;
+
+    // Bắt buộc Minh Khai tướng sở hữu kỹ năng khi kích hoạt chủ động
+    if (skillId) {
+      this._ensureHeroRevealedForSkill(player, skillId);
+    }
 
     const normSkillId = normalizeSkillId(skillId);
 
@@ -2459,6 +2486,18 @@ export class DispatcherV4 {
       this.heroRegistry.revealPlayerHero(this.state, player, 1, null, true);
     } else {
       this.heroRegistry.revealPlayerHero(this.state, player, heroIndex, null, true);
+    }
+  }
+
+  /**
+   * Đảm bảo tướng sở hữu kỹ năng được lật mặt (Minh Khai) khi phát động kỹ năng
+   * Theo đúng Luật Quốc Chiến: Bất kỳ tướng nào sử dụng kỹ năng thì tướng đó phải lật mở chân dung!
+   */
+  _ensureHeroRevealedForSkill(player, skillId, skillDisplayName = null) {
+    if (!player) return;
+    const heroIdx = this.heroRegistry.getHeroIndexForSkill(player, skillId);
+    if (player.revealedHeroes && !player.revealedHeroes[heroIdx]) {
+      this.heroRegistry.revealPlayerHero(this.state, player, heroIdx, skillDisplayName || skillId);
     }
   }
 }
