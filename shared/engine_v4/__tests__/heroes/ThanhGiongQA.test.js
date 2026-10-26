@@ -392,5 +392,54 @@ describe('QA Toàn Diện Tướng Hệ Lạc: Thánh Gióng (Thanh Giong QA Sui
       const reaction = BotBrain.decideReaction(state, 1, frame);
       expect(reaction.doDiscard).toBe(false);
     });
+
+    it('Thánh Gióng có Chu Cát Liên Nỏ: Đánh Chém lần 2, Tre Ngà vẫn tiếp tục kích hoạt phán xét và khóa Né', () => {
+      const state = createMockGameState();
+      const dispatcher = new DispatcherV4(state);
+      const p0 = state.getPlayer(0);
+      const p1 = state.getPlayer(1);
+
+      // Trang bị Chu Cát Liên Nỏ
+      p0.equipment.weapon = { id: 'lien_no', name: 'Chu Cát Liên Nỏ', range: 1 };
+
+      // Chém lần 1: Phán xét ra Club
+      state.drawPile.push({ id: 'judge_1', suit: 'club', color: 'black' });
+      const slash1 = { id: 'slash_1', name: 'Chém', type: 'slash', suit: 'spade', color: 'black' };
+      p0.hand = [slash1];
+      p1.hand = [];
+
+      CombatRules.playSlash(state, 0, 1, slash1);
+      expect(state.priorityStack.peek().type).toBe('ASK_TRE_NGA_DISCARD');
+      expect(state.priorityStack.peek().context.judgeSuit).toBe('club');
+
+      // p1 không bỏ bài -> bị phạt ăn 1 sát thương
+      dispatcher.dispatchAction({
+        type: 'ACTION_REACT',
+        playerId: 1,
+        data: { doDiscard: false }
+      });
+      expect(p1.hp).toBe(3);
+      expect(state.priorityStack.isEmpty()).toBe(true);
+
+      // Chém lần 2: Phán xét ra Heart
+      state.drawPile.push({ id: 'judge_2', suit: 'heart', color: 'red' });
+      const slash2 = { id: 'slash_2', name: 'Chém', type: 'slash', suit: 'diamond', color: 'red' };
+      p0.hand = [slash2];
+
+      CombatRules.playSlash(state, 0, 1, slash2);
+
+      // KHẲNG ĐỊNH: Lần 2 Tre Ngà VẪN kích hoạt đầy đủ (frequency: unlimited)!
+      expect(state.priorityStack.peek().type).toBe('ASK_TRE_NGA_DISCARD');
+      expect(state.priorityStack.peek().context.judgeSuit).toBe('heart');
+
+      // p1 không bỏ bài -> tiếp tục ăn 1 sát thương nữa
+      dispatcher.dispatchAction({
+        type: 'ACTION_REACT',
+        playerId: 1,
+        data: { doDiscard: false }
+      });
+      expect(p1.hp).toBe(2);
+      expect(state.priorityStack.isEmpty()).toBe(true);
+    });
   });
 });

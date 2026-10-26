@@ -24,6 +24,7 @@ export const ThanhGiong = {
       id: 'tre_nga',
       name: 'Tre Ngà',
       type: 'reactive',
+      frequency: 'unlimited',
       trigger: 'ON_SLASH_TARGET',
       filter: (ctx) => ctx.ownerId === ctx.actorId,
       description: 'Sau khi sử dụng [Chém] chỉ định mục tiêu, tiến hành phán xét; mục tiêu phải bỏ bài cùng chất nếu không thì cấm Né.',
