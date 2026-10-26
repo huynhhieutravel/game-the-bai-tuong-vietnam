@@ -414,7 +414,10 @@ export class HeadlessRunner {
           } else if (card && (card.type === 'trick' || action.asChain || action.customData?.asFireAttack || action.virtualCardName === 'Hỏa Công' || action.virtualCardName === 'Xiềng Xích')) {
             try {
               const trickCard = action.virtualCardName ? { ...card, name: action.virtualCardName, virtual: true } : card;
-              TrickRules.playTrick(state, currentBotId, action.targetIds || (action.targetId !== undefined ? [action.targetId] : []), trickCard);
+              TrickRules.playTrick(state, currentBotId, action.targetIds || (action.targetId !== undefined ? [action.targetId] : []), trickCard, {
+                targetCardId: action.targetCardId,
+                zone: action.zone
+              });
             } catch (e) {
               stateMachine.endActionPhase();
             }

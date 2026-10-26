@@ -242,6 +242,8 @@ export class BotRunnerV4 {
                   virtualCardName: action.virtualCardName,
                   asSlash: action.asSlash,
                   asChain: action.asChain,
+                  targetCardId: action.targetCardId,
+                  zone: action.zone,
                   ...(action.customData || {})
                 });
               } else if (action && action.type === 'USE_SKILL') {

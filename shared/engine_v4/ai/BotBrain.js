@@ -726,19 +726,19 @@ export class BotBrain {
 
         // 4. Q4: Với Cướp Bài / Tước Bài lên kẻ địch: Ưu tiên chọn trang bị nguy hiểm
         if (isStealOrDismantle) {
+          const isSteal = card.name === 'Cướp Bài' || card.idKey === 'cuop_bai';
           const targetEnemy = sortedEnemies[0];
-          const armor = targetEnemy.equipment?.armor;
-          const weapon = targetEnemy.equipment?.weapon;
-          const horseDef = targetEnemy.equipment?.horse_defense;
-          const targetEquip = armor || weapon || horseDef;
-
-          return {
-            type: 'PLAY_CARD',
-            cardId: card.id,
-            targetId: targetEnemy.id,
-            targetIds: [targetEnemy.id],
-            targetCardId: targetEquip ? targetEquip.id : null
-          };
+          const choice = this._pickStealOrDismantleCard(bot, targetEnemy, isSteal, state);
+          if (choice) {
+            return {
+              type: 'PLAY_CARD',
+              cardId: card.id,
+              targetId: targetEnemy.id,
+              targetIds: [targetEnemy.id],
+              targetCardId: choice.cardId,
+              zone: choice.zone
+            };
+          }
         }
 
         const targetEnemy = sortedEnemies[0];
@@ -781,19 +781,178 @@ export class BotBrain {
   }
 
   /**
-   * Ra quyết định đánh Chém (Slash) kết hợp Uống Rượu & Phương Thiên Kích / Vân Đồn
+   * Kiểm tra Bot có sở hữu Chu Cát Liên Nỏ hoặc cờ vô hạn Chém hay không
    */
-  static _decideSlashAction(state, bot) {
-    if (bot.temporaryFlags?.vanDonLose) return null;
+  static _hasCrossbow(bot) {
+    if (!bot) return false;
     const botWeapon = bot.equipment?.weapon;
     const botWeaponId = String(botWeapon?.id || botWeapon?.idKey || botWeapon?.key || '');
-    const hasCrossbow = isEquip(botWeapon, 'lien_no') ||
+    return isEquip(botWeapon, 'lien_no') ||
       botWeapon?.name === 'Liên Nỏ' || 
       botWeaponId === 'crossbow' || 
       botWeaponId.includes('lien-no') || 
       botWeaponId.includes('liên-nỏ') || 
       botWeaponId.includes('lien_no') ||
       Boolean(bot.temporaryFlags?.unlimitedSlash);
+  }
+
+  /**
+   * Bộ Não Chiến Thuật: Chọn lá bài tối ưu khi Cướp Bài (Snatch) hoặc Tước Bài (Dismantle)
+   * Tuân thủ 5 quy tắc chuẩn xác theo ADR 0102:
+   * 1. Cứu viện đồng minh dính phán xét nguy hiểm (Sấm Sét -> Hỗn Loạn -> Binh Lương).
+   * 2. Bất biến Bạch Ngân Sư Tử: CẤM Tước Bài làm địch hồi 1 HP (trừ khi địch đầy máu).
+   * 3. Bóc vỏ phòng thủ: Khi địch <= 2 HP chỉ còn 1 bài tay và Bot có Chém -> Ưu tiên giật bài tay.
+   * 4. Ma trận định giá trang bị: Bát Quái Trận (100) -> Chu Cát Liên Nỏ (95-110) -> Ngựa thủ (+1) (70) -> Vũ khí công (75) -> Ngựa công (-1) (50).
+   * 5. Phân hóa Cướp (tối đa hóa trang bị/tài nguyên cho Bot) vs Hủy (triệt tiêu vũ khí/giáp nguy hiểm của địch).
+   */
+  static _pickStealOrDismantleCard(bot, target, isSteal, state) {
+    if (!target) return null;
+
+    const isAlly = this._isKnownAlly(bot, target) || bot.id === target.id;
+
+    // 1. Cứu viện đồng minh / bản thân: Ưu tiên tuyệt đối gỡ cẩm nang phán xét độc hại
+    if (isAlly) {
+      if (target.judgementArea && target.judgementArea.length > 0) {
+        const lightning = target.judgementArea.find(c => c.name === 'Sấm Sét' || c.idKey === 'sam_set');
+        const chaos = target.judgementArea.find(c => c.name === 'Hỗn Loạn' || c.idKey === 'hon_loan');
+        const starvation = target.judgementArea.find(c => c.name === 'Binh Lương Thốn Đoạn' || c.idKey === 'binh_luong');
+        const chosen = lightning || chaos || starvation || target.judgementArea[0];
+        return {
+          cardId: chosen.id,
+          zone: 'judge',
+          reason: 'rescue_ally_judge'
+        };
+      }
+      return null;
+    }
+
+    // 2. Kẻ địch:
+    const handCount = target.hand?.length || 0;
+    const armor = target.equipment?.armor;
+    const weapon = target.equipment?.weapon;
+    const horseDef = target.equipment?.horse_defense;
+    const horseAtk = target.equipment?.horse_attack;
+
+    // Helper kiểm tra Bạch Ngân Sư Tử
+    const isSilverLion = card => Boolean(card && (
+      card.name === 'Bạch Ngân' || 
+      card.name === 'Bạch Ngân Sư Tử' || 
+      isEquip(card, 'bach_ngan') ||
+      card.idKey === 'bach_ngan' || 
+      card.id?.includes('bach_ngan')
+    ));
+
+    // Q3: Bóc Vỏ Bọc Phòng Thủ (Lethal Hand-Stripping Protocol)
+    // Nếu địch ít máu (<= 2 HP), chỉ còn đúng 1 lá bài tay, và Bot có Chém trong tầm đánh
+    const alivePlayers = state.getAlivePlayers ? state.getAlivePlayers() : state.players.filter(p => p.isAlive);
+    const hasSlashReady = this.getAvailableSlashCount(bot) > 0 && 
+                          ((bot.turnStats?.slashCount || 0) === 0 || this._hasCrossbow(bot)) &&
+                          RangeSystem.inSlashRange(bot, target, alivePlayers);
+    if (target.hp <= 2 && handCount === 1 && hasSlashReady) {
+      const targetCard = target.hand[0];
+      return {
+        cardId: targetCard.id,
+        zone: 'hand',
+        reason: 'lethal_hand_strip'
+      };
+    }
+
+    // Q2: Bất biến Bạch Ngân Sư Tử (Silver Lion Invariant)
+    // - Nếu là Tước Bài (Hủy): CẤM tước Bạch Ngân nếu địch bị thương (tránh hồi 1 máu cho địch)
+    // - Nếu là Cướp Bài: Cho phép cướp nếu địch đầy máu, HOẶC Bot đang bị thương và chưa có giáp
+    const isTargetWounded = target.hp < target.maxHp;
+    const canTouchArmor = (armorCard) => {
+      if (!armorCard) return false;
+      if (!isSilverLion(armorCard)) return true;
+      if (!isTargetWounded) return true; // Địch đầy máu thì cướp/hủy thoải mái
+      if (isSteal && !bot.equipment?.armor && bot.hp < bot.maxHp) return true; // Bot bị thương cần giáp
+      return false; // Còn lại: CẤM đụng vào Bạch Ngân để địch không hồi máu!
+    };
+
+    // Q1 & Q4: Định giá Trang bị (Equipment Priority Scoring)
+    const scoredEquips = [];
+
+    // A. Giáp phòng thủ
+    if (armor && canTouchArmor(armor)) {
+      let armorScore = 80;
+      const aName = armor.name || '';
+      if (aName.includes('Bát Quái') || isEquip(armor, 'bat_quai_tran') || armor.idKey === 'bat_quai_tran') {
+        armorScore = 100; // Bát Quái Trận là giáp né nguy hiểm nhất
+      }
+      scoredEquips.push({ card: armor, score: armorScore, slot: 'armor' });
+    }
+
+    // B. Vũ khí nguy hiểm
+    if (weapon) {
+      let weaponScore = 60;
+      const wName = weapon.name || '';
+      if (wName.includes('Liên Nỏ') || isEquip(weapon, 'lien_no') || weapon.idKey === 'chu_cat_lien_no' || weapon.idKey === 'lien_no') {
+        // Chu Cát Liên Nỏ cực kỳ nguy hiểm, nếu Cướp Bài mà Bot chưa có Liên Nỏ thì ưu tiên tối đa!
+        weaponScore = isSteal && !this._hasCrossbow(bot) ? 110 : 95;
+      } else if (wName.includes('Cổ Đĩnh') || wName.includes('Phương Thiên') || wName.includes('Thanh Long')) {
+        weaponScore = 75;
+      }
+      scoredEquips.push({ card: weapon, score: weaponScore, slot: 'weapon' });
+    }
+
+    // C. Ngựa thủ (+1)
+    if (horseDef) {
+      // Phá ngựa thủ để Bot và đồng minh chém tới
+      scoredEquips.push({ card: horseDef, score: 70, slot: 'horse_defense' });
+    }
+
+    // D. Ngựa công (-1)
+    if (horseAtk) {
+      scoredEquips.push({ card: horseAtk, score: 50, slot: 'horse_attack' });
+    }
+
+    // Sắp xếp trang bị theo điểm ưu tiên giảm dần
+    scoredEquips.sort((a, b) => b.score - a.score);
+
+    // Nếu có trang bị hợp lệ:
+    if (scoredEquips.length > 0) {
+      // Nếu Cướp Bài và địch có rất nhiều bài tay (>= 4 bài) nhưng chỉ có trang bị điểm thấp (< 60)
+      if (isSteal && handCount >= 4 && scoredEquips[0].score < 60) {
+        const randCard = target.hand[Math.floor(Math.random() * target.hand.length)];
+        return { cardId: randCard.id, zone: 'hand', reason: 'steal_hand_card_rich' };
+      }
+
+      return {
+        cardId: scoredEquips[0].card.id,
+        zone: 'equip',
+        slot: scoredEquips[0].slot,
+        reason: `target_equip_${scoredEquips[0].slot}`
+      };
+    }
+
+    // Không có trang bị nào đáng lấy/hủy -> Nhắm vào bài trên tay
+    if (handCount > 0) {
+      const randCard = target.hand[Math.floor(Math.random() * target.hand.length)];
+      return {
+        cardId: randCard.id,
+        zone: 'hand',
+        reason: 'target_hand_fallback'
+      };
+    }
+
+    // Cuối cùng: Cẩm nang phán xét của địch (nếu có gì đó)
+    if (target.judgementArea && target.judgementArea.length > 0) {
+      return {
+        cardId: target.judgementArea[0].id,
+        zone: 'judge',
+        reason: 'target_judge_fallback'
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Ra quyết định đánh Chém (Slash) kết hợp Uống Rượu & Phương Thiên Kích / Vân Đồn
+   */
+  static _decideSlashAction(state, bot) {
+    if (bot.temporaryFlags?.vanDonLose) return null;
+    const hasCrossbow = this._hasCrossbow(bot);
     const canSlash = hasCrossbow || (bot.turnStats?.slashCount || 0) < 1;
     if (!canSlash) return null;
 
@@ -1234,47 +1393,14 @@ export class BotBrain {
         const target = state.getPlayer(targetId);
         if (!target) return { type: 'ACTION_REACT', canceled: true };
 
-        // 1. Q4: Nếu mục tiêu là ĐỒNG MINH (hoặc bản thân): Ưu tiên tuyệt đối gỡ cẩm nang phán xét độc hại!
-        if (this._isKnownAlly(bot, target) || bot.id === target.id) {
-          if (target.judgementArea && target.judgementArea.length > 0) {
-            return {
-              type: 'ACTION_REACT',
-              cardId: target.judgementArea[0].id,
-              zone: 'judge',
-              canceled: false
-            };
-          }
-        }
-
-        // 2. Nếu mục tiêu là KẺ ĐỊCH:
-        // Ưu tiên tước/cướp trang bị: Giáp phòng thủ (Bát Quái Trận...) -> Vũ khí nguy hiểm -> Ngựa thủ
-        const equipCards = Object.values(target.equipment || {}).filter(Boolean);
-        if (equipCards.length > 0) {
-          const armor = target.equipment?.armor;
-          const weapon = target.equipment?.weapon;
-          const horseDef = target.equipment?.horse_defense;
-          const chosenEquip = armor || weapon || horseDef || equipCards[0];
+        const isSteal = frame.type === 'ASK_SNATCH' || frame.context?.trickType === 'snatch';
+        const choice = this._pickStealOrDismantleCard(bot, target, isSteal, state);
+        if (choice) {
           return {
             type: 'ACTION_REACT',
-            cardId: chosenEquip.id,
-            zone: 'equip',
-            canceled: false
-          };
-        }
-        if (target.hand && target.hand.length > 0) {
-          const randCard = target.hand[Math.floor(Math.random() * target.hand.length)];
-          return {
-            type: 'ACTION_REACT',
-            cardId: randCard.id,
-            zone: 'hand',
-            canceled: false
-          };
-        }
-        if (target.judgementArea && target.judgementArea.length > 0) {
-          return {
-            type: 'ACTION_REACT',
-            cardId: target.judgementArea[0].id,
-            zone: 'judge',
+            cardId: choice.cardId,
+            targetCardId: choice.cardId,
+            zone: choice.zone,
             canceled: false
           };
         }

@@ -209,6 +209,8 @@ for (let g = 0; g < MATCH_COUNT; g++) {
             virtualCardName: action.virtualCardName,
             asSlash: action.asSlash,
             asChain: action.asChain,
+            targetCardId: action.targetCardId,
+            zone: action.zone,
             ...(action.customData || {})
           });
           stats.totalActions++;

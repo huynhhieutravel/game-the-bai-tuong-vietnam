@@ -537,7 +537,10 @@ for (let g = 0; g < MATCH_COUNT; g++) {
           } else if (card && (card.type === 'trick' || card.type === 'TRICK')) {
             stats.totalTricks++;
             try {
-              TrickRules.playTrick(state, currentBotId, action.targetId !== undefined ? [action.targetId] : [], card);
+              TrickRules.playTrick(state, currentBotId, action.targetId !== undefined ? [action.targetId] : [], card, {
+                targetCardId: action.targetCardId,
+                zone: action.zone
+              });
             } catch (e) {
               stateMachine.endActionPhase();
             }

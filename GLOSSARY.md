@@ -1444,9 +1444,26 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
 - **🤝 Cứu Viện Đồng Minh Với Cướp Bài & Tước Bài (Support Steal & Dismantle):**
   - **Khái niệm:** Mở rộng trí tuệ tương trợ đồng đội trong [BotBrain.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/ai/BotBrain.js) và [DispatcherV4.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/application/DispatcherV4.js).
   - Khi đồng minh (hoặc bản thân Bot) đang bị dính cẩm nang phán xét nguy hại (`Sấm Sét`, `Hỗn Loạn`, `Binh Lương`), Bot ưu tiên sử dụng [Tước Bài] hoặc [Cướp Bài] chỉ định đích danh lá bùa hại đó (`targetCardId`) để giải cứu đồng minh.
-  - Khi tấn công kẻ địch: Bot ưu tiên tước/cướp Trang bị phòng thủ hiểm hóc (Bát Quái Trận, Ngựa phòng thủ +1) hoặc vũ khí tầm xa trước khi bốc ngẫu nhiên bài trên tay.
+
+- **🛡️ Ma Trận Định Giá Trang Bị Khi Cướp & Tước (Offensive Equipment Priority Matrix):**
+  - **Khái niệm:** Chuẩn hóa theo [ADR 0102](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/docs/adr/0102-tactical-ai-snatch-dismantle-equipment-priority-and-silver-lion-invariant.md). Khi Bot nhắm vào kẻ địch có trang bị:
+    1. **Bát Quái Trận (Điểm 100):** Giáp né 50% miễn phí. Ưu tiên phá/cướp số 1 để mở đường cho sát thương phe ta.
+    2. **Chu Cát Liên Nỏ (Điểm 95 - 110):** Vũ khí xả Chém vô hạn. Nếu là Cướp Bài và Bot chưa có Liên Nỏ, ưu tiên tối đa 110 điểm để cướp về dùng; nếu là Tước Bài, ưu tiên 95 điểm để phá hỏa lực địch.
+    3. **Vũ khí công kích khác (Điểm 75):** Cổ Đĩnh Đao, Phương Thiên Kích, Thanh Long Đao.
+    4. **Ngựa thủ (+1 Cự ly) (Điểm 70):** Phá để mở cự ly tấn công cho Bot và đồng minh.
+    5. **Ngựa công (-1 Cự ly) (Điểm 50):** Phá để giảm áp lực áp sát của địch.
+
+- **🦁 Bất Biến Bạch Ngân Sư Tử (Silver Lion Invariant):**
+  - **Quy tắc:** Trang bị `Bạch Ngân Sư Tử` khi rời khỏi người khiến nạn nhân hồi 1 HP.
+  - **Khi Tước Bài (Hủy):** Tuyệt đối **CẤM** tước Bạch Ngân của kẻ địch nếu kẻ địch đang bị thương (`target.hp < target.maxHp`), ngăn chặn hành vi "giúp địch hồi máu". Chỉ được phép tước nếu kẻ địch đang đầy máu (`target.hp >= target.maxHp`).
+  - **Khi Cướp Bài (Lấy về mình):** Chỉ cướp nếu kẻ địch đầy máu, HOẶC bản thân Bot đang bị thương và chưa có giáp (`!bot.equipment?.armor && bot.hp < bot.maxHp`).
+
+- **🥊 Giao Thức Bóc Vỏ Bọc Phòng Thủ (Lethal Hand-Stripping Protocol):**
+  - **Quy tắc:** Khi kẻ địch còn ít máu ($\le 2$ HP), chỉ còn đúng **1 lá bài trên tay** (rất dễ là Né/Đào), và Bot đang có sẵn [Chém] trong tầm đánh:
+  - Bot **ưu tiên giật lá bài trên tay** (`zone: 'hand'`) thay vì cướp trang bị, nhằm bóc sạch lớp phòng thủ duy nhất của địch trước khi tung đòn Chém kết liễu chắc chắn trúng 100%.
 
 - **🔥 Hỏa Công Tương Hỗ Xiềng Xích (Chained Fire Attack Synergy):**
   - **Khái niệm:** Chiến thuật khuếch đại sát thương diện rộng của [Hỏa Công] khi kết hợp với trạng thái [Xiềng Xích].
   - Khi lựa chọn mục tiêu Hỏa Công, Bot ưu tiên hàng đầu các kẻ địch đang bị Xiềng Xích (`chained: true`) để kích hoạt chuỗi sát thương nguyên tố lửa lan truyền toàn bộ các mục tiêu bị xích trên bàn cờ.
+
 
