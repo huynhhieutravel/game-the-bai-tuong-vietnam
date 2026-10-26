@@ -65,6 +65,11 @@ export function VipHeroSelectorModal({ draftSelection = [], me, onSelect, onClos
   // Kiểm tra tướng đã được chọn trong draftSelection chưa
   const isSelected = (heroId) => draftSelection.includes(heroId);
 
+  // Lấy tướng đầu tiên đã chọn để kiểm tra tính hợp lệ phe
+  const firstSelectedHero = draftSelection.length > 0
+    ? (HEROES.find(h => h.id === draftSelection[0]) || me?.draftHeroes?.find(h => h.id === draftSelection[0]))
+    : null;
+
   // Helper lấy mô tả kỹ năng chuẩn
   const getSkillDesc = (skill) => {
     if (!skill) return '';
@@ -139,7 +144,7 @@ export function VipHeroSelectorModal({ draftSelection = [], me, onSelect, onClos
           </div>
 
           <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-            Nhấn vào danh tướng để xem chi tiết kỹ năng • Chọn 2 tướng cùng phe
+            Bấm [Chọn ✓] hoặc chạm thẻ để tuyển nhanh • Bấm [Soi 🔍] để xem kỹ năng
           </div>
 
           <button
@@ -250,17 +255,34 @@ export function VipHeroSelectorModal({ draftSelection = [], me, onSelect, onClos
           {availableHeroes.length > 0 ? (
             availableHeroes.map(hero => {
               const selected = isSelected(hero.id);
+              const isUnselectable = firstSelectedHero && !selected && hero.faction !== firstSelectedHero.faction;
+              const isFull = !selected && draftSelection.length >= 2;
               const factionCfg = FACTION_CONFIG[hero.faction] || FACTION_CONFIG['Lạc'];
 
               return (
                 <div
                   key={hero.id}
-                  onClick={() => setInspectedHero(hero)}
+                  onClick={() => {
+                    if (!isUnselectable && (!isFull || selected)) {
+                      onSelect(hero.id);
+                    }
+                  }}
+                  title={
+                    selected
+                      ? `${hero.name} (Đã chọn) - Bấm để hủy chọn`
+                      : isUnselectable
+                      ? `${hero.name} (Khác phe với ${firstSelectedHero.name})`
+                      : isFull
+                      ? `${hero.name} (Đã đủ 2 tướng)`
+                      : `${hero.name} - Bấm thẻ để tuyển mộ nhanh`
+                  }
                   style={{
                     minHeight: '230px',
                     height: '230px',
                     position: 'relative',
-                    cursor: 'pointer',
+                    cursor: isUnselectable ? 'not-allowed' : (isFull && !selected ? 'not-allowed' : 'pointer'),
+                    opacity: isUnselectable ? 0.38 : (isFull && !selected ? 0.6 : 1),
+                    filter: isUnselectable ? 'grayscale(0.65)' : 'none',
                     background: 'linear-gradient(180deg, #162038 0%, #0c1222 100%)',
                     border: selected ? '2.5px solid #10b981' : `1.5px solid ${factionCfg.badgeBorder}`,
                     borderRadius: '10px',
@@ -274,8 +296,10 @@ export function VipHeroSelectorModal({ draftSelection = [], me, onSelect, onClos
                     boxSizing: 'border-box'
                   }}
                   onMouseEnter={e => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.borderColor = selected ? '#10b981' : '#fbbf24';
+                    if (!isUnselectable) {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.borderColor = selected ? '#10b981' : '#fbbf24';
+                    }
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.transform = 'none';
@@ -363,7 +387,7 @@ export function VipHeroSelectorModal({ draftSelection = [], me, onSelect, onClos
                       <div style={{
                         position: 'absolute',
                         inset: 0,
-                        background: 'rgba(16, 185, 129, 0.28)',
+                        background: 'rgba(16, 185, 129, 0.3)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -372,11 +396,11 @@ export function VipHeroSelectorModal({ draftSelection = [], me, onSelect, onClos
                         <span style={{
                           background: '#10b981',
                           color: '#ffffff',
-                          padding: '4px 12px',
+                          padding: '5px 14px',
                           borderRadius: '20px',
                           fontWeight: '900',
                           fontSize: '0.82rem',
-                          boxShadow: '0 0 12px rgba(16, 185, 129, 0.8)',
+                          boxShadow: '0 0 14px rgba(16, 185, 129, 0.9)',
                           border: '1.5px solid #ffffff'
                         }}>
                           ✓ ĐÃ CHỌN
@@ -385,19 +409,20 @@ export function VipHeroSelectorModal({ draftSelection = [], me, onSelect, onClos
                     )}
                   </div>
 
-                  {/* Chân Thẻ: Tên Tướng & Kỹ Năng */}
+                  {/* Chân Thẻ: Tên Tướng & Cụm Nút Soi / Chọn Nhanh */}
                   <div style={{
-                    height: '52px',
+                    height: '54px',
                     flexShrink: 0,
                     padding: '4px 8px',
                     background: '#090d16',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
+                    gap: '6px',
                     borderTop: '1px solid rgba(255, 255, 255, 0.08)',
                     boxSizing: 'border-box'
                   }}>
-                    <div style={{ overflow: 'hidden', paddingRight: '4px' }}>
+                    <div style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden' }}>
                       <div style={{
                         fontWeight: '800',
                         fontSize: '0.88rem',
@@ -419,19 +444,88 @@ export function VipHeroSelectorModal({ draftSelection = [], me, onSelect, onClos
                       </div>
                     </div>
 
-                    <span style={{
-                      fontSize: '0.7rem',
-                      padding: '3px 7px',
-                      borderRadius: '5px',
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      border: '1px solid rgba(245, 158, 11, 0.4)',
-                      color: '#fbbf24',
-                      fontWeight: 'bold',
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0
-                    }}>
-                      Soi 🔍
-                    </span>
+                    {/* Cụm Nút Tác Vụ: Soi Chi Tiết & Chọn Nhanh */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInspectedHero(hero);
+                        }}
+                        title="Xem chi tiết kỹ năng"
+                        style={{
+                          fontSize: '0.72rem',
+                          padding: '4px 7px',
+                          borderRadius: '5px',
+                          background: 'rgba(245, 158, 11, 0.15)',
+                          border: '1px solid rgba(245, 158, 11, 0.45)',
+                          color: '#fbbf24',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(245, 158, 11, 0.3)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(245, 158, 11, 0.15)'}
+                      >
+                        Soi 🔍
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isUnselectable || (isFull && !selected)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isUnselectable && (!isFull || selected)) {
+                            onSelect(hero.id);
+                          }
+                        }}
+                        title={
+                          selected
+                            ? 'Bỏ chọn tướng này'
+                            : isUnselectable
+                            ? `Phải chọn cùng phe với ${firstSelectedHero.name}`
+                            : isFull
+                            ? 'Đã chọn đủ 2 tướng'
+                            : 'Chọn nhanh tướng này'
+                        }
+                        style={{
+                          fontSize: '0.72rem',
+                          padding: '4px 8px',
+                          borderRadius: '5px',
+                          fontWeight: '800',
+                          cursor: isUnselectable || (isFull && !selected) ? 'not-allowed' : 'pointer',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease',
+                          ...(selected
+                            ? {
+                                background: 'rgba(239, 68, 68, 0.25)',
+                                border: '1px solid #ef4444',
+                                color: '#fca5a5'
+                              }
+                            : isUnselectable
+                            ? {
+                                background: 'rgba(100, 116, 139, 0.15)',
+                                border: '1px solid rgba(148, 163, 184, 0.2)',
+                                color: '#64748b'
+                              }
+                            : isFull
+                            ? {
+                                background: 'rgba(100, 116, 139, 0.15)',
+                                border: '1px solid rgba(148, 163, 184, 0.2)',
+                                color: '#64748b'
+                              }
+                            : {
+                                background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                                border: '1px solid #34d399',
+                                color: '#ffffff',
+                                boxShadow: '0 0 8px rgba(16, 185, 129, 0.4)'
+                              })
+                        }}
+                      >
+                        {selected ? 'Bỏ ✕' : isUnselectable ? 'Khác phe' : isFull ? 'Đủ 2' : 'Chọn ✓'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -629,23 +723,42 @@ export function VipHeroSelectorModal({ draftSelection = [], me, onSelect, onClos
                 >
                   ✕ Xem Tướng Khác
                 </button>
-                <button
-                  className={`btn-action ${isSelected(inspectedHero.id) ? 'danger' : 'success'}`}
-                  style={{
-                    flex: '2',
-                    padding: '8px',
-                    fontSize: '0.9rem',
-                    borderRadius: '8px',
-                    fontWeight: 'bold',
-                    boxShadow: '0 0 15px rgba(16, 185, 129, 0.4)'
-                  }}
-                  onClick={() => {
-                    onSelect(inspectedHero.id);
-                    setInspectedHero(null);
-                  }}
-                >
-                  {isSelected(inspectedHero.id) ? '🚫 Bỏ Chọn Tướng Này' : '👑 Tuyển Mộ Tướng Này'}
-                </button>
+                {(() => {
+                  const isInspectedSelected = isSelected(inspectedHero.id);
+                  const isInspectedUnselectable = firstSelectedHero && !isInspectedSelected && inspectedHero.faction !== firstSelectedHero.faction;
+                  const isInspectedFull = !isInspectedSelected && draftSelection.length >= 2;
+
+                  return (
+                    <button
+                      className={`btn-action ${isInspectedSelected ? 'danger' : 'success'}`}
+                      disabled={isInspectedUnselectable || isInspectedFull}
+                      style={{
+                        flex: '2',
+                        padding: '8px',
+                        fontSize: '0.9rem',
+                        borderRadius: '8px',
+                        fontWeight: 'bold',
+                        boxShadow: isInspectedSelected ? 'none' : '0 0 15px rgba(16, 185, 129, 0.4)',
+                        opacity: (isInspectedUnselectable || isInspectedFull) ? 0.5 : 1,
+                        cursor: (isInspectedUnselectable || isInspectedFull) ? 'not-allowed' : 'pointer'
+                      }}
+                      onClick={() => {
+                        if (!isInspectedUnselectable && (!isInspectedFull || isInspectedSelected)) {
+                          onSelect(inspectedHero.id);
+                          setInspectedHero(null);
+                        }
+                      }}
+                    >
+                      {isInspectedSelected
+                        ? '🚫 Bỏ Chọn Tướng Này'
+                        : isInspectedUnselectable
+                        ? `⚠️ Cần Cùng Phe (${firstSelectedHero.faction})`
+                        : isInspectedFull
+                        ? '⚠️ Đã Chọn Đủ 2 Tướng'
+                        : '👑 Tuyển Mộ Tướng Này'}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </div>
