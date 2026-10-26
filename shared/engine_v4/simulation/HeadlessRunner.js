@@ -296,10 +296,10 @@ export class HeadlessRunner {
           const p = state.getPlayer(actorId);
           const target = state.getPlayer(frame.targetId);
           if (p && target && p.hand?.length > 0 && target.hand?.length > 0) {
-            const myCard = p.hand.pop();
-            const oppCard = target.hand.pop();
-            state.discardPile.push(myCard);
-            state.discardPile.push(oppCard);
+            const myCard = p.hand[0];
+            const oppCard = target.hand[0];
+            state.moveCard(myCard.id, { type: 'hand', playerId: actorId }, { type: 'discardPile' });
+            state.moveCard(oppCard.id, { type: 'hand', playerId: target.id }, { type: 'discardPile' });
 
             const rankToNum = (r) => {
               if (typeof r === 'number') return r;
@@ -337,6 +337,54 @@ export class HeadlessRunner {
             p.skillUsage = p.skillUsage || {};
             p.skillUsage.duyen_tho = p.skillUsage.duyen_tho || {};
             p.skillUsage.duyen_tho.usedThisTurn = true;
+          }
+        } else if (frame.type === 'ASK_WEAPON_SKILL') {
+          const p = state.getPlayer(actorId);
+          const weapon = frame.context?.weapon || frame.context?.weaponName;
+          if (weapon === 'Rìu Đá' || weapon === 'Quán Thạch Phủ') {
+            const target = state.getPlayer(frame.targetId);
+            if (p && p.hand && p.hand.length >= 2 && target && Math.random() < 0.5) {
+              const discards = [p.hand[0].id, p.hand[1].id];
+              state.discardFromHand(actorId, discards);
+              state.priorityStack.pop();
+              CombatRules.applyDamage(state, actorId, target.id, frame.context?.damageAmount || 1, 'slash_penetrate', false, frame.context?.slashCard);
+            } else {
+              state.priorityStack.pop();
+            }
+          } else if (weapon === 'Thanh Long Đao') {
+            const extraSlash = p?.hand?.find(c => c.type === 'slash' || c.name === 'Chém');
+            const target = state.getPlayer(frame.targetId);
+            if (p && extraSlash && target && Math.random() < 0.5) {
+              state.discardFromHand(actorId, [extraSlash.id]);
+              state.priorityStack.pop();
+              state.priorityStack.push({
+                type: 'ASK_DODGE',
+                sourceId: actorId,
+                targetId: target.id,
+                priorityQueue: [target.id],
+                context: {
+                  card: extraSlash,
+                  requiredDodges: 1,
+                  dodgesProvided: 0,
+                  damageAmount: 1
+                }
+              });
+            } else {
+              state.priorityStack.pop();
+            }
+          } else if (weapon === 'Song Kiếm') {
+            const source = state.getPlayer(frame.sourceId);
+            if (p && p.hand && p.hand.length > 0) {
+              state.discardFromHand(actorId, [p.hand[0].id]);
+              state.priorityStack.pop();
+            } else {
+              state.priorityStack.pop();
+              if (source && source.isAlive) {
+                state.drawCards(source.id, 1);
+              }
+            }
+          } else {
+            state.priorityStack.pop();
           }
         } else {
           // Bỏ qua các frame khác bằng cách pop

@@ -103,20 +103,7 @@ describe('ActiveSkillsAndDuelReactions Test Suite', () => {
     expect(frame.type).toBe('ASK_SLASH_RESPONSE');
     expect(frame.context.reason).toBe('nam-man');
 
-    // Player 3 responds with skip -> takes 1 damage
-    dispatcher.dispatchAction({
-      type: 'ACTION_REACT',
-      payload: { playerId: 3, responseType: 'skip', data: {} }
-    });
-    expect(p3.hp).toBe(2);
-
-    // Player 2 responds with skip -> takes 1 damage
-    dispatcher.dispatchAction({
-      type: 'ACTION_REACT',
-      payload: { playerId: 2, responseType: 'skip', data: {} }
-    });
-    expect(p2.hp).toBe(2);
-
+    // Theo đúng chiều kim đồng hồ: Player 1 phản hồi trước tiên
     // Player 1 responds with Chém -> defended, hp stays 3
     dispatcher.dispatchAction({
       type: 'ACTION_REACT',
@@ -124,6 +111,20 @@ describe('ActiveSkillsAndDuelReactions Test Suite', () => {
     });
     expect(p1.hp).toBe(3);
     expect(p1.hand.length).toBe(0);
+
+    // Player 2 giải quyết tiếp theo -> responds with skip -> takes 1 damage
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: { playerId: 2, responseType: 'skip', data: {} }
+    });
+    expect(p2.hp).toBe(2);
+
+    // Player 3 giải quyết cuối cùng -> responds with skip -> takes 1 damage
+    dispatcher.dispatchAction({
+      type: 'ACTION_REACT',
+      payload: { playerId: 3, responseType: 'skip', data: {} }
+    });
+    expect(p3.hp).toBe(2);
     expect(state.priorityStack.isEmpty()).toBe(true);
   });
 

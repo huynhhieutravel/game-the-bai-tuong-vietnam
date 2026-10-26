@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 import { canUseSkill, canAttack } from 'shared/engine_v4/rules/TargetResolverV4.js';
 import { PHASES } from 'shared/data/gameData';
-import { getPlayerGender } from 'shared/engine_v4/application/index.js';
+import { getPlayerGender, hasSkill } from 'shared/engine_v4/application/index.js';
+import { normalizeSkillId, normalizeGender } from 'shared/utils/translationHelper';
 
 export function useSkillInteraction({
     gameState,
@@ -19,25 +20,30 @@ export function useSkillInteraction({
         if (gameState.currentPlayerIndex !== mainPlayerId) return;
     
         if (isActionPending.current) return;
+
+        const normSkillId = normalizeSkillId(skillId);
+
+        if (normSkillId === 'thuy_to') {
+            const me = gameState.players.find(p => p.id === mainPlayerId);
+            if (!me || !me.hand || me.hand.length === 0) {
+                gameAPI.addLog('Bạn không có bài trên tay để dùng Thủy Tổ!', 'warning');
+                return;
+            }
+        }
+
+        if (normSkillId === 'hoa_than') {
+            const me = gameState.players.find(p => p.id === mainPlayerId);
+            const isAnTu = me && (hasSkill(me, 'hoa_than_an_tu') || hasSkill(me, 'hoa-than-an-tu'));
+            if (isAnTu) {
+                isActionPending.current = true;
+                gameAPI.useSkill(mainPlayerId, 'hoa-than-an-tu');
+                cancelTargeting();
+                return;
+            }
+        }
     
-        const skillIdMap = {
-            'Thủy Tổ': 'thuy-to',
-            'Tự Chủ': 'tu-chu',
-            'Tiên Phong': 'tien-phong',
-            'Diệu Dược': 'dieu-duoc',
-            'Hòa Thân': 'hoa-than',
-            'Bình Loạn': 'binh-loan',
-            'Trung Dũng': 'trung-dung',
-            'Bạch Đằng': 'bach-dang',
-            'Lặn Sâu': 'lan-sau',
-            'Tâm Công': 'tam-cong',
-            'Vân Đồn': 'van-don',
-            'Đoạt Sao': 'doat-sao',
-            'Duyên Thơ': 'duyen-tho'
-        };
-    
-        if (skillId === 'Bọc Trăm Trứng' || skillId === 'Bọc Trăm Trứng (Chủ Công Kỹ)') {
-           if (activeSkill === skillId) {
+        if (normSkillId === 'boc_tram_trung') {
+           if (activeSkill === skillId || activeSkill === normSkillId) {
               cancelTargeting();
            } else {
               setActiveSkill(skillId);
@@ -54,8 +60,8 @@ export function useSkillInteraction({
            return;
         }
     
-        if (skillId === 'Tiên Duyên') {
-           if (activeSkill === skillId) {
+        if (normSkillId === 'tien_duyen') {
+           if (activeSkill === skillId || activeSkill === normSkillId) {
                cancelTargeting();
            } else {
                setActiveSkill(skillId);
@@ -72,8 +78,8 @@ export function useSkillInteraction({
            return;
         }
         
-        if (skillId === 'Phá Thành') {
-           if (activeSkill === skillId) {
+        if (normSkillId === 'pha_thanh') {
+           if (activeSkill === skillId || activeSkill === normSkillId) {
                cancelTargeting();
            } else {
                setActiveSkill(skillId);
@@ -90,8 +96,8 @@ export function useSkillInteraction({
            return;
         }
 
-        if (skillId === 'Thần Hỏa') {
-           if (activeSkill === skillId) {
+        if (normSkillId === 'than_hoa') {
+           if (activeSkill === skillId || activeSkill === normSkillId) {
                cancelTargeting();
            } else {
                 setActiveSkill(skillId);
@@ -101,15 +107,26 @@ export function useSkillInteraction({
                     targetingDef: { type: 'single', filter: (state, player) => state.players.filter(p => p.isAlive && p.hand.length > 0) },
                     step: 0,
                     selectedTargets: [],
-                    validTargets: gameState.players.filter(p => p.isAlive && p.hand.length > 0).map(p => p.id),
+                    validTargets: [],
                     message: '🔥 Hãy nhấp chọn 1 lá bài ĐỎ trên tay để ném Hỏa Công.'
                 });
            }
            return;
         }
 
-        if (['Tâm Công', 'Vân Đồn', 'Duyên Thơ', 'Tiên Phong'].includes(skillId)) {
-           if (activeSkill === skillId) {
+        if (['tam_cong', 'van_don', 'duyen_tho', 'tien_phong'].includes(normSkillId)) {
+           if (normSkillId === 'tam_cong') {
+               const me = gameState.players.find(p => p.id === mainPlayerId);
+               if (!me || !me.hand || me.hand.length === 0) {
+                   gameAPI.addLog('Bạn không có bài trên tay để dùng Tâm Công!', 'warning');
+                   return;
+               }
+               if (me.skillUsage?.tam_cong?.usedThisTurn) {
+                   gameAPI.addLog('[Tâm Công] Mỗi lượt chỉ được sử dụng 1 lần!', 'warning');
+                   return;
+               }
+           }
+           if (activeSkill === skillId || activeSkill === normSkillId) {
                cancelTargeting();
            } else {
                setActiveSkill(skillId);
@@ -117,8 +134,14 @@ export function useSkillInteraction({
                    card: null,
                    virtualCardName: null,
                    targetingDef: { type: 'single', filter: (state, player) => {
-                       if (skillId === 'Duyên Thơ') {
-                           return state.players.filter(p => p.id !== player.id && p.isAlive && p.hp < p.maxHp && (getPlayerGender(p) === 'Nam' || getPlayerGender(p) === 'Male'));
+                       if (normSkillId === 'duyen_tho') {
+                           return state.players.filter(p => {
+                               if (p.id === player.id || !p.isAlive || p.hp >= p.maxHp) return false;
+                               return normalizeGender(getPlayerGender(p)) === 'male';
+                           });
+                       }
+                       if (normSkillId === 'van_don') {
+                           return state.players.filter(p => p.id !== player.id && p.isAlive && p.hand?.length > 0);
                        }
                        return state.players.filter(p => p.id !== player.id && p.isAlive);
                    } },
@@ -126,8 +149,12 @@ export function useSkillInteraction({
                    selectedTargets: [],
                    validTargets: gameState.players.filter(p => {
                        if (p.id === mainPlayerId || !p.isAlive) return false;
-                       if (skillId === 'Duyên Thơ') {
-                           return p.hp < p.maxHp && (getPlayerGender(p) === 'Nam' || getPlayerGender(p) === 'Male');
+                       if (normSkillId === 'duyen_tho') {
+                           if (p.hp >= p.maxHp) return false;
+                           return normalizeGender(getPlayerGender(p)) === 'male';
+                       }
+                       if (normSkillId === 'van_don') {
+                           return p.hand && p.hand.length > 0;
                        }
                        return true;
                    }).map(p => p.id),
@@ -137,8 +164,8 @@ export function useSkillInteraction({
            return;
         }
     
-        if (skillId === 'Định Quốc') {
-           if (activeSkill === skillId) {
+        if (normSkillId === 'dinh_quoc') {
+           if (activeSkill === skillId || activeSkill === normSkillId) {
                cancelTargeting();
            } else {
                setActiveSkill(skillId);
@@ -155,10 +182,14 @@ export function useSkillInteraction({
            return;
         }
     
-        const mappedId = skillIdMap[skillId];
-        if (mappedId) {
+        const directSkills = [
+            'thuy_to', 'tu_chu', 'tien_phong', 'dieu_duoc', 'hoa_than', 
+            'binh_loan', 'trung_dung', 'bach_dang', 'lan_sau', 'doat_sao', 'can_gian'
+        ];
+        if (directSkills.includes(normSkillId)) {
            isActionPending.current = true;
-           gameAPI.useSkill(mainPlayerId, mappedId);
+           const sendId = normSkillId.replace(/_/g, '-');
+           gameAPI.useSkill(mainPlayerId, sendId);
            cancelTargeting();
         } else {
            // Toggle active skill selection

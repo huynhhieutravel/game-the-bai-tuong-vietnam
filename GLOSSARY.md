@@ -35,6 +35,12 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
   - `cost`: Chi phí bài/máu phải trả.
   - `resolve`: Logic thực thi hiệu ứng.
   - `aiHints`: Chỉ dẫn hành vi cho Bot AI.
+- **Canonical Skill Description SSOT (Nguồn Sự Thật Kỹ Năng Chuẩn):** `shared/data/gameData.js` và `shared/data/SkillDescriptions.js` là Single Source of Truth duy nhất cho văn bản mô tả kỹ năng tướng. Mọi view model (`GameViewMapperV4.js`), modal chi tiết tướng trên bàn chơi (`GameView.jsx`), draft tướng đầu trận (`gameSetupV4.js`) và trang bách khoa toàn thư (`HeroDetail.jsx`) bắt buộc phải đọc từ nguồn này. Tuyệt đối không để các ghi chú vắn tắt của lập trình viên trong file engine che khuất mô tả hoàn chỉnh chuẩn Wiki/GDD.
+- **Skill Type Badge Standard (Chuẩn Nhãn Phân Loại Kỹ Năng):** Hệ thống 4 nhãn phân loại kỹ năng trực quan trên thẻ bài và hồ sơ tướng, được chuẩn hóa tiếng Việt:
+  - `CHỦ ĐỘNG` (Active — Màu Xanh dương `#3b82f6`): Kỹ năng người chơi chủ động phát động trong lượt hành động.
+  - `BỊ ĐỘNG` (Passive/Reactive — Màu Xanh lá `#10b981`): Kỹ năng kích hoạt tự động hoặc phản ứng khi có sự kiện thỏa mãn.
+  - `TỎA ĐỊNH` (Lock — Màu Đỏ `#ef4444`): Tỏa Định Kỹ có hiệu lực liên tục, mang tính ép buộc và không thể hủy bỏ.
+  - `HẠN ĐỊNH` (Limited — Màu Tím `#8b5cf6`): Hạn Định Kỹ chỉ được phép sử dụng duy nhất 1 lần trong suốt ván chơi.
 - **Range & Distance (Tầm đánh & Khoảng cách):**
   - **Distance (Khoảng cách):** Số bước ngắn nhất giữa 2 người chơi trên vòng tròn, chịu ảnh hưởng bởi Ngựa +1 và Ngựa -1.
   - **Attack Range (Tầm đánh):** Tầm với tối đa của vũ khí người chơi đang trang bị (mặc định = 1). Người chơi chỉ được Chém mục tiêu có $\text{Khoảng cách} \le \text{Tầm đánh}$.
@@ -948,6 +954,414 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
   - **Khái niệm:** Quy tắc bảo toàn tính miễn nhiễm của các kỹ năng Tỏa định (như `dam_bac` của Lang Liêu khi hết bài trên tay không thể bị Chém/Quyết đấu; `nghe_an_ke` của Nguyễn Chích không thể bị Cướp Bài/Hỗn Loạn). Quy tắc này được đồng bộ xuyên suốt từ `TargetResolverV4` đến `BotBrain` và `TrickRules`/`CombatRules`, đảm bảo Bot không bao giờ gửi đi payload hành động vi phạm điều kiện miễn nhiễm.
 - **⏱️ Active Non-Card Reaction Resolver (Bộ Phản Hồi Ngăn Xếp Phi Thẻ Bài):**
   - **Khái niệm:** Cơ chế trong `BotRunnerV4` và `BotBrain` xử lý các khung ưu tiên phản hồi không yêu cầu tiêu hao thẻ bài vật lý (như `doJudge: true` của Phá Thành, `doUse: true` của Dưỡng Quân, `suit` của Tâm Công, `option` của Mượn Đao). Tránh việc hệ thống nhận diện nhầm các quyết định logic này là trạng thái hủy bỏ (`canceled: true`).
+
+---
+
+## 64. KIỂM TOÁN TOÀN DIỆN KỸ NĂNG TƯỚNG & ĐỒNG BỘ GIAO DIỆN PHẢN HỒI (COMPREHENSIVE HERO SKILLS AUDIT & UI REACTION MATRIX)
+
+- **⚔️ Vân Đồn Đấu Điểm (`ASK_VAN_DON` & `VanDonModal`):**
+  - **Khái niệm:** Khung ưu tiên cho phép Trần Khánh Dư (`tran_khanh_du`) phát động đấu điểm với 1 tướng địch có bài trên tay.
+  - **Giao diện Client:** `VanDonModal` cho phép người chơi trực tiếp chạm chọn lá bài trên tay để đọ điểm với đối thủ.
+  - **Cơ chế phân định:** Thắng (Rank cao hơn) -> được thêm 1 lần [Chém] vô hạn cự ly và chọn 2 mục tiêu; Thua/Hòa -> bị cấm [Chém] trong lượt hiện tại.
+- **🌺 Hòa Thân Công Chúa An Tư (`ASK_HOA_THAN_AN_TU` & `HoaThanAnTuModal`):**
+  - **Khái niệm:** Phân biệt rõ ràng giữa kỹ năng [Hòa Thân] của Huyền Trân Công Chúa (`hoa_than` - hệ Sơn: ép 2 tướng nam Quyết Đấu) và [Hòa Thân] của Công chúa An Tư (`hoa_than_an_tu` - hệ Hà: dùng bài chất Rô ♦ đặt Hỗn Loạn).
+  - **Hỗ trợ đa nguồn:** Cho phép chuyển đổi cả lá bài chất ♦ trên tay lẫn trang bị chất ♦ trên người thành cẩm nang [Hỗn Loạn].
+- **🕊️ Can Gián Phản Hồi (`ASK_CAN_GIAN`):**
+  - **Khái niệm:** Khi Nguyễn Địa Lô (`nguyen_dia_lo`) phát động Can Gián mà chưa xác định mục tiêu, hệ thống đẩy frame `ASK_CAN_GIAN` để mở hộp thoại tương tác.
+  - **Chốt chặn an toàn:** Bắt buộc lượng Sinh lực hiện tại lớn hơn 1 (`hp > 1`) mới được phép mất máu; chặn đứng tuyệt đối nguy cơ tự sát.
+- **📜 Thông Ngôn Hồi Bài (`ASK_THONG_NGON`):**
+  - **Khái niệm:** Cho phép Trần Nhật Duật (`tran_nhat_duat`) thu hồi lá bài phán xét vừa có hiệu lực từ chồng bài bỏ về tay thông qua hộp thoại xác nhận tương tác thay vì placeholder trống.
+- **🧘 Phật Tâm Chuỗi Phán Xét (`ASK_PHAT_TAM`):**
+  - **Khái niệm:** Cho phép Nguyên Phi Ỷ Lan (`nguyen_phi_y_lan`) chủ động xác nhận mở chuỗi phán xét Phật Tâm tại đầu lượt, thu toàn bộ các lá bài màu Đen rút được về tay cho đến khi gặp lá bài màu Đỏ.
+- **🛡️ Bất Biến Kiểm Tra Điều Kiện Kích Hoạt Kỹ Năng (`skill.canUse` Guard):**
+  - **Khái niệm:** Bộ điều phối `DispatcherV4` tự động kiểm tra phương thức `skill.canUse()` tại nhánh dự phòng trước khi gọi `skill.execute()`. Nhờ đó, mọi kỹ năng có điều kiện khắt khe (như `lan_sau` đòi hỏi HP > 1, kỹ năng giới hạn 1 lần/lượt) được bảo vệ hai tầng, triệt tiêu nguy cơ gọi trái phép từ mã khách hoặc bot.
+- **☀️ Khai Thiên Chuyển Hóa Bài Đỏ (`Khai Thiên` Hand Conversion):**
+  - **Khái niệm:** Kỹ năng của Thần Trụ Trời cho phép sử dụng hoặc đánh ra *bất kỳ lá bài màu Đỏ nào* (Cơ Bản, Cẩm Nang, Trang Bị) như một lá [Chém]. Loại bỏ hoàn toàn lỗi lọc cứng chỉ nhận bài Trang bị ở giao diện `PlayerHand.jsx`.
+- **🎴 Thẻ Chuyển Hóa Tương Tác (`CARD_CONVERTING_SKILLS`):**
+  - **Khái niệm:** Danh sách các kỹ năng chủ động cho phép biến đổi bài trên tay người chơi khi được kích hoạt (`Tiên Duyên`, `Khai Thiên`, `Định Quốc`, `Thần Hỏa`, `Kỳ Tập`, `Dời Núi`, `Phá Thành`, `Hòa Thân`). Đảm bảo lá bài chuyển đổi sáng lên hợp lệ để người chơi nhấp chọn trực tiếp mà không bị vô hiệu hóa vì không thỏa điều kiện lá bài gốc.
+- **🛡️ Chuẩn Hóa Truy Cập Trang Bị (`Safe Equipment Normalization`):**
+  - **Khái niệm:** Cho phép các hàm kiểm tra kỹ năng phản hồi (như `Chương Dương`, `Chuyển Trang Bị`) duyệt an toàn trên cả cấu trúc mảng (`Array`) và đối tượng từ điển (`Object`), ngăn chặn lỗi `equipment.forEach is not a function`.
+
+---
+
+## 65. MA TRẬN HIỆP ĐỒNG BIẾN ĐỔI CHẤT & MÀU TƯỚNG (DUAL HERO SUIT & COLOR SYNERGY MATRIX)
+
+- **♠️➡️♥️ Quốc Sắc Chuyển Đổi Thực Tế (`getEffectiveSuit` & `getEffectiveColor`):**
+  - **Khái niệm:** Tỏa Định Kỹ [Quốc Sắc] của Ngọc Hân Công Chúa biến đổi mọi lá bài chất Bích (♠) của người sở hữu thành chất Cơ (♥) và mang màu Đỏ (`red`).
+  - **Nguyên tắc Hiệp Đồng Song Tướng (Dual-Hero Synergy Invariant):** Khi người chơi kết hợp Ngọc Hân Công Chúa với bất kỳ tướng nào khác, toàn bộ các cơ chế/kỹ năng phụ thuộc vào chất (Suit) hoặc màu sắc (Color) BẮT BUỘC phải tính toán dựa trên **Chất & Màu thực tế** (`getEffectiveSuit`, `getEffectiveColor`) thay vì đọc trực tiếp thuộc tính gốc của lá bài vật lý (`card.suit`, `card.color`).
+- **🔥 Khai Thiên + Quốc Sắc:**
+  - Lá bài chất Bích ♠ được tính là Đỏ, do đó được phép sử dụng như lá [Chém] trong cả pha Ra bài chủ động lẫn khi phản ứng đáp trả [Quyết Đấu] (`ASK_SLASH_DUEL`) và [Nam Man Xâm Nhập] (`ASK_SLASH_RESPONSE`).
+- **🌿 Nam Dược + Quốc Sắc:**
+  - Lá bài chất Bích ♠ được tính là Đỏ, cho phép Tuệ Tĩnh sử dụng như [Đào] ngoài lượt để cứu bản thân hoặc đồng đội đang hấp hối (`ASK_PEACH`).
+- **🔥 Thần Hỏa + Quốc Sắc:**
+  - Rùa Vàng có thể dùng lá bài chất Bích ♠ như [Hỏa Công] để tấn công đối thủ.
+- **🛡️ Kỳ Tập + Quốc Sắc:**
+  - Dã Tượng chỉ được dùng bài Đen làm [Tước Bài]. Vì lá Bích ♠ đã biến thành Cơ ♥ (Đỏ), lá Bích ♠ BỊ CẤM sử dụng cho Kỳ Tập; chỉ có lá Nhép ♣ mới được sử dụng.
+- **🏹 Bình Loạn + Quốc Sắc:**
+  - Nguyễn Bặc cần 2 lá bài cùng chất để kích hoạt [Loạn Tiễn]. Với Quốc Sắc, 1 lá Bích ♠ và 1 lá Cơ ♥ được công nhận là **cùng chất Cơ ♥** và phát động thành công [Loạn Tiễn].
+- **☯️ Quân Cơ + Quốc Sắc:**
+  - Đinh Điền chỉ được dùng lá bài Đen để thay thế bài phán xét. Lá Bích ♠ (đã thành Đỏ) BỊ CẤM thay phán xét.
+- **🔥 Kích Hỏa Hỏa Công + Quốc Sắc:**
+  - Khi mục tiêu để lộ lá bài chất Cơ ♥, người phát động có Quốc Sắc có thể bỏ lá bài Bích ♠ để kích hoạt sát thương Lửa thành công.
+
+---
+
+## 66. HỆ THỐNG KIỂM SOÁT HỢP ĐỒNG GIAO DIỆN & MA TRẬN TEST SONG TƯỚNG (UI-ENGINE CONTRACT & DUAL-HERO MATRIX TESTING)
+
+- **🤖 Điểm Mù Bot Giả Lập (Headless Bot Blindspot):**
+  - **Khái niệm:** Tình trạng các bài kiểm tra tự động chạy hàng ngàn trận đấu giữa các Bot (`sim:app`, `sim:core`) đạt tỷ lệ thành công 100% nhưng người chơi thực tế trên điện thoại (iPhone/Android/Web) vẫn gặp lỗi mờ nút bấm, kẹt vòng chờ hoặc sai hiệu ứng.
+  - **Nguyên nhân cốt lõi:** Bot AI ra quyết định trực tiếp qua `BotBrain` và gọi thẳng hàm `engine.dispatch(...)` với trạng thái bộ nhớ thuần túy, hoàn toàn bỏ qua lớp DOM React, không mở `ModalContainer`, không đi qua `useCardInteraction` hay các thao tác cảm ứng của người dùng.
+- **📜 Hợp Đồng Payload Giao Diện - Lõi (UI-Engine Reaction Contract):**
+  - **Khái niệm:** Định dạng dữ liệu chuẩn mực bắt buộc phải đồng nhất giữa Client UI (`gameAPI.respond(payload)`) và Điều phối Engine (`DispatcherV4._handleReact(payload)`).
+  - **Bất biến:** Mọi payload phản hồi từ Modal phải sử dụng đúng định danh trường (field naming contract) như `cardId` (thay vì `cardIdx`), `doProvide: true`, `targetId`, `selectedSuit`. Bất kỳ sự sai lệch nào cũng dẫn đến việc Engine bỏ qua phản hồi và đẩy người chơi vào trạng thái chờ 15s của Watchdog Timer.
+- **🃏 Bộ Lọc Thẻ Hiệu Dụng Đồng Nhất (Canonical Effective Card Resolver):**
+  - **Khái niệm:** Quy tắc bất biến yêu cầu tất cả các thành phần giao diện (`PlayerHand.jsx`, `ModalContainer.jsx`, `DodgeModal.jsx`, `BinhLoanModal.jsx`, `HoaCongDiscardModal.jsx`, v.v.) tuyệt đối **KHÔNG ĐƯỢC ĐỌC TRỰC TIẾP** thuộc tính thô của lá bài vật lý (`card.suit`, `card.color`) khi kiểm tra điều kiện sáng nút hoặc lọc bài hợp lệ.
+  - **Cơ chế thực thi:** Bắt buộc 100% các vị trí kiểm tra trên UI phải thông qua các hàm hiệu dụng `getEffectiveSuit(card, hero)` và `getEffectiveColor(card, hero)` từ Engine để bảo toàn trọn vẹn các hiệu ứng chuyển đổi chất/màu (như Quốc Sắc của Ngọc Hân Công Chúa).
+- **🎲 Fuzzing Ma Trận Song Tướng (Dual-Hero Combinatorial Fuzzing):**
+  - **Khái niệm:** Kỹ thuật kiểm thử tự động tổ hợp quét qua toàn bộ 741 cặp song tướng ($\binom{39}{2} = 741$), đặc biệt tập trung vào các ma trận chuyển đổi chéo giữa các tướng can thiệp chất/màu và các tướng yêu cầu điều kiện kích hoạt theo chất/màu (Quốc Sắc, Khai Thiên, Linh Giám, Chương Dương, Thính Chính, Quân Cơ, Dời Núi, Bình Loạn, Hòa Thân, Nam Dược, Thần Hỏa, Kỳ Tập).
+
+---
+
+## 67. CƠ CHẾ PHÒNG VỆ CUỘC ĐUA PHẢN HỒI & CHỐNG KẸT PHA BỎ BÀI (ASYNC REACTION RACE & DISCARD PHASE DEADLOCK IMMUNITY)
+
+- **⚡ Cuộc Đua Bất Đồng Bộ Trong Khung Ưu Tiên (Stale PriorityFrame Race Condition):**
+  - **Khái niệm:** Hiện tượng `BotRunnerV4` đặt bộ đếm giờ (`setTimeout`) để trả lời một khung ưu tiên cũ (như `ASK_NEGATE`), nhưng khung đó đã bị giải phóng và thay thế bởi một khung khác (như `ASK_SLASH_DUEL` dành cho Người chơi khác). Khi bộ đếm giờ điểm hỏa, Bot gửi phản hồi sai quyền hạn và bị `TrickRules.respondDuel` chặn lại với lỗi `Không phải lượt đọ Chém của người chơi X!`.
+  - **Cơ chế phòng vệ:** Trước khi gửi phản hồi, BotRunner luôn kiểm tra `expectedActorId === actor.id`. Nếu khung trên đỉnh ngăn xếp không còn chờ Bot này, yêu cầu bị hủy bỏ trong êm đẹp. Đồng thời `DispatcherV4._handleReact` chặn các phản hồi sai lệch và an toàn bỏ qua.
+- **🛡️ Bất Biến Chuyển Lượt Pha Bỏ Bài (Discard Phase Completion Invariant):**
+  - **Khái niệm:** Quy tắc bảo đảm pha Bỏ bài (`PHASES.DISCARD`) không bao giờ bị bế tắc khi người chơi hoặc Bot không còn bài dư thừa (`excess <= 0`).
+  - **Cơ chế thực thi:** 
+    1. Khi ngăn xếp ưu tiên rỗng trong pha Bỏ bài, `DispatcherV4` tự động gọi `_checkDiscardLimit(turnPlayer)` để giải phóng pha nếu số bài đã hợp lệ.
+    2. Nếu `endPhase()` được gọi khi trò chơi đã ở pha Bỏ bài, `DispatcherV4` và `StateMachine` kiểm tra giới hạn bài và chuyển ngay sang pha Kết thúc (`PHASES.END` / `nextTurn()`) thay vì ném ngoại lệ dừng game.
+    3. `BotRunnerV4` quản lý trọn vẹn pha Bỏ bài: chỉ bỏ bài khi `requiredCards > 0 && type === 'ASK_DISCARD'`, ngược lại lập tức gọi kết thúc pha chuyển lượt.
+
+---
+
+## 68. CƠ CHẾ TRIỆT TIÊU DEAD ACTOR & PHÒNG VỆ MÀU SẮC SONG TƯỚNG (DEAD ACTOR PURGE & COLOR SYNERGY DEFENSE)
+
+- **💀 Cơ Chế Thanh Tẩy Khung Phản Hồi Khi Tử Trận (Universal PriorityFrame Death Purge):**
+  - **Khái niệm:** Nguyên tắc giải phóng triệt để ngăn xếp ưu tiên (`PriorityStack`) ngay khi một người chơi tử trận (`handleDeath`) để ngăn chặn việc trò chơi dừng lại chờ đợi người đã khuất.
+  - **Cơ chế thực thi:**
+    1. Lọc và loại bỏ `deadPlayerId` khỏi tất cả các mảng `priorityQueue` của mọi frame trong stack.
+    2. Hủy bỏ ngay lập tức các trận Quyết Đấu `ASK_SLASH_DUEL` liên quan đến người chơi đã tử trận.
+    3. Thanh tẩy mọi frame đơn mục tiêu có `frame.targetId === deadPlayerId` nếu hàng đợi ưu tiên không còn ai khác.
+    4. Nếu người tử trận đang giữ quyền phản hồi hiện tại (`currentActorId === deadPlayerId`), tự động đôn người kế tiếp trong `priorityQueue` lên hoặc pop frame tức thì.
+- **🎨 Chuẩn Hóa Màu Sắc Hiệu Dụng Trong Trí Tuệ Nhân Tạo (AI Effective Color Resolution):**
+  - **Khái niệm:** Quy định bắt buộc mọi module AI (`BotBrain.js`, `BotRunnerV4.js`) và Dispatcher khi kiểm tra tính chất Đen/Đỏ của thẻ bài cho các kỹ năng như *Thính Chính* (Nguyên Phi Ỷ Lan), *Linh Giám* (Trần Thủ Độ), *Khai Thiên* (Trần Hưng Đạo), *Nam Dược* (Tuệ Tĩnh) phải luôn thông qua hàm `globalHeroRegistry.getEffectiveColor(player, card)` và `getEffectiveSuit(player, card)`.
+  - **Khắc phục lỗi:** Triệt tiêu hoàn toàn xung đột màu sắc khi tướng biến đổi toàn bộ bài thành Đỏ (Khai Thiên) kết hợp với tướng dùng bài Đen để Né (Thính Chính), bảo đảm không văng ngoại lệ `Lá bài không phải là lá [Né] hợp lệ!`.
+- **🛡️ Tự Động Phục Hồi Thẻ Bỏ Bài (Auto-fallback Discard Recovery):**
+  - **Khái niệm:** Cơ chế phòng vệ trong `DispatcherV4._handleDiscard` và `case 'ASK_DISCARD'`: nếu số lượng hoặc ID thẻ bài gửi lên không khớp với yêu cầu `required = Math.min(hand.length, cardsToDiscard)`, Dispatcher tự động chọn `required` lá bài đầu tiên từ trên tay để hoàn tất việc bỏ bài, pop frame an toàn và chuyển lượt mượt mà.
+
+---
+
+## 69. TƯƠNG TÁC THẺ CẨM NANG & HỆ THỐNG THÔNG BÁO CHIẾN ĐẤU (INTERACTIVE TRICK MODAL & TACTICAL TOAST FEEDS)
+
+- **🃏 Khung Chọn Thẻ Tương Tác Cướp/Tước (Interactive Snatch & Dismantle Frame):**
+  - **Khái niệm:** Khi Người chơi (Human Player) sử dụng cẩm nang [Tước Bài], [Cướp Bài] hoặc kỹ năng phái sinh (như [Kỳ Tập] của Dã Tượng), thay vì tự động bốc bài ngẫu nhiên, hệ thống kích hoạt khung ưu tiên `ASK_SNATCH` hoặc `ASK_DISMANTLE` trên `PriorityStack`.
+  - **Trải nghiệm người dùng:** Mở giao diện `AskSnatchDismantleModal` cho phép người chơi trực tiếp chạm chọn mục tiêu mong muốn giữa 3 khu vực:
+    1. **Bài trên tay (Hand Cards):** Hiển thị các lá bài úp mặt bí mật.
+    2. **Khu vực Trang bị (Equipment Zone):** Hiển thị rõ tên và icon của Vũ khí, Giáp phòng thủ, Ngựa tấn công/phòng thủ đang trang bị.
+    3. **Khu vực Phán xét (Judgement Zone):** Hiển thị các cẩm nang trì hoãn (Sấm Sét, Hỗn Loạn) để giải cứu bản thân/đồng đội hoặc cướp bùa lợi.
+  - **Phân tách Trí Tuệ Nhân Tạo (Headless AI Separation):** Đối với Bot AI hoặc trong chế độ giả lập (`extraArgs.interactive !== true`), thuật toán `BotBrain` tự động tính toán mục tiêu giá trị nhất (Vũ khí/Giáp $\rightarrow$ Phán xét $\rightarrow$ Bài trên tay) mà không làm nghẽn giao diện.
+- **📢 Dòng Sự Kiện Toast Chiến Thuật Nổi Bật (Tactical Toast Feeds):**
+  - **Khái niệm:** Cơ chế lắng nghe log sự kiện thời gian thực trong `GameView.jsx` để lập tức kích hoạt Toast Banner ở vị trí trung tâm tầm mắt người chơi cho các biến cố chiến đấu then chốt:
+    - `💥 [Tên] đã tước 1 lá bài của [Mục tiêu]!`
+    - `🤏 [Tên] đã cướp 1 lá bài của [Mục tiêu]!`
+    - `🛡️ [Tên] sử dụng [Hóa Giải] vô hiệu hóa cẩm nang!`
+    - `⚡ Cẩm nang [Tên] có hiệu lực!`
+    - `💨 [Tên] đã né thành công cú Chém!`
+  - **Mục tiêu UX:** Xóa bỏ hoàn toàn cảm giác "im bặt" khó hiểu sau khi ra cẩm nang, giúp người chơi nắm bắt diễn biến ván đấu tức thì mà không cần phải chủ động mở hộp thoại Nhật ký (Log modal).
+- **💡 Chỉ Dẫn Trực Quan Pha Bỏ Bài (Visual Discard Guidance & Glowing Area):**
+  - **Khái niệm:** Chuỗi phản hồi kép dẫn dắt người chơi khi bước vào Pha Bỏ Bài (`PHASES.DISCARD`):
+    1. **Toast nhắc nhở hành động:** Hiển thị banner hướng dẫn cụ thể: `⚠️ Đến Pha Bỏ Bài: Hãy chọn ${amount} lá bài trên tay rồi bấm [Bỏ Bài]!`.
+    2. **Viền sáng đỏ hổ phách:** Khu vực bài trên tay (`PlayerHand.jsx`) tự động phát sáng viền mềm (`boxShadow: 0 0 15px rgba(239, 68, 68, 0.45)`), báo hiệu cho người chơi biết rõ cần bấm chọn các lá bài trên tay trước khi nút [Bỏ Bài] sáng- **🌾 Toàn Diện Cẩm Nang Trì Hoãn & Tiệt Trừ Auto-Discard (Comprehensive Delayed Trick & Card Safety):**
+  - **Binh Lương Thốn Đoạn (`binh_luong`):** Đã bổ sung nhánh xử lý hoàn chỉnh trong `DispatcherV4._handlePlayCard`, kiểm tra cự ly $\le 1$ (hoặc vô hạn đối với Tiên Dung qua kỹ năng `tien_duyen_khoang_cach`), mở cửa sổ Hóa Giải 2 giai đoạn (khi thi triển và khi bắt đầu pha phán xét). Nếu phán xét KHÔNG PHẢI Nhép (♣), người chơi bị mất Pha Rút Bài (`skipDrawPhase = true`).
+  - **Triệt Tiêu Hoàn Toàn Nhánh Default Vứt Bài Lãng Phí:** Loại bỏ vĩnh viễn đoạn code `this.state.discardFromHand` trong `_handlePlayCard`. Mọi thao tác đánh bài không hợp lệ hoặc chưa phân loại đều bị ném lỗi minh bạch, giữ an toàn 100% cho bài trên tay người chơi.
+  - **🛡️ Hóa Giải Cá Nhân Đòn Đánh Diện Rộng (Personal Negate on AOE):** Khi trúng cẩm nang toàn bàn như [Nam Man Xâm Nhập] (Dã Man) hoặc [Vạn Tiễn Quy Tâm] (Loạn Tiễn), người chơi không có Chém hoặc Né có thể sử dụng trực tiếp lá [Hóa Giải] (hoặc kỹ năng Linh Giám với bài Đen) ngay trên Modal để bảo vệ bản thân, vô hiệu hóa sát thương cho riêng mình mà không bị mất lá bài phòng thủ quý giá.
+
+---
+ thị đầy đủ trong 1.8s - 2.6s, sau đó tự động chuyển sang thông báo tiếp theo trong hàng đợi, đảm bảo người chơi quan sát được trọn vẹn kết quả của toàn bộ người chơi trên bàn.
+- **🎯 Bộ Đếm Mục Tiêu Động Đa Vị Trí (Dynamic Multi-Target Counter):**
+  - **Khái niệm:** Hệ thống phản hồi số lượng tức thời trên cả 3 vị trí giao diện khi người chơi thao tác với các lá bài chọn nhiều mục tiêu (Xiềng Xích, Tiên Duyên):
+    1. **Banner thông báo trung tâm:** Cập nhật liên tục `Đã chọn 0/2 mục tiêu (Bấm "Rèn Lại" nếu không khóa ai)` $\rightarrow$ `Đã chọn 1/2 mục tiêu` $\rightarrow$ `Đã chọn 2/2 mục tiêu (Đã đủ)`.
+    2. **Nút bấm Hành động (Action Button):** Chuyển đổi nhãn trực quan từ `Rèn Lại (Bỏ 1)` sang `Khóa Xích (1/2)` hoặc `Khóa Xích (2/2)`.
+    3. **Huy hiệu thanh trạng thái trên cùng:** Hiển thị tức thời tỷ lệ chọn `🎯 Đã chọn 1/2`.
+
+---
+
+## 71. QUY TẮC MỞ TƯỚNG CHÍNH, BẢO LƯU GIỚI TÍNH & HIỂN THỊ TRANG BỊ TRỰC QUAN
+
+- **👑 Quy Tắc Tướng Đầu Tiên Mở Phải Là Tướng Chính (Main Hero First Reveal Rule):**
+  - **Khái niệm:** Trong chế độ Quốc Chiến, Tướng Chính (`heroIndex: 0`) là trụ cột đại diện của người chơi. Tướng đầu tiên được mở ra trong ván đấu BẮT BUỘC phải là Tướng Chính.
+  - **Bảo toàn tính nhất quán (Engine & Bot Guard):**
+    1. **Bot Brain:** Khi chưa lật Tướng Chính (`revealedHeroes[0] === false`), bot tuyệt đối không bao giờ quyết định mở Phó Tướng (slot 1) trước, kể cả khi Phó Tướng sở hữu kỹ năng chủ động như *Duyên Thơ* (Hồ Xuân Hương). Bot luôn mở Tướng Chính làm tiền đề.
+    2. **Engine Dispatcher & Registry Guard:** Bất kỳ thao tác hoặc trigger nào yêu cầu mở Phó Tướng khi Tướng Chính chưa mở sẽ tự động kích hoạt mở Tướng Chính trước. Không bao giờ tồn tại trạng thái Tướng Chính còn ÚP mà Phó Tướng đã MỞ.
+- **⚧️ Quy Tắc Giới Tính Bất Biến Thuộc Về Tướng Chính (Gender Bound to Main Hero):**
+  - **Khái niệm:** Giới tính của nhân vật trong ván đấu (`player.gender` và `getPlayerGender(player)`) hoàn toàn do Tướng Chính (`heroes[0]`) quyết định.
+  - **Bảo toàn:** Kể cả khi Phó Tướng có giới tính khác (ví dụ: Tướng Chính Dã Tượng là Nam, Phó Tướng Hồ Xuân Hương là Nữ), nhân vật vẫn luôn được xác định là Nam đối với tất cả các kỹ năng và hiệu ứng nhắm mục tiêu theo giới tính.
+- **🛡️ Hiển Thị Trang Bị Trực Quan & Loại Bỏ Xung Đột React Style:**
+  - **Khái niệm:** Trên bàn chơi đối thủ (`PlayerBoard.jsx`), các ô trang bị khi đã lắp đồ không bao giờ chỉ hiển thị trơ trọi chất & số bài (như `♣4`).
+  - **Hệ thống hiển thị đa lớp:**
+    1. **Biểu tượng trang bị trung tâm:** Giữ nguyên icon phân loại rõ ràng (Kiếm, Khiên, Ngựa công, Ngựa thủ) màu vàng kim sáng bóng `var(--color-gold)`.
+    2. **Huy hiệu chỉ số bổ trợ:** Hiển thị tức thời chỉ số `+1` (ngựa thủ) hoặc `-1` (ngựa công) ở góc trên.
+    3. **Huy hiệu chất & số bài:** Đặt gọn gàng tại góc dưới với nền tương phản cao.
+    4. **Tách biệt thuộc tính Style:** Triệt tiêu hoàn toàn warning React bằng cách tách riêng `backgroundColor` và `backgroundImage`, không pha trộn shorthand property với `backgroundSize`.
+
+---
+
+## 72. ĐỘNG THÁI MỞ TƯỚNG ĐƠN ĐẦU TIÊN, NÚT KỸ NĂNG CHỦ ĐỘNG & VÒNG ĐỜI TOAST BANNER (DYNAMIC FIRST HERO REVEAL, ACTIVE SKILL ACTIONBAR & TOAST LIFECYCLE)
+
+- **🃏 Cơ Chế Mở Tướng Đơn Đầu Tiên Thành Tướng Chính (Dynamic First Hero Reveal & Slot Swap):**
+  - **Khái niệm:** Trong chế độ Quốc Chiến, khi bắt đầu ván đấu, cả 2 tướng đều là **TƯỚNG ẨN** (`TƯỚNG 1` và `TƯỚNG 2`), chưa cố định đâu là Chính hay Phó.
+  - **Quy tắc hoán đổi nguyên tử (Atomic Slot Swap):**
+    - Khi cả 2 tướng đang úp (`!revealedHeroes[0] && !revealedHeroes[1]`), nếu người chơi hoặc bot bấm lật mở vị trí thứ hai (slot 1):
+      - Hệ thống tự động hoán đổi tướng ở slot 1 lên làm Tướng Chính (`mainHeroId` & slot 0).
+      - Tướng ở slot 0 cũ chuyển xuống làm Tướng Phó (`subHeroId` & slot 1).
+      - **Chỉ mở duy nhất 1 tướng vừa chọn (`revealedHeroes = [true, false]`)**. Tướng còn lại tuyệt đối giữ nguyên trạng thái úp mặt (`false`).
+    - Giới tính nhân vật (`player.gender`) tức thời gắn chặt với Tướng Chính vừa lộ diện.
+    - Triệt tiêu hoàn toàn lỗi tự động lật đúp cả 2 tướng cùng lúc.
+- **⚡ Chuẩn Hóa Hiển Thị Nút Kỹ Năng Chủ Động Trên Thanh Hành Động (ActionBar Active Skill Display):**
+  - **Khái niệm:** Đảm bảo tất cả các kỹ năng chủ động (như *Hòa Thân* của Công chúa An Tư, *Diệu Dược* của Tuệ Tĩnh, *Tự Chủ* của Khúc Thừa Dụ, *Bình Loạn* của Nguyễn Bặc...) luôn hiển thị nút thao tác rõ ràng trên thanh `ActionBar.jsx` trong Pha Hành Động (`PHASES.ACTION`).
+  - **Chuẩn hóa bộ lọc:**
+    - Nhận diện linh hoạt thuộc tính kiểu kỹ năng: `type === 'CHỦ ĐỘNG'`, `'CHU DONG'`, `'ACTIVE'`, hoặc `'ACTIVE_DEFENSIVE'`.
+    - Fallback thông minh theo danh mục tên kỹ năng chủ động kinh điển.
+    - So sánh pha không phân biệt hoa thường: `(gameState.phase || '').toLowerCase() === 'action'`.
+- **⏱️ Vòng Đời Toast Banner Tự Hủy & Dọn Dẹp Sự Kiện Lỗi Thời (Anti-Stale Toast Engine):**
+  - **Khái niệm:** Hệ thống xử lý thông báo trung tâm (`GameView.jsx`) đảm bảo thông báo luôn kịp thời và không bao giờ bị treo vĩnh viễn trên màn hình.
+  - **Cơ chế tách Effect:**
+    1. Tách riêng `useEffect` tiêu thụ hàng đợi `toastQueue` và `useEffect` quản lý bộ đếm thời gian tự hủy (`setTimeout 2300ms`). Loại bỏ lỗi React re-render làm hàm cleanup `clearTimeout` xóa mất bộ hẹn giờ.
+    2. **Tự động dọn dẹp khi có tương tác mới:** Khi xuất hiện modal yêu cầu phản hồi khẩn cấp (`gameState.waitingForResponse` như Dã Man, Bỏ Bài, Chém, Né...), hệ thống tự động xóa sạch banner thông báo cũ và dọn rác hàng đợi để trả lại không gian tương tác rõ ràng cho người chơi.
+    3. **Tự động thu hồi chỉ dẫn lỗi thời:** Khi kết thúc Pha Bỏ Bài hoặc khi chuyển sang lượt người chơi khác, banner nhắc nhở `⚠️ Đến Pha Bỏ Bài...` tự động biến mất ngay tức khắc.
+- **🌐 Hệ Thống Chuẩn Hóa & Đồng Bộ Ngôn Ngữ Toàn Diện (Comprehensive Language & Translation Synchronization Architecture):**
+  - **Khái niệm:** Tầng trung gian chuẩn hóa trung tâm ([translationHelper.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/utils/translationHelper.js)) xóa bỏ triệt để mọi đứt gãy dữ liệu (Desynchronization) giữa tầng engine/data (tiếng Anh snake_case) và giao diện UI/ViewModel (tiếng Việt có dấu / không dấu / emoji).
+  - **5 Trụ cột đồng bộ hóa:**
+    1. *Kiểu Kỹ Năng (`normalizeSkillType`):* Nhận diện đồng thời `CHỦ ĐỘNG`, `chu dong`, `ACTIVE`, `ACTIVE_DEFENSIVE`, `BỊ ĐỘNG`, `PASSIVE`, `TỎA ĐỊNH`, `LOCK`, `HẠN ĐỊNH`, `LIMITED`. Luôn cung cấp đầy đủ `code` (chuỗi chuẩn), `label` (tiếng Việt có dấu), `badgeColor`, `isActive`, `isPassive`, `isLock`, `isLimited`.
+    2. *Phe Phái & Đồng Minh (`getCanonicalFaction`, `getFactionLabel`, `getFactionColor`, `isSameFaction`):* So sánh chính xác giữa `Hà` và `ha`, `Sơn` và `son`, `Lạc` và `lac`, `Việt` và `viet`. Xóa bỏ vĩnh viễn lỗi so sánh cứng `===` gây xử phạt ngộ sát nhầm, bot tấn công nhầm đồng minh hoặc trận đấu không thể kết thúc.
+    3. *Chất & Màu Sắc Lá Bài (`normalizeSuit`, `getSuitColor`, `isSameSuit`):* Nhận diện đồng nhất 4 chất qua tiếng Anh (`heart`, `diamond`, `spade`, `club`), tiếng Việt (`cơ`, `rô`, `bích`, `chuồn`, `nhép`) và ký hiệu Emoji (`♥`, `♦`, `♠`, `♣`). Cung cấp màu `red`/`black` chuẩn cho các kỹ năng Khai Thiên, Dã Tượng Kỳ Tập, Bát Quái, Thần Hỏa, Thông Ngôn.
+    4. *Tên / ID Kỹ Năng (`normalizeSkillId`):* Chuyển đổi hai chiều giữa tên kỹ năng tiếng Việt có dấu (`Hòa Thân`, `Đoạt Sáo`, `Can Gián`, `Dời Núi`...) và ID snake_case (`hoa_than`, `doat_sao`, `can_gian`, `doi_nui`...), khắc phục triệt để lỗi typo tiếng Việt (`Đoạt Sao` vs `Đoạt Sáo`).
+    5. *Giới Tính Nhân Vật (`normalizeGender`, `getPlayerGender`, `getPlayerGenderLabel`):* Luôn trả về `male`|`female`|`none` và nhãn `Nam`|`Nữ` bất kể định dạng đầu vào. Tướng chưa lộ diện luôn trả về `none` để bảo toàn bí mật danh tính.
+
+---
+
+## 73. RÀ SOÁT TOÀN DIỆN 39 VỊ TƯỚNG & HỆ THỐNG ĐỒNG BỘ ĐỊNH DANH KỸ NĂNG ĐA TẦNG (COMPREHENSIVE 39 HEROES GRILL & MULTI-TIER SKILL RESOLUTION)
+
+- **🛡️ Danh Mục Tỏa Định Kỹ Toàn Diện (Comprehensive Lock Skill Registry):**
+  - **Khái niệm:** Khắc phục triệt để lỗ hổng thiếu sót danh mục Tỏa Định Kỹ trong [HeroRegistry.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/heroes/HeroRegistry.js) (trước đó chỉ có 7 kỹ năng).
+  - **16 Tỏa Định Kỹ Chuẩn Hóa:**
+    - Hệ Lạc: `thiet_ma` (Thánh Gióng), `no_than_cao_lo` / `no_than` (Cao Lỗ), `tien_duyen_khoang_cach` (Tiên Dung), `dam_bac` (Lang Liêu), `than_giap` (Rùa Vàng).
+    - Hệ Việt: `ho_gia` (Lê Ngân).
+    - Hệ Hà: `nghe_an_ke` (Nguyễn Chích), `nhiep_chinh` / `nhiep_chinh_to_hien_thanh` (Tô Hiến Thành), `ho_chu` (Nguyễn Địa Lô), `quoc_sac` (Ngọc Hân Công Chúa).
+    - Hệ Sơn: `uy_chan` (Đinh Bộ Lĩnh), `khai_quoc` (Nguyễn Bặc), `pha_quan_nguyen_xi` / `pha_quan` (Nguyễn Xí).
+  - **Bảo toàn bất biến:** Khi tướng bị khóa kỹ năng bởi *Tre Ngà* (Thánh Gióng) hoặc khi Lê Ngân còn 1 HP (*Hộ Giá*), các Tỏa Định Kỹ trên tuyệt đối không bị vô hiệu hóa sai lệch.
+- **🔗 Nhận Diện Kỹ Năng Đa Tầng Bất Biến (Multi-Tier Skill Normalization):**
+  - **Khái niệm:** Cơ chế `hasSkill(player, skillId)` và `getHeroIndexForSkill(player, skillId)` đối soát linh hoạt 4 tầng:
+    1. ID nguyên bản (`skillId`).
+    2. ID dạng snake_case (`skillId.replace(/-/g, '_')`).
+    3. ID dạng kebab-case (`skillId.replace(/_/g, '-')`).
+    4. Canonical ID qua `normalizeSkillId(skillId)`.
+  - **Triệt tiêu lỗi phân biệt bí danh:** Bất kể hệ thống gọi qua ID vắn tắt (`no-than`, `pha-quan`, `phat-toi`, `tien-phong`, `hoa-than`) hay ID phân biệt (`no_than_cao_lo`, `pha_quan_nguyen_xi`, `phat_toi_dinh_dien`, `tien_phong_nguyen_lu`, `hoa_than_huyen_tran`), `hasSkill` luôn trả về `true` chính xác 100%.
+
+---
+
+## 74. TRIẾT LÝ KIỂM THỬ ĐA TẦNG, CHỐT CHẶN ĐIỂM MÙ HEADLESS SIMULATION & CHỐNG THOÁI HÓA ÂM THẦM (MULTI-TIER TESTING ARCHITECTURE, SIMULATION BLIND SPOTS & ANTI-SILENT-DEGRADATION)
+
+- **🙈 Điểm Mù Headless Simulation (Headless Simulation Blind Spots):**
+  - **Khái niệm:** Giới hạn nhận thức cố hữu của các bài kiểm thử mô phỏng hàng ngàn trận đấu chạy thuần trên Node.js (V8 Engine).
+  - **2 Giới hạn cốt lõi:**
+    1. *DOM-Agnostic:* Bot AI gọi trực tiếp API logic backend (`gameAPI.useSkill`), hoàn toàn không tương tác với cây React Virtual DOM hay các bộ lọc hiển thị trên component UI (`ActionBar.jsx`). Do đó, lỗi làm mất nút bấm của người chơi người thật không bao giờ khiến simulation bị lỗi.
+    2. *Silent Masking Paradox (Nghịch lý dập lửa âm thầm):* Khối `try/catch` và cơ chế fallback an toàn của Bot AI tự động chọn bỏ qua (`canceled: true`) khi gặp lỗi logic hoặc modal không khớp, rồi chuyển sang hành động cơ bản (Chém / End Turn). Ván đấu vẫn kết thúc 100% trơn tru nhưng kỹ năng tướng đã bị thoái hóa âm thầm (Silent Degradation).
+- **🔬 Thiên Kiến Xác Nhận Unit Test (Confirmation Bias & Single-Layer Testing):**
+  - **Khái niệm:** Hiện tượng bài kiểm thử đơn vị do chính kỹ sư cài đặt kỹ năng tự viết chỉ kiểm tra các dữ liệu đầu vào theo đúng định dạng nội bộ mà kỹ sư đó hình dung (ví dụ: gọi đúng `no_than_cao_lo`).
+  - **Lỗ hổng:** Bỏ quên kiểm thử giao tiếp hợp đồng giữa các tầng (Cross-Layer Contract Divergence) khi tầng UI, ViewModel hoặc cấu hình `gameData.js` truyền vào định dạng khác (`no-than` hoặc `Nỏ Thần`).
+- **🛡️ Bộ Ba Chân Kiềng Kiểm Định Bất Biến (Three-Pillar Invariant Testing Standard):**
+  - **Khái niệm:** Quy chuẩn kiểm thử chất lượng toàn diện của Việt Sát, loại bỏ sự phụ thuộc đơn lẻ vào Headless Simulation:
+    1. **Tầng 1 — Logic Unit Tests:** Kiểm tra tính đúng đắn toán học và xử lý sự kiện của từng tướng độc lập.
+    2. **Tầng 2 — Cross-Layer Invariant Audits ([audit_39_heroes.mjs](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/__tests__/audit_39_heroes.mjs)):** Quét toàn bộ ma trận tích Descartes giữa dữ liệu UI (`gameData.js`), Engine Registry (`HeroRegistry.js`), Helper ngôn ngữ (`translationHelper.js`) và Mô tả (`SkillDescriptions.js`). Đảm bảo 100% tướng và kỹ năng luôn thỏa mãn các bất biến danh mục và định danh đa tầng trước khi build.
+    3. **Tầng 3 — UI Component Contract Tests:** Kiểm thử tự động component [ActionBar.jsx](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/client/src/components/game/ActionBar.jsx) với ViewModel thực tế để đảm bảo mọi kỹ năng chủ động đều render nút bấm trực quan cho người chơi.
+
+---
+
+## 75. TRẢI NGHIỆM THÔNG BÁO ĐA DÒNG, NEO CUỘN NHẬT KÝ THÔNG MINH & CHUẨN HÓA STYLE REACT (MULTI-LINE TOAST, SMART LOG SCROLL ANCHOR & CLEAN STYLE CONTRACT)
+
+- **💬 Thông Báo Đa Dòng Không Cắt Chữ (Multi-Line Non-Clipping Toast):**
+  - **Khái niệm:** Nâng cấp hệ thống banner thông báo (`.game-toast-popup` và `.game-toast-text`), loại bỏ hoàn toàn thuộc tính ép 1 dòng `white-space: nowrap` khiến thông báo bị cắt cụt bằng dấu ba chấm (`...`).
+  - **Quy chuẩn hiển thị:**
+    1. *Tự động xuống dòng mềm mại:* Áp dụng `white-space: normal; word-break: break-word;` kết hợp `line-clamp: 3` cho phép hiển thị trọn vẹn thông điệp dài (như danh hiệu Tiên Phong Cắm Cờ, hiệu ứng lật tướng, phán xét).
+    2. *Bo góc Dynamic Capsule:* Bo góc `border-radius: 18px` thanh lịch, giữ icon và nút đóng ✕ căn chỉnh đều ở hàng đầu (`align-items: flex-start`).
+    3. *Thời lượng thông minh:* Tin nhắn dài (> 35 ký tự) tự động kéo dài thời gian hiển thị lên `3600ms` để người chơi kịp đọc trọn vẹn nội dung.
+- **📜 Neo Cuộn Nhật Ký Thông Minh (Smart Log Scroll Anchor & Floating Button):**
+  - **Khái niệm:** Cơ chế phân biệt ý định cuộn của người dùng (User Scroll Intent) trong modal Nhật Ký Trận Đấu ([GameView.jsx](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/client/src/components/game/GameView.jsx)).
+  - **Quy tắc vận hành:**
+    1. *Chế độ Theo Dõi Thời Gian Thực:* Khi thanh cuộn ở sát đáy (< 60px), các dòng log mới phát sinh sẽ tự động cuộn xuống dưới cùng để người chơi theo dõi diễn biến trận đấu.
+    2. *Chế độ Đọc Lịch Sử Cũ:* Khi người chơi vuốt/cuộn ngược lên trên để xem lại các sự kiện trước đó, hệ thống lập tức khóa tự động cuộn (`isUserScrolledUpRef.current = true`). Tuyệt đối không giật tuột màn hình xuống đáy khi có log mới.
+    3. *Nút Nổi Quay Lại Nhanh:* Hiển thị nút `⬇ Tin mới nhất` (`.log-scroll-bottom-btn`) mạ vàng nổi bật ở góc dưới. Nhấn vào sẽ cuộn mượt mà về đáy và tái kích hoạt chế độ theo dõi thời gian thực.
+- **🧹 Triệt Tiêu Xung Đột React Style Shorthand (Zero Style Shorthand Conflict):**
+  - **Khái niệm:** Chuẩn hóa toàn bộ thuộc tính inline style của các ô trang bị (`PlayerBoard.jsx`, `MyHeroBar.jsx`) và CSS class (`.equip-slot`, `.my-hero-equip-slot`).
+  - **Bảo toàn:** Luôn sử dụng thuộc tính longhand độc lập (`backgroundColor`, `backgroundImage: 'url(...) : none'`, `backgroundSize: 'cover'`), xóa bỏ hoàn toàn Console Warning DevTools của React khi rerender.
+
+---
+
+## 76. HỦY THÔNG BÁO TỨC THÌ KHI TƯƠNG TÁC, TỔNG KẾT CẨM NANG TOÀN BÀN, BỐ TRÍ MÀN HÌNH NGANG & ĐỒNG BỘ DÃ TÂM (INSTANT TOAST DISMISSAL, AOE SUMMARY, LANDSCAPE MOBILE HEADROOM & CAREERIST PROFILE SYNC)
+
+- **⚡ Hủy Thông Báo Tức Thì Khi Tương Tác (Instant Toast Dismissal on Player Action):**
+  - **Khái niệm:** Cơ chế dọn sạch thông báo đang hiển thị (`dismissBanner()`) ngay khi người chơi có bất kỳ hành động chủ động nào (chọn lá bài trên tay, bấm kỹ năng, bấm nút bỏ bài, bấm hành động hoặc chạm vào bàn chơi).
+  - **Tối ưu tốc độ:** Rút ngắn thời gian hiển thị mặc định của thông báo (từ 2500ms xuống 1500ms, hàng đợi dồn chỉ 1100ms), đồng thời lọc bỏ các thông báo rác (như thông báo kích hoạt cẩm nang đơn mục tiêu) để loại bỏ hoàn toàn độ trễ (delay) gây ức chế cho người chơi.
+- **🏹 Tổng Kết Diễn Biến Cẩm Nang Toàn Bàn (AOE Tactics Collective Summary):**
+  - **Khái niệm:** Hệ thống gom kết quả phản hồi của tất cả người chơi trong các đợt công kích diện rộng ([Dã Man] và [Vạn Tiễn]) thành một thông điệp trực quan xuất hiện ngay khi chuỗi tấn công kết thúc.
+  - **Cơ chế:** Gắn đối tượng theo dõi `aoeResult` xuyên suốt các khung ưu tiên (`ASK_SLASH_RESPONSE`, `ASK_DODGE`). Khi toàn bộ mục tiêu đã phản ứng xong, ghi nhận log tổng kết dạng:
+    - *Toàn bộ đỡ được:* `🏹 [Dã Man]: P2, P3, P4 đều dùng [Chém] cản đòn!`
+    - *Có người mất máu:* `🏹 [Dã Man]: P2, P4 dùng [Chém] cản; P3 mất máu!`
+    - *Vạn Tiễn:* `🎯 [Vạn Tiễn]: P2 dùng [Né] cản; P3, P4 mất máu!`
+  - **Hiển thị ưu tiên:** Gắn icon đặc thù (`🏹`, `🎯`) và tự động đưa thông điệp tổng kết lên banner thông báo để người chơi nắm bắt tức thì cục diện trận đấu mà không cần mở lịch sử log.
+- **📐 Tọa Độ Vòng Cung Màn Hình Ngang & Bảo Vệ Khoảng Trống Người Chơi 3 (Landscape Mobile Headroom Protection):**
+  - **Khái niệm:** Tinh chỉnh công thức elip vị trí đối thủ trên thiết bị di động nằm ngang (`isLandscapeMobile`) trong [GameView.jsx](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/client/src/components/game/GameView.jsx).
+  - **Thông số:** Điều chỉnh `baseY = 32.5%`, `ry = 3.5%` (thay vì `baseY = 29.5%`, `ry = 6.5%`). Khi đó, Người chơi 3 ở góc $90^\circ$ có `topCss = 29%` (~127px từ đỉnh), cách mép dưới của thanh tiêu đề `game-header` (42px) một khoảng an toàn > 20px.
+  - **Hiệu quả:** Thanh tiêu đề của Người chơi 3 (gồm Tên, Badge Phe, Trạng thái Ẩn/Dã Tâm) hiển thị trọn vẹn 100%, không còn bị thanh Header và Toast che khuất hay đè mất tích. Chồng bài rút cũng được hạ xuống `top: 29%` cân xứng hoàn hảo.
+- **🐺 Đồng Bộ Phe Dã Tâm Trong Hồ Sơ Tướng & ViewModel (Careerist Faction Sync & Profile Modal):**
+  - **Khái niệm:** Khắc phục triệt để lỗi người chơi đã thoái hóa thành Dã Tâm (`isDaTam = true`) nhưng trong modal Hồ Sơ Tướng vẫn ghi `(Phe Lạc)`.
+  - **Quy chuẩn:**
+    1. *Tầng ViewModel ([GameViewMapperV4.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/application/GameViewMapperV4.js)):* Khi `pVM.isDaTam` là true, gán chuẩn hóa `pVM.faction = 'Dã Tâm'`, `pVM.canonicalFaction = 'datam'`, `pVM.rawFaction = 'datam'`.
+    2. *Tầng Giao Diện ([GameView.jsx](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/client/src/components/game/GameView.jsx)):* Tiêu đề modal đọc điều kiện `targetPlayer.isDaTam ? '(Phe Dã Tâm)' : (Phe ${targetPlayer.faction})`. Badge cạnh tên tướng trong modal hiển thị rõ `DÃ TÂM` với màu viền xám tro `#9ca3af`.
+    3. *Thông Báo Lộ Diện:* Log thoái hóa `🐺 [Dã Tâm]` được ưu tiên đẩy lên banner thông báo với biểu tượng đầu sói `🐺`.
+
+---
+
+## 77. CHUẨN HÓA HIỂN THỊ Ô TRANG BỊ NGỰA & BỘ MODAL ĐA PHA KỸ NĂNG DƯỠNG QUÂN (EQUIPMENT HORSE DISPLAY & MULTI-PHASE DUONG QUAN MODALS)
+
+- **🐎 Hiển Thị Ô Trang Bị Ngựa Trực Quan (+1 / -1) (Intuitive Horse Equipment Display):**
+  - **Khái niệm:** Tách biệt hoàn toàn cách hiển thị của ô Ngựa (`EQUIP_MOUNT_DEF` và `EQUIP_MOUNT_ATK`) khỏi thẻ bài thu nhỏ thông thường trên thanh trang bị cá nhân ([MyHeroBar.jsx](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/client/src/components/game/MyHeroBar.jsx)) và bảng đối thủ ([PlayerBoard.jsx](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/client/src/components/game/PlayerBoard.jsx)).
+  - **Triệt tiêu lá bài thu nhỏ:** Không dùng ảnh nền thẻ bài (`backgroundImage: 'none'`) hay chất bài/số bài (`♠Q`, `♣4`) đè kín slot ngựa khiến người chơi không nhận biết được công năng.
+  - **Quy chuẩn hiển thị:**
+    1. *Ngựa thủ (`+1` Cự ly):* Sử dụng nền chuyển sắc lam ngọc (`#0284c7`), viền sáng xanh dương (`#38bdf8`), biểu tượng đầu ngựa thủ `MountDefIcon` phát quang, đi kèm huy hiệu số `+1` to, rõ nét, tương phản cao ở góc dưới. Đồng bộ hoàn hảo với chỉ số `ℹ️ Cự ly: +1` trên thanh Header.
+    2. *Ngựa công (`-1` Tầm đánh):* Sử dụng nền chuyển sắc hồng thẫm (`#b91c1c`), viền sáng đỏ tươi (`#ef4444`), biểu tượng đầu ngựa công `MountAtkIcon`, đi kèm huy hiệu số `-1` nổi bật.
+    3. *Bảo lưu tương tác thẻ bài:* Người chơi vẫn có thể click vào ô ngựa để mở popup phóng to ([CardDetailModal]) xem tên ngựa, chất bài, số bài và mô tả chi tiết bất kỳ lúc nào.
+- **⚡ Bộ Modal Đa Pha Cho Kỹ Năng Dưỡng Quân ([DuongQuanModal.jsx](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/client/src/components/modals/DuongQuanModal.jsx)):**
+  - **Khái niệm:** Phân nhánh giao diện modal phản hồi tương ứng theo từng giai đoạn trong lượt của tướng Dương Đình Nghệ (`duong_dinh_nghe`), triệt tiêu hoàn toàn lỗi fallback popup đỏ `[UI FALLBACK] Unhandled request type: ask_duong_quan_1 for human player!`.
+  - **3 Nhánh Giao Diện Tương Ứng:**
+    1. *Pha Bắt Đầu (`ask_duong_quan_1` - BEGIN_PHASE):* Modal hỏi người chơi có muốn bỏ qua Pha Phán xét và Pha Rút bài để lập tức tung đòn [Chém] không giới hạn cự ly vào 1 mục tiêu? Cho phép chọn nhanh mục tiêu từ danh sách và bấm `⚡ Xác nhận Chém` (gửi `{ doUse: true, targetId }`) hoặc `Bỏ qua (Rút bài)` (gửi `{ doUse: false }`).
+    2. *Pha Ra Bài (`ask_duong_quan_2` - ACTION_PHASE):* Modal yêu cầu chọn 1 lá bài Trang bị (từ tay hoặc trên người) và 1 mục tiêu để Chém không giới hạn cự ly, đồng thời cảnh báo kết thúc Pha Ra bài ngay sau đòn đánh.
+    3. *Pha Bỏ Bài (`ask_duong_quan_3` - DISCARD_PHASE):* Khi mặt tướng đang ngửa, modal cho phép tự lật úp mặt tướng để bỏ qua việc bỏ bài dư thừa và Chém 1 mục tiêu bất kỳ.
+  - **Kết nối ModalContainer:** Đăng ký nhận diện đồng thời cả 4 loại request: `ask_duong_quan`, `ask_duong_quan_1`, `ask_duong_quan_2`, `ask_duong_quan_3` trong [ModalContainer.jsx](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/client/src/components/modals/ModalContainer.jsx).
+
+---
+
+## 78. HỆ THỐNG LỰA CHỌN KỸ NĂNG VŨ KHÍ TƯƠNG TÁC (INTERACTIVE WEAPON SKILLS CHOICE: RÌU ĐÁ, THANH LONG ĐAO, SONG KIẾM)
+
+- **🪓 Rìu Đá (Rock Axe / Quán Thạch Phủ) - Trao Quyền Lựa Chọn Tuyệt Đối Cho Người Chơi:**
+  - **Khái niệm:** Khi đòn [Chém] của tướng trang bị Rìu Đá bị mục tiêu dùng lá [Né] cản phá thành công, người tấn công được quyền đưa ra quyết định:
+    1. *Kích hoạt Rìu Đá (`doUse: true`):* Chọn chính xác 2 lá bài (từ bài trên tay hoặc trang bị khác trên người, trừ chính Rìu Đá) để bỏ đi và bắt buộc đòn Chém trúng đích (xuyên Né, gây sát thương).
+    2. *Bỏ qua (`doUse: false`):* Từ chối kích hoạt, giữ lại toàn bộ bài (ví dụ khi chỉ còn Đào/Rượu quan trọng) và chấp nhận đối thủ né thành công.
+  - **Triệt tiêu lỗi tự động cướp bài:** Xóa bỏ hoàn toàn nhánh logic cưỡng chế `source.hand.slice(0, 2)` tự ý vứt 2 lá bài đầu tiên của người chơi.
+- **🐉 Thanh Long Đao (Dragon Blade) - Quyết Định Chém Bồi Hoặc Dừng Lại:**
+  - Khi đòn Chém bị Né, hệ thống đẩy frame `ASK_WEAPON_SKILL` lên đỉnh stack hỏi người tấn công có muốn đánh bồi thêm 1 lá Chém nữa hay không.
+  - Người chơi có quyền chọn lá [Chém] mong muốn từ tay (hoặc kỹ năng biến Chém như Dời Núi / Khai Thiên) để vung đao tiếp, hoặc bấm `Bỏ qua` để bảo toàn bài và kết thúc đòn đánh an toàn.
+- **⚔️ Song Kiếm (Twin Swords) - Nạn Nhân Khác Giới Chủ Động Đối Phó:**
+  - Khi tướng sử dụng Song Kiếm Chém một mục tiêu khác giới tính (`male` $\leftrightarrow$ `female`), frame `ASK_WEAPON_SKILL` được đẩy lên trên đỉnh stack (ngay trên frame `ASK_DODGE`).
+  - Nạn nhân là người đưa ra phản hồi: chọn 1 lá bài trên tay hoặc trang bị để tự bỏ đi, HOẶC bấm `Bỏ qua` (để người tấn công rút 1 lá bài từ chồng bài rút).
+  - Quá trình này được giải quyết trọn vẹn trước khi chuyển sang cửa sổ đánh lá [Né] của frame `ASK_DODGE`.
+- **🖥️ Đồng Bộ Giao Diện ModalContainer & AskWeaponSkillModal:**
+  - Ánh xạ rõ ràng frame `ASK_WEAPON_SKILL` từ `PriorityStack` thành `type: 'ask_weapon_skill'` trên `GameViewMapperV4.js`.
+  - [ModalContainer.jsx](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/client/src/components/modals/ModalContainer.jsx) mở [AskWeaponSkillModal.jsx](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/client/src/components/modals/AskWeaponSkillModal.jsx) cho đúng người chơi cần phản hồi (`responderId`), hiển thị danh sách thẻ bài trên tay và trang bị để tick chọn cùng 2 nút `✅ Xác nhận` và `Bỏ qua`.
+- **🧠 Tối Ưu Chiến Thuật BotAI (BotBrain):**
+  - Tích hợp nhánh `case 'ASK_WEAPON_SKILL'` trong `BotBrain.js`: Bot biết ưu tiên bỏ bài rác khi đối thủ sắp hết máu hoặc bot dư dả bài, tuyệt đối không vứt lá [Đào] để kích hoạt Rìu Đá nếu không cần thiết; Bot biết chém tiếp bằng Thanh Long Đao khi mục tiêu là kẻ thù và bot còn dư Chém.
+
+---
+
+## 79. HÓA GIẢI CẨM NANG TRÌ HOÃN (HỖN LOẠN, SẤM SÉT) & KHÓA THAO TÁC THẺ PHẢN ỨNG TRONG LƯỢT (DELAYED TRICK NEGATE WINDOW & REACTION CARD SAFETY)
+
+- **⚖️ Cửa Sổ Hóa Giải Cẩm Nang Trì Hoãn 2 Giai Đoạn (Two-Phase Delayed Trick Negate Window):**
+  - **Khái niệm:** Khắc phục triệt để lỗi người chơi cầm lá [Hóa Giải] (hoặc kỹ năng Linh Giám, Chương Dương) nhưng không được hỏi khi bị [Hỗn Loạn] hoặc khi bước vào phán xét.
+  - **Giai đoạn 1 (Khi Thi Triển):** Khi một tướng sử dụng [Hỗn Loạn], [Sấm Sét] hoặc [Binh Lương Thốn Đoạn] lên mục tiêu, nếu trên bàn có bất kỳ ai sở hữu lá bài hoặc kỹ năng Hóa Giải (`hasAnyNegatePlayer`), hệ thống lập tức mở chuỗi Hóa Giải (`ASK_NEGATE` với `isDelayedTrick: true`). Nếu Hóa Giải thành công, cẩm nang rơi thẳng vào chồng bài bỏ (`discardPile`), không thể đặt vào khu phán xét của mục tiêu.
+  - **Giai đoạn 2 (Pha Phán Xét - Judgement Negate Window theo ADR 0005):** Trước khi lật lá bài phán xét, nếu trong khu phán xét có cẩm nang trì hoãn, hệ thống bắt buộc mở vòng hỏi Hóa Giải theo chiều kim đồng hồ quanh bàn cờ bắt đầu từ chính người bị phán xét (`isJudgementNegate: true`). Nếu Hóa Giải thành công, cẩm nang bị vô hiệu hóa và rơi vào bài bỏ, người chơi hoàn toàn không bị phạt mất lượt và không phải lật bài phán xét.
+- **🛡️ Khóa Thao Tác Thẻ Bài Phản Ứng Trong Lượt (Reaction-Only Card Safety & Anti Auto-Discard):**
+  - **Khái niệm:** Triệt tiêu hoàn toàn lỗi người chơi nhấp vào lá [Hóa Giải] trong Pha Hành Động thì lá bài tự động bị đánh ra và biến mất vào chồng bài bỏ ("kiểu dùng bỏ").
+  - **3 Tầng Chốt Chặn Bất Biến:**
+    1. *Tầng ViewModel ([GameViewMapperV4.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/application/GameViewMapperV4.js)):* Đánh dấu `isPlayable = false` và `unplayableReason = 'Lá [Hóa Giải] chỉ có thể sử dụng khi phản ứng cẩm nang'` cho lá Hóa Giải trong Pha Hành Động.
+    2. *Tầng Tương Tác ([useCardInteraction.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/client/src/components/game/hooks/useCardInteraction.js)):* Chặn tuyệt đối không mở phiên chọn mục tiêu hoặc auto-cast khi bấm vào lá Hóa Giải / Né nếu không có kỹ năng chuyển hóa chủ động (như Khai Thiên, Dời Núi), đồng thời hiện thông báo cảnh báo rõ ràng.
+    3. *Tầng Thực Thi ([DispatcherV4.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/application/DispatcherV4.js)):* Từ chối lệnh `PLAY_CARD` với lá Hóa Giải / Né trong Pha Hành Động bằng ngoại lệ rõ ràng, xóa bỏ hoàn toàn nhánh fallback `default` tự ý `discardFromHand` bài quý giá của người chơi.
+- **🌾 Toàn Diện Cẩm Nang Trì Hoãn & Tiệt Trừ Auto-Discard (Comprehensive Delayed Trick & Card Safety):**
+  - **Binh Lương Thốn Đoạn (`binh_luong`):** Đã bổ sung nhánh xử lý hoàn chỉnh trong `DispatcherV4._handlePlayCard`, kiểm tra cự ly $\le 1$ (hoặc vô hạn đối với Tiên Dung qua kỹ năng `tien_duyen_khoang_cach`), mở cửa sổ Hóa Giải 2 giai đoạn (khi thi triển và khi bắt đầu pha phán xét). Nếu phán xét KHÔNG PHẢI Nhép (♣), người chơi bị mất Pha Rút Bài (`skipDrawPhase = true`).
+  - **Triệt Tiêu Hoàn Toàn Nhánh Default Vứt Bài Lãng Phí:** Loại bỏ vĩnh viễn đoạn code `this.state.discardFromHand` trong `_handlePlayCard`. Mọi thao tác đánh bài không hợp lệ hoặc chưa phân loại đều bị ném lỗi minh bạch, giữ an toàn 100% cho bài trên tay người chơi.
+  - **🛡️ Hóa Giải Cá Nhân Đòn Đánh Diện Rộng (Personal Negate on AOE):** Khi trúng cẩm nang toàn bàn như [Nam Man Xâm Nhập] (Dã Man) hoặc [Vạn Tiễn Quy Tâm] (Loạn Tiễn), người chơi không có Chém hoặc Né có thể sử dụng trực tiếp lá [Hóa Giải] (hoặc kỹ năng Linh Giám với bài Đen) ngay trên Modal ([ModalContainer.jsx](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/client/src/components/modals/ModalContainer.jsx)) để bảo vệ bản thân, vô hiệu hóa sát thương cho riêng mình mà không bị mất lá bài phòng thủ quý giá.
+
+---
+
+## 80. KIẾN TRÚC KIỂM THỬ 4 TẦNG & BẢO VỆ HỢP ĐỒNG GIAO DIỆN (FOUR-TIER QA ARCHITECTURE & VIEWMODEL CONTRACT GUARD)
+
+- **🏛️ Kiến Trúc Kiểm Thử 4 Tầng (Four-Tier QA Architecture):**
+  - **Khái niệm:** Hệ thống phòng thủ kiểm thử khép kín 4 lớp được thiết lập theo [ADR 0080](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/docs/adr/0080-four-tier-qa-architecture-and-viewmodel-contract-guard.md) nhằm triệt tiêu hoàn toàn khoảng cách giữa logic Game Engine và hiển thị React UI, chấm dứt tình trạng "test xanh nhưng vào game đứng hình".
+  - **Tầng 1 (Unit Rules & Skills):** Kiểm thử từng lá bài, từng kỹ năng và luật bất biến nội bộ.
+  - **Tầng 2 (ViewModel Contract Guard):** Kiểm thử hợp đồng dữ liệu giữa Engine và UI thông qua [ViewModelContractGuard.test.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/__tests__/application/ViewModelContractGuard.test.js).
+  - **Tầng 3 (Modal Container Integration QA):** Kiểm thử tích hợp React DOM thực tế bằng `@testing-library/react` qua [ModalContainerIntegrationQA.test.jsx](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/client/src/components/__tests__/ModalContainerIntegrationQA.test.jsx).
+  - **Tầng 4 (Hybrid Human-Bot Simulation):** Đại giả lập lai (1 Người Thật + 3 Bots) tương tác 100% qua dữ liệu ViewModel qua [HybridHumanBotSimulation.test.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/__tests__/simulation/HybridHumanBotSimulation.test.js).
+- **🛡️ ViewModel Contract Guard (Bảo Vệ Hợp Đồng Giao Diện):**
+  - **Khái niệm:** Bộ kiểm tra bắt buộc đảm bảo với bất kỳ frame phản ứng nào được đẩy lên `PriorityStack`, hàm `toViewModel(state, actorId)` PHẢI luôn sinh ra `waitingForResponse.responderId === actorId`.
+  - **Triệt Tiêu Lỗi Falsy Số 0 (Zero-Falsy Eradication):** Cấm tuyệt đối việc dùng toán tử logic `||` cho các trường ID người chơi (vì `id: 0` của Bạn luôn là falsy). Bắt buộc sử dụng toán tử Nullish Coalescing `??` trên toàn bộ hệ thống.
+- **🤖 Đại Giả Lập Lai (Hybrid Human-Bot Simulation):**
+  - **Khái niệm:** Kịch bản mô phỏng trận đấu trong đó Người chơi 0 đóng vai Human Player. Người chơi 0 bị cấm truy cập ngầm vào state của Engine, chỉ được ra quyết định dựa trên `toViewModel(state, 0).waitingForResponse`. Nếu Engine đang chờ Người chơi 0 nhưng ViewModel không phát tín hiệu, hệ thống lập tức ném ngoại lệ Deadlock để phát hiện lỗi ngay tức thì.
+
+---
+
+## 81. KIỂM ĐỊNH GIÁC QUAN TOÀN DIỆN & BẤT BIẾN HIỂN THỊ (FULL-SPECTRUM SENSORY QA & PRESENTATION INVARIANTS)
+
+- **👁️ Bất Biến Phản Hồi Giác Quan (Sensory Feedback Invariant):**
+  - **Khái niệm:** Nguyên tắc thiết kế và kiểm thử chuẩn hóa theo [ADR 0081](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/docs/adr/0081-full-spectrum-qa-and-sensory-feedback-invariants.md): Mọi thay đổi trạng thái quan trọng trong Game Engine (người chơi tử vong, kết liễu kẻ địch nhận thưởng bài, ngộ sát đồng đội bị phạt, trò chơi ngã ngũ) bắt buộc phải có phản hồi thị giác tương ứng trên màn hình người chơi (phản hồi 1:1 giữa logic ngầm và giác quan người chơi).
+- **💀 Con Dấu Tử Trận & Thang Độ Xám (Death State Stamp & Grayscale):**
+  - **Khái niệm:** Khi một người chơi hết máu và chính thức tử trận, giao diện lập tức:
+    1. Thay thẻ phe bằng huy hiệu đỏ `💀 TỬ TRẬN`.
+    2. Dập con dấu mộc nghiêng `💀 TỬ TRẬN` đè chéo xuyên qua cặp thẻ tướng chính - phó với nền tối làm mờ.
+    3. Phủ hiệu ứng giảm độ bão hòa (grayscale 70%, opacity 0.55), loại trừ hoàn toàn tình trạng người chơi còn sống bị nhầm lẫn với đối thủ đã chết.
+- **🏆 Màn Hình Vinh Danh & Bảng Điểm Kết Thúc Trận (GameOver Scoreboard Modal):**
+  - **Khái niệm:** Khi `gameState.gameOver === true`, giao diện hiển thị modal toàn màn hình vinh danh phe chiến thắng, cung cấp bảng điểm tổng kết (Scoreboard) toàn bộ người chơi (Tên, Cặp Tướng, Phe, Trạng thái sống/chết, Kết quả thắng/bại) và 3 nút hành động dứt khoát: `Chơi Lại Ván Mới`, `Xem Lại Bàn Đấu` và `Về Menu Chính`.
+- **🎁 Leo Thang Phản Hồi Toast (Sensory Toast Escalation):**
+  - **Khái niệm:** Cơ chế bắt sự kiện log thời gian thực để bắn các Toast banner nổi bật giữa màn hình với biểu tượng cảm xúc sinh động:
+    - 🎁 `LẬP CÔNG! ... được thưởng rút 2 lá bài!`
+    - 💀 `[Người chơi X] ĐÃ TỬ TRẬN!`
+    - ⚠️ `ÁC MỘNG! Ngộ sát đồng minh cùng phe, phải bỏ toàn bộ bài!`
+    - 🏆 `TRÒ CHƠI KẾT THÚC! Phe ... giành chiến thắng!`
+---
+
+## 85. CHUẨN HÓA TRANG BỊ CHUẨN & BỘ KIỂM ĐỊNH TOÀN DIỆN VŨ KHÍ (CANONICAL EQUIPMENT NORMALIZATION & COMPREHENSIVE WEAPONS QA)
+
+- **🏹 Chuẩn Hóa Khóa Trang Bị Chuẩn (`CANONICAL_EQUIP_KEYS` & `normalizeEquipKey`):**
+  - **Khái niệm:** Hệ thống chuẩn hóa khóa trang bị trung tâm được thiết lập theo [ADR 0085](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/docs/adr/0085-canonical-equipment-normalization-and-weapons-qa.md) tại [translationHelper.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/utils/translationHelper.js), giải quyết triệt để lỗi thẻ bài sinh ra từ `CardDeck.getStandardDeck()` có ID tiếng Việt có dấu kèm timestamp (ví dụ `'liên-nỏ-0-1792972291440_93'`) không khớp với logic kiểm tra chuỗi ASCII gạch dưới (`thanh_long`, `crossbow`).
+  - **Từ điển 12 khóa chuẩn (`CANONICAL_EQUIP_KEYS`):**
+    - 7 Vũ khí: `lien_no`, `thanh_long_dao`, `riu_da`, `song_kiem`, `phuong_thien_kich`, `quat_sat`, `ky_lan_cung`.
+    - 3 Phòng cụ: `bat_quai`, `hac_thuan`, `bach_ngan`.
+    - 2 Thú cưỡi: `ngua_chien`, `ngua_than`.
+  - **Hàm `normalizeEquipKey(cardOrName)`:** Tự động loại bỏ dấu tiếng Việt (kể cả chữ `đ` $\rightarrow$ `d`), loại bỏ hậu tố ID ngẫu nhiên, đưa về snake_case chuẩn xác.
+  - **Hàm `isEquip(cardOrEquip, canonicalKey)`:** Bộ lọc an toàn đa lớp cho mọi thao tác kiểm tra trang bị trên Engine, Dispatcher, Trí tuệ Bot AI và Giao diện Modal.
+- **🛡️ Bất Biến Mất Trang Bị Trong Mượn Đao & Song Kiếm (`ON_EQUIP_LOST` Invariant):**
+  - Khi người chơi bị [Mượn Đao] từ chối Chém và giao nộp vũ khí cho người mượn, hoặc khi bị [Song Kiếm] ép tháo bỏ trang bị (như giáp Bạch Ngân), hệ thống bắt buộc phải phát sự kiện `ON_EQUIP_LOST`, đảm bảo quyền lợi kích hoạt kỹ năng phản ứng (Hồ Xuân Hương - Xuân Hương rút 2 lá bài).
+---
+
+## 86. NÂNG CẤP KIẾN TRÚC QA BẤT KHẢ XÂM PHẠM & XÓA BỎ THIÊN KIẾN DỮ LIỆU GIẢ (AUTOMATED QA HARDENING & ANTI-SYNTHETIC FIXTURE ARCHITECTURE)
+
+- **⚠️ Thiên Kiến Dữ Liệu Giả (Synthetic Fixture Bias):**
+  - **Khái niệm:** Điểm mù nguy hiểm trong kiểm thử phần mềm được nhận diện và triệt tiêu theo [ADR 0086](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/docs/adr/0086-automated-qa-hardening-and-anti-synthetic-fixture-architecture.md): Hiện tượng các ca unit test tự bịa ra dữ liệu mock (ví dụ `{ id: 'crossbow', name: 'Liên Nỏ' }`) ăn khớp với logic lỗi (`id.includes('crossbow')`), dẫn đến việc test xanh 100% nhưng khi người dùng chơi thực tế với lá bài thật (`liên-nỏ-0-1792972291440_93`) thì hệ thống lại bị liệt hoàn toàn.
+- **🛡️ Cổng Quét Tĩnh Kiểm Định Trang Bị Chuẩn (`audit_canonical_equip_usage.mjs`):**
+  - **Khái niệm:** Kịch bản quét tĩnh tự động (Static Build Gate) chạy trước `vitest run` trong lệnh `npm test` và `npm run cap:build`. Quét toàn bộ mã nguồn `shared/` và `client/`, cấm triệt để việc so sánh chuỗi ID thủ công (`.id.includes('crossbow')`) hoặc các lệnh gọi `me.equipment?.find(...)`, bảo đảm 100% codebase phải đi qua `isEquip(card, key)` hoặc `normalizeEquipKey(card)`.
+- **🧪 Fuzzing Ma Trận 108 Lá Bài Thật (`StandardDeck108PermutationQA`):**
+  - **Khái niệm:** Bộ kiểm định ma trận tổ hợp [StandardDeck108PermutationQA.test.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/__tests__/matrix/StandardDeck108PermutationQA.test.js) tự động duyệt qua toàn bộ 108 lá bài nguyên bản từ `CardDeck.getStandardDeck()`, kiểm tra tính toàn vẹn thuộc tính, tự động trang bị, thay thế và tiêu hao qua Dispatcher V4 để bảo đảm không có bất kỳ lá bài thật nào sinh lỗi trong chu kỳ sống.
+- **🎯 Bảo Vệ Hợp Đồng Giao Diện Nút Bấm Vũ Khí (`ViewModelWeaponContract`):**
+  - **Khái niệm:** Hợp đồng kiểm thử tự động [ViewModelWeaponContractQA.test.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/__tests__/application/ViewModelWeaponContractQA.test.js) bảo đảm sự đồng bộ 1:1 giữa logic Engine và hiển thị UI: khi trang bị Liên Nỏ thật, hàm `canPlayCard` và ViewModel sinh ra cho các lá Chém thứ 2, thứ 3 trên tay người chơi bắt buộc phải luôn ở trạng thái `canPlay: true` (sáng nút đánh).
+
+---
+
+## 87. CHUẨN HÓA CẨM NANG & KIỂM ĐỊNH CHỐNG THIÊN KIẾN DỮ LIỆU GIẢ (CANONICAL TRICK CARDS & ANTI-SYNTHETIC FIXTURE VALIDATION)
+
+- **📜 Khóa Cẩm Nang & Thẻ Cơ Bản Chuẩn (`CANONICAL_CARD_KEYS` & `normalizeCardKey`):**
+  - **Khái niệm:** Hệ thống định danh thẻ bài chuẩn hóa được thiết lập theo [ADR 0087](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/docs/adr/0087-canonical-trick-cards-and-anti-synthetic-fixture-validation.md) tại [translationHelper.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/utils/translationHelper.js), giải quyết triệt để lỗi phân mảnh chuỗi khi so khớp các lá bài từ bộ bài chuẩn `CardDeck.getStandardDeck()` (vốn có ID tiếng Việt có dấu như `'sấm-sét-0-...'`, `'hóa-giải-0-...'`).
+  - **14 Khóa Cẩm Nang Chuẩn:** `quyet_dau`, `cuop_bai`, `tuoc_bai`, `muon_dao`, `loan_tien`, `da_man`, `hoi_xuan`, `hoa_giai`, `xieng_xich`, `hoa_cong`, `vo_trung`, `sam_set`, `hon_loan`, `binh_luong`.
+  - **4 Khóa Cơ Bản Chuẩn:** `chem`, `ne`, `dao`, `ruou`.
+  - **Hàm `isTrick(card, key)` & `isDelayedTrick(card, key)`:** Bộ lọc chuẩn hóa giúp xác thực cẩm nang tức thì ở cả Engine, Dispatcher, TargetResolver và ViewMapper.
+- **⚡ Bất Biến Chống Trùng Cẩm Nang Trì Hoãn (`Anti-Duplicate Delayed Trick Invariant`):**
+  - **Khái niệm:** Bất biến luật chơi quốc tế quy định rằng trong khu vực phán xét (`judgementArea`) của cùng một người chơi, tuyệt đối không được phép tồn tại 2 lá cẩm nang trì hoãn cùng loại (ví dụ: không thể có 2 lá Sấm Sét hoặc 2 lá Hỗn Loạn).
+  - Cả `TrickRules._playDelayedTrick` và `TargetResolverV4.canPlayCard` đều đối soát qua `normalizeCardKey(c) === normalizeCardKey(card)` hoặc `isDelayedTrick(c, key)`, chặn đứng lỗi so sánh `id === id` sai lệch trước đây.
+- **🌀 Sấm Sét Nhảy Vòng Thông Minh (Smart Lightning Loop Skipping):**
+  - **Khái niệm:** Khi lá bài [Sấm Sét] phán xét không nổ, lá bài sẽ nhảy sang khu phán xét của người chơi còn sống kế tiếp. Nếu người kế tiếp đã có một lá Sấm Sét khác trong khu phán xét, Sấm Sét sẽ tự động nhảy qua người đó để tìm người chơi còn sống tiếp theo chưa có Sấm Sét. Nếu tất cả mọi người còn sống đều đã có Sấm Sét, lá bài được đưa an toàn vào chồng bài bỏ (`discardPile`), triệt tiêu 100% nguy cơ trùng lặp.
+- **🛡️ Bộ Kiểm Định Chống Thiên Kiến Dữ Liệu Giả (`TricksComprehensiveAntiSyntheticQA`):**
+  - **Khái niệm:** Bộ test tự động [TricksComprehensiveAntiSyntheticQA.test.js](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/shared/engine_v4/__tests__/rules/TricksComprehensiveAntiSyntheticQA.test.js) sử dụng 100% lá bài cẩm nang thật lấy trực tiếp từ `CardDeck.getStandardDeck()`, kiểm chứng thành công toàn diện các kịch bản: chặn trùng Sấm Sét/Hỗn Loạn thật, chuỗi Hóa Giải đa tầng với ID tiếng Việt, AOE Loạn Tiễn/Dã Man thật, và Xiềng Xích rèn lại/xích mục tiêu.
+
 
 
 

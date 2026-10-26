@@ -8,6 +8,7 @@
 import { RangeSystem } from '../rules/RangeSystem.js';
 import { globalHeroRegistry, hasSkill, getPlayerGender } from '../heroes/HeroRegistry.js';
 import { getAvailableTargets, getTargetingDefinition } from '../rules/TargetResolverV4.js';
+import { isSameFaction, getCanonicalFaction, isEquip } from '../../utils/translationHelper.js';
 
 function rankToNumber(rank) {
   if (typeof rank === 'number') return rank;
@@ -46,9 +47,13 @@ export class BotBrain {
           targetIds: [bot.id]
         };
       }
-      // Thính Chính (Nguyễn Phi Ỷ Lan) - Dùng bài Đỏ như Đào
+      // Thính Chính (Nguyễn Phi Ỷ Lan) - Dùng bài Đỏ như Đào khi bị thương
       if (hasSkill(bot, 'thinh_chinh')) {
-        const isRed = c => c && (c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+        const isRed = c => {
+          if (!c) return false;
+          const col = globalHeroRegistry.getEffectiveColor(bot, c);
+          return col ? col === 'red' : Boolean(c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+        };
         const redCard = bot.hand.find(c => isRed(c) && c.type !== 'peach' && c.name !== 'Đào');
         if (redCard) {
           return {
@@ -106,15 +111,7 @@ export class BotBrain {
     if (!bot.revealedHeroes[1]) unrevealed.push(1);
     if (unrevealed.length === 0) return null;
 
-    // Ưu tiên 1: Lấy Thưởng Tiên Phong Cắm Cờ (+2 lá bài cho người đầu tiên lật tướng)
-    if (!state.hasPioneerRewardClaimed) {
-      return {
-        type: 'REVEAL_HERO',
-        heroIndex: unrevealed[0]
-      };
-    }
-
-    // Ưu tiên 2: Lật tướng sở hữu kỹ năng chủ động / chiến đấu cần lật để dùng
+    // Danh sách các kỹ năng chủ động / chiến đấu cần hiển lộ tướng để kích hoạt
     const activeSkillIds = [
       'dieu_duoc', 'bach_dang', 'ky_tap', 'can_gian', 'hoa_than_an_tu',
       'hoa_than', 'hoa_than_huyen_tran', 'binh_loan', 'pha_thanh',
@@ -125,18 +122,55 @@ export class BotBrain {
       'duong_quan', 'trung_dung'
     ];
 
-    for (const idx of unrevealed) {
-      const heroId = idx === 0 ? (bot.mainHeroId || bot.heroId) : bot.subHeroId;
-      const hero = globalHeroRegistry.getHero(heroId);
-      if (hero && Array.isArray(hero.skills)) {
-        const hasActiveSkill = hero.skills.some(s => {
+    // QUY TẮC QUỐC CHIẾN BẮT BUỘC:
+    // Tướng đầu tiên lật mở BẮT BUỘC phải là Tướng Chính (slot 0).
+    // Tuyệt đối không được phép lật Phó Tướng (slot 1) khi Tướng Chính chưa lộ diện.
+    if (!bot.revealedHeroes[0]) {
+      // 1. Nhận Thưởng Tiên Phong Cắm Cờ: Lật Tướng Chính
+      if (!state.hasPioneerRewardClaimed) {
+        return {
+          type: 'REVEAL_HERO',
+          heroIndex: 0
+        };
+      }
+
+      // 2. Kích hoạt Kỹ Năng Chủ Động: Nếu Tướng Chính HOẶC Phó Tướng có skill cần dùng,
+      // Bot bắt buộc phải lật Tướng Chính trước làm tiền đề lộ diện!
+      const mainHeroId = bot.mainHeroId || bot.heroId;
+      const subHeroId = bot.subHeroId;
+      const mainHero = globalHeroRegistry.getHero(mainHeroId);
+      const subHero = globalHeroRegistry.getHero(subHeroId);
+      const hasAnyActiveSkill = [mainHero, subHero].some(hero => {
+        if (!hero || !Array.isArray(hero.skills)) return false;
+        return hero.skills.some(s => {
+          const sId = (s.id || s).replace(/-/g, '_').toLowerCase();
+          return activeSkillIds.includes(sId);
+        });
+      });
+
+      if (hasAnyActiveSkill) {
+        return {
+          type: 'REVEAL_HERO',
+          heroIndex: 0
+        };
+      }
+
+      return null;
+    }
+
+    // Khi Tướng Chính đã lộ diện (bot.revealedHeroes[0] === true), lúc này mới xét lật Phó Tướng (slot 1)
+    if (!bot.revealedHeroes[1]) {
+      const subHeroId = bot.subHeroId;
+      const subHero = globalHeroRegistry.getHero(subHeroId);
+      if (subHero && Array.isArray(subHero.skills)) {
+        const hasActiveSkill = subHero.skills.some(s => {
           const sId = (s.id || s).replace(/-/g, '_').toLowerCase();
           return activeSkillIds.includes(sId);
         });
         if (hasActiveSkill) {
           return {
             type: 'REVEAL_HERO',
-            heroIndex: idx
+            heroIndex: 1
           };
         }
       }
@@ -204,7 +238,11 @@ export class BotBrain {
 
     // 3. Kỳ Tập (Dã Tượng) - Dùng bài Đen như Tước Bài
     if (hasSkill(bot, 'ky_tap')) {
-      const isBlack = c => c && (c.color === 'black' || c.suit === 'spade' || c.suit === 'club' || c.suit === '♠' || c.suit === '♣');
+      const isBlack = c => {
+        if (!c) return false;
+        const col = globalHeroRegistry.getEffectiveColor(bot, c);
+        return col ? col === 'black' : Boolean(c.color === 'black' || c.suit === 'spade' || c.suit === 'club' || c.suit === '♠' || c.suit === '♣');
+      };
       const blackCard = bot.hand.find(c => isBlack(c) && c.type !== 'peach' && c.name !== 'Đào');
       if (blackCard) {
         const potentialVictims = alivePlayers.filter(p => 
@@ -317,7 +355,9 @@ export class BotBrain {
 
     // 8. Tiên Phong (Nguyễn Lữ) - Hy sinh vũ khí hoặc HP để gây 1 sát thương chắc chắn
     if ((hasSkill(bot, 'tien_phong_nguyen_lu') || hasSkill(bot, 'tien_phong'))) {
-      const canCost = Boolean(bot.equipment?.weapon) || bot.hp > 1;
+      const handWeapon = (bot.hand || []).find(c => c && (c.type === 'weapon' || c.subtype === 'equip_weapon' || c.subType === 'equip_weapon'));
+      const hasWeapon = Boolean(bot.equipment?.weapon || handWeapon);
+      const canCost = hasWeapon || bot.hp > 1;
       if (canCost) {
         const enemiesInRange = alivePlayers.filter(p => 
           p.id !== bot.id && 
@@ -325,22 +365,25 @@ export class BotBrain {
           RangeSystem.inSlashRange(bot, p, alivePlayers)
         );
         const sortedEnemies = this._sortTargetsByPriority(bot, enemiesInRange);
-        if (sortedEnemies.length > 0 && (sortedEnemies[0].hp <= 2 || bot.equipment?.weapon)) {
+        if (sortedEnemies.length > 0 && (sortedEnemies[0].hp <= 2 || hasWeapon)) {
           return {
             type: 'USE_SKILL',
             skillId: 'tien_phong',
             targets: [sortedEnemies[0].id],
-            options: { costType: bot.equipment?.weapon ? 'weapon' : 'hp' }
+            options: { 
+              costType: hasWeapon ? 'weapon' : 'hp',
+              cardId: bot.equipment?.weapon ? bot.equipment.weapon.id : (handWeapon ? handWeapon.id : undefined)
+            }
           };
         }
       }
     }
 
     // 9. Tâm Công (Nguyễn Trãi) - Bắt kẻ địch đoán chất bài
-    if (hasSkill(bot, 'tam_cong') && !bot.skillUsage?.tam_cong?.usedThisTurn) {
+    if (hasSkill(bot, 'tam_cong') && !bot.skillUsage?.tam_cong?.usedThisTurn && (bot.hand?.length || 0) > 0) {
       const targetEnemies = this._sortTargetsByPriority(
         bot,
-        alivePlayers.filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p) && p.hand?.length > 0)
+        alivePlayers.filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p))
       );
       if (targetEnemies.length > 0) {
         return {
@@ -442,7 +485,7 @@ export class BotBrain {
 
     // 3. Định Quốc (Đinh Điền) - Chủ động kêu gọi đồng minh Sơn dâng bài
     if (hasSkill(bot, 'dinh_quoc') && (bot.hand?.length || 0) <= 2) {
-      const hasSonAlly = alivePlayers.some(p => p.id !== bot.id && (p.faction === 'son' || p.faction === 'Sơn'));
+      const hasSonAlly = alivePlayers.some(p => p.id !== bot.id && getCanonicalFaction(p.faction) === 'son');
       if (hasSonAlly) {
         return {
           type: 'USE_SKILL',
@@ -626,13 +669,25 @@ export class BotBrain {
    */
   static _decideSlashAction(state, bot) {
     if (bot.temporaryFlags?.vanDonLose) return null;
-    const hasCrossbow = bot.equipment?.weapon?.id === 'crossbow' || bot.equipment?.weapon?.name === 'Liên Nỏ';
+    const botWeapon = bot.equipment?.weapon;
+    const botWeaponId = String(botWeapon?.id || botWeapon?.idKey || botWeapon?.key || '');
+    const hasCrossbow = isEquip(botWeapon, 'lien_no') ||
+      botWeapon?.name === 'Liên Nỏ' || 
+      botWeaponId === 'crossbow' || 
+      botWeaponId.includes('lien-no') || 
+      botWeaponId.includes('liên-nỏ') || 
+      botWeaponId.includes('lien_no') ||
+      Boolean(bot.temporaryFlags?.unlimitedSlash);
     const canSlash = hasCrossbow || (bot.turnStats?.slashCount || 0) < 1;
     if (!canSlash) return null;
 
     const hasDoiNui = globalHeroRegistry.hasSkill(bot, 'doi_nui', true);
     const hasKhaiThien = globalHeroRegistry.hasSkill(bot, 'khai_thien', true);
-    const isRed = c => c && (c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+    const isRed = c => {
+      if (!c) return false;
+      const col = globalHeroRegistry.getEffectiveColor(bot, c);
+      return col ? col === 'red' : Boolean(c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+    };
 
     const slashCard = bot.hand.find(c => c.type === 'slash' || c.name === 'Chém') || 
       (hasDoiNui ? bot.hand.find(c => c.type === 'dodge' || c.name === 'Né') : null) ||
@@ -668,7 +723,7 @@ export class BotBrain {
 
     // Kiểm tra hiệu ứng Phương Thiên Kích (last card in hand -> up to 3 targets)
     const isLastCard = bot.hand.length === 1 && bot.hand[0].id === slashCard.id;
-    const hasPhuongThienKich = bot.equipment?.weapon?.name === 'Phương Thiên Kích' || bot.equipment?.weapon?.idKey === 'phuong_thien_kich';
+    const hasPhuongThienKich = isEquip(bot.equipment?.weapon, 'phuong_thien_kich') || bot.equipment?.weapon?.name === 'Phương Thiên Kích' || bot.equipment?.weapon?.idKey === 'phuong_thien_kich';
     const hasVanDon = bot.temporaryFlags?.vanDonWin;
 
     let chosenTargets = [sortedEnemies[0].id];
@@ -709,7 +764,7 @@ export class BotBrain {
     if (!target || target.id === bot.id) return true;
     if (bot.isDaTam || target.isDaTam) return false;
     const isRevealed = target.revealedHeroes?.some(Boolean);
-    return isRevealed && Boolean(target.faction) && target.faction !== 'none' && target.faction === bot.faction;
+    return Boolean(isRevealed && isSameFaction(bot, target));
   }
 
   /**
@@ -719,7 +774,7 @@ export class BotBrain {
     if (!target || target.id === bot.id) return false;
     if (bot.isDaTam || target.isDaTam) return true;
     const isRevealed = target.revealedHeroes?.some(Boolean);
-    return isRevealed && Boolean(target.faction) && target.faction !== 'none' && target.faction !== bot.faction;
+    return Boolean(isRevealed && getCanonicalFaction(target.faction) !== 'none' && !isSameFaction(bot, target));
   }
 
   /**
@@ -750,6 +805,7 @@ export class BotBrain {
     switch (frame.type) {
       case 'ASK_DODGE': {
         const hasBaguaArmor = bot.equipment?.armor && (
+          isEquip(bot.equipment.armor, 'bat_quai') ||
           bot.equipment.armor.name === 'Bát Quái' ||
           bot.equipment.armor.id === 'bat_quai' ||
           bot.equipment.armor.key === 'bat_quai'
@@ -765,7 +821,11 @@ export class BotBrain {
 
         const hasDoiNui = globalHeroRegistry.hasSkill(bot, 'doi_nui', true);
         const hasThinhChinh = globalHeroRegistry.hasSkill(bot, 'thinh_chinh', true);
-        const isBlack = c => c && (c.color === 'black' || c.suit === 'spade' || c.suit === 'club' || c.suit === '♠' || c.suit === '♣');
+        const isBlack = c => {
+          if (!c) return false;
+          const col = globalHeroRegistry.getEffectiveColor(bot, c);
+          return col ? col === 'black' : Boolean(c.color === 'black' || c.suit === 'spade' || c.suit === 'club' || c.suit === '♠' || c.suit === '♣');
+        };
         const dodgeCard = bot.hand.find(c => c.type === 'dodge' || c.name === 'Né') || 
           (hasDoiNui ? bot.hand.find(c => c.type === 'slash' || c.name === 'Chém') : null) ||
           (hasThinhChinh ? bot.hand.find(isBlack) : null);
@@ -781,7 +841,11 @@ export class BotBrain {
         const isSelf = frame.targetId === bot.id;
         const isAlly = victim && this._isKnownAlly(bot, victim);
         const hasNamDuoc = globalHeroRegistry.hasSkill(bot, 'nam_duoc', true) && state.currentTurnPlayerId !== bot.id;
-        const isRed = c => c && (c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+        const isRed = c => {
+          if (!c) return false;
+          const col = globalHeroRegistry.getEffectiveColor(bot, c);
+          return col ? col === 'red' : Boolean(c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+        };
 
         let healCard = bot.hand.find(c => c.type === 'peach' || c.name === 'Đào');
         if (!healCard && isSelf) {
@@ -809,7 +873,11 @@ export class BotBrain {
         const target = targetId !== null && targetId !== undefined ? state.getPlayer(targetId) : null;
         const hasLinhGiam = globalHeroRegistry.hasSkill(bot, 'linh_giam', true);
         const hasChuongDuong = globalHeroRegistry.hasSkill(bot, 'chuong_duong', true);
-        const isBlack = c => c && (c.color === 'black' || c.suit === 'spade' || c.suit === 'club' || c.suit === '♠' || c.suit === '♣');
+        const isBlack = c => {
+          if (!c) return false;
+          const col = globalHeroRegistry.getEffectiveColor(bot, c);
+          return col ? col === 'black' : Boolean(c.color === 'black' || c.suit === 'spade' || c.suit === 'club' || c.suit === '♠' || c.suit === '♣');
+        };
         const equipCard = bot.hand.find(c => c.type === 'equip' || ['weapon', 'armor', 'horse_attack', 'horse_defense'].includes(c.type));
         const negateCard = bot.hand.find(c => c.name === 'Hóa Giải' || c.idKey === 'hoa_giai') ||
           (hasLinhGiam ? bot.hand.find(isBlack) : null) ||
@@ -858,7 +926,11 @@ export class BotBrain {
         // Đồng minh phe Lạc ra Chém giùm cho Chúa công Lạc Long Quân
         const hasDoiNui = globalHeroRegistry.hasSkill(bot, 'doi_nui', true);
         const hasKhaiThien = globalHeroRegistry.hasSkill(bot, 'khai_thien', true);
-        const isRed = c => c && (c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+        const isRed = c => {
+          if (!c) return false;
+          const col = globalHeroRegistry.getEffectiveColor(bot, c);
+          return col ? col === 'red' : Boolean(c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+        };
         const slashCard = bot.hand.find(c => c.type === 'slash' || c.name === 'Chém') || 
           (hasDoiNui ? bot.hand.find(c => c.type === 'dodge' || c.name === 'Né') : null) ||
           (hasKhaiThien ? bot.hand.find(isRed) : null);
@@ -910,6 +982,44 @@ export class BotBrain {
           type: 'ACTION_REACT',
           doReact: false
         };
+      }
+
+      case 'ASK_DISMANTLE':
+      case 'ASK_SNATCH': {
+        const targetId = frame.context?.targetId ?? frame.targetId;
+        const target = state.getPlayer(targetId);
+        if (!target) return { type: 'ACTION_REACT', canceled: true };
+
+        const equipCards = Object.values(target.equipment || {}).filter(Boolean);
+        if (equipCards.length > 0) {
+          const armor = target.equipment?.armor;
+          const weapon = target.equipment?.weapon;
+          const chosenEquip = armor || weapon || equipCards[0];
+          return {
+            type: 'ACTION_REACT',
+            cardId: chosenEquip.id,
+            zone: 'equip',
+            canceled: false
+          };
+        }
+        if (target.hand && target.hand.length > 0) {
+          const randCard = target.hand[Math.floor(Math.random() * target.hand.length)];
+          return {
+            type: 'ACTION_REACT',
+            cardId: randCard.id,
+            zone: 'hand',
+            canceled: false
+          };
+        }
+        if (target.judgementArea && target.judgementArea.length > 0) {
+          return {
+            type: 'ACTION_REACT',
+            cardId: target.judgementArea[0].id,
+            zone: 'judge',
+            canceled: false
+          };
+        }
+        return { type: 'ACTION_REACT', canceled: true };
       }
 
       case 'ASK_HOACONG_REVEAL': {
@@ -1088,8 +1198,30 @@ export class BotBrain {
       case 'ASK_DOI_SU':
       case 'ASK_HOA_NGHI':
       case 'ASK_NAM_QUOC_SON_HA':
-      case 'ASK_HO_CHU': {
+      case 'ASK_HO_CHU':
+      case 'ASK_THONG_NGON':
+      case 'ASK_PHAT_TAM': {
         return { type: 'ACTION_REACT', doUse: true, doReact: true };
+      }
+
+      case 'ASK_CAN_GIAN': {
+        if (bot.hp >= 3) {
+          return { type: 'ACTION_REACT', doUse: true, doReact: true };
+        }
+        return { type: 'ACTION_REACT', doUse: false, doReact: false };
+      }
+
+      case 'ASK_HOA_THAN_AN_TU': {
+        const diamondCard = (bot.hand || []).find(c => c.suit === 'diamond' || c.suit === '♦');
+        const enemies = this._sortTargetsByPriority(bot, state.getAlivePlayers().filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p)));
+        if (diamondCard && enemies[0]) {
+          return {
+            type: 'ACTION_REACT',
+            cardId: diamondCard.id,
+            targetId: enemies[0].id
+          };
+        }
+        return { type: 'ACTION_REACT', canceled: true };
       }
 
       case 'ASK_SUIT': {
@@ -1247,11 +1379,15 @@ export class BotBrain {
       }
 
       case 'ASK_TIEN_PHONG': {
-        // Nguyễn Lữ chọn hy sinh vũ khí hoặc 1 HP
-        const costType = bot.equipment?.weapon ? 'weapon' : 'hp';
+        // Nguyễn Lữ chọn hy sinh vũ khí (trang bị hoặc trên tay) hoặc 1 HP
+        const handWeapon = (bot.hand || []).find(c => c && (c.type === 'weapon' || c.subtype === 'equip_weapon' || c.subType === 'equip_weapon'));
+        const hasWeapon = Boolean(bot.equipment?.weapon || handWeapon);
+        const costType = hasWeapon ? 'weapon' : 'hp';
+        const cardId = bot.equipment?.weapon ? bot.equipment.weapon.id : (handWeapon ? handWeapon.id : undefined);
         return {
           type: 'ACTION_REACT',
           costType,
+          cardId,
           targetId: frame.context?.targetId,
           canceled: false
         };
@@ -1329,7 +1465,11 @@ export class BotBrain {
       case 'ASK_SLASH_RESPONSE': {
         const hasDoiNui = globalHeroRegistry.hasSkill(bot, 'doi_nui', true);
         const hasKhaiThien = globalHeroRegistry.hasSkill(bot, 'khai_thien', true);
-        const isRed = c => c && (c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+        const isRed = c => {
+          if (!c) return false;
+          const col = globalHeroRegistry.getEffectiveColor(bot, c);
+          return col ? col === 'red' : Boolean(c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+        };
         const slashCard = bot.hand.find(c => c.type === 'slash' || c.name === 'Chém') ||
           (hasDoiNui ? bot.hand.find(c => c.type === 'dodge' || c.name === 'Né') : null) ||
           (hasKhaiThien ? (bot.hand.find(c => isRed(c) && c.type !== 'peach' && c.name !== 'Đào') || bot.hand.find(isRed)) : null);
@@ -1400,6 +1540,77 @@ export class BotBrain {
         return {
           type: 'ACTION_REACT',
           doUse: !!hasCombatCard
+        };
+      }
+
+      case 'ASK_WEAPON_SKILL': {
+        const weapon = frame.context?.weapon || frame.context?.weaponName;
+        if (weapon === 'Rìu Đá' || weapon === 'Quán Thạch Phủ' || isEquip(weapon, 'riu_da')) {
+          const target = state.getPlayer(frame.targetId);
+          const isEnemy = target && !this._isKnownAlly(bot, target);
+          const availableCards = [...(bot.hand || [])];
+          const nonPeachCards = availableCards.filter(c => c.name !== 'Đào' && c.type !== 'peach');
+          if (isEnemy && (target.hp <= (frame.context?.damageAmount || 1) || nonPeachCards.length >= 3)) {
+            const getPriority = (card) => {
+              if (card.name === 'Đào' || card.type === 'peach') return 100;
+              if (card.name === 'Né' || card.type === 'dodge') return 80;
+              if (card.name === 'Chém' || card.type === 'slash') return 60;
+              return 20;
+            };
+            const sorted = [...nonPeachCards].sort((a, b) => getPriority(a) - getPriority(b));
+            if (sorted.length >= 2) {
+              return {
+                type: 'ACTION_REACT',
+                doUse: true,
+                cardIds: [sorted[0].id, sorted[1].id]
+              };
+            }
+          }
+          return {
+            type: 'ACTION_REACT',
+            doUse: false,
+            canceled: true
+          };
+        }
+
+        if (weapon === 'Thanh Long Đao' || isEquip(weapon, 'thanh_long_dao')) {
+          const target = state.getPlayer(frame.targetId);
+          const isEnemy = target && !this._isKnownAlly(bot, target);
+          const extraSlash = bot.hand?.find(c => c.type === 'slash' || c.name === 'Chém');
+          if (isEnemy && extraSlash) {
+            return {
+              type: 'ACTION_REACT',
+              doUse: true,
+              cardId: extraSlash.id
+            };
+          }
+          return {
+            type: 'ACTION_REACT',
+            doUse: false,
+            canceled: true
+          };
+        }
+
+        if (weapon === 'Song Kiếm' || isEquip(weapon, 'song_kiem')) {
+          const nonPeachCards = (bot.hand || []).filter(c => c.name !== 'Đào' && c.type !== 'peach');
+          if (nonPeachCards.length > 0) {
+            return {
+              type: 'ACTION_REACT',
+              doUse: true,
+              cardIds: [nonPeachCards[0].id]
+            };
+          }
+          return {
+            type: 'ACTION_REACT',
+            doUse: false,
+            canceled: true
+          };
+        }
+
+        return {
+          type: 'ACTION_REACT',
+          doUse: false,
+          canceled: true
         };
       }
 

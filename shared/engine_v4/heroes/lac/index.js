@@ -74,7 +74,7 @@ export const CaoLoLac = {
       id: 'no_than_cao_lo',
       name: 'Nỏ Thần',
       type: 'lock',
-      description: 'Tầm đánh của [Chém] bằng điểm số lá bài; bài tay >= địch cấm Né; HP <= địch +1 sát thương.',
+      description: 'Phạm vi công kích của [Chém] bạn sử dụng bằng đúng điểm số của lá bài đó. Sau khi [Chém] chỉ định mục tiêu, thực hiện các hiệu ứng sau nếu thỏa điều kiện: Nếu số bài trên tay của bạn không ít hơn mục tiêu, họ không thể sử dụng [Né]. Nếu Sinh lực của bạn không nhiều hơn mục tiêu, [Chém] đó gây thêm 1 điểm sát thương.',
       trigger: 'ON_SLASH_TARGET',
       filter: (ctx) => ctx.ownerId === ctx.actorId,
       execute: (state, ctx) => {
@@ -153,13 +153,29 @@ export const RuaVang = {
       id: 'than_hoa',
       name: 'Thần Hỏa',
       type: 'active',
-      description: 'Có thể sử dụng bài Đỏ như [Hỏa Công].'
+      description: 'Có thể sử dụng bài Đỏ như [Hỏa Công].',
+      canUse: (state, ctx) => {
+        const p = ctx.owner || (state && state.getPlayer ? state.getPlayer(ctx.ownerId) : null);
+        if (!p || !p.hand || p.hand.length === 0) return false;
+        return p.hand.some(c => {
+          const s = (c.suit || '').toString().toLowerCase();
+          return s === 'heart' || s === 'diamond' || s === '♥' || s === '♦' || s === 'cơ' || s === 'rô' || c.color === 'red';
+        });
+      }
     }),
     new SkillContract({
       id: 'linh_giam',
       name: 'Linh Giám',
       type: 'active',
-      description: 'Có thể sử dụng bài Đen như [Vô Giải Khả Kích].'
+      description: 'Có thể sử dụng bài Đen như [Vô Giải Khả Kích].',
+      canUse: (state, ctx) => {
+        const p = ctx.owner || (state && state.getPlayer ? state.getPlayer(ctx.ownerId) : null);
+        if (!p || !p.hand || p.hand.length === 0) return false;
+        return p.hand.some(c => {
+          const s = (c.suit || '').toString().toLowerCase();
+          return s === 'spade' || s === 'club' || s === '♠' || s === '♣' || s === 'bích' || s === 'chuồn' || c.color === 'black';
+        });
+      }
     })
   ]
 };
@@ -177,7 +193,15 @@ export const ChuDongTu = {
       id: 'tien_duyen_chu_dong_tu',
       name: 'Tiên Duyên',
       type: 'active',
-      description: 'Bài ♣ có thể dùng như [Thiết Tác Liên Hoàn].'
+      description: 'Bài ♣ có thể dùng như [Thiết Tác Liên Hoàn].',
+      canUse: (state, ctx) => {
+        const p = ctx.owner || (state && state.getPlayer ? state.getPlayer(ctx.ownerId) : null);
+        if (!p || !p.hand || p.hand.length === 0) return false;
+        return p.hand.some(c => {
+          const s = (c.suit || '').toString().toLowerCase();
+          return s === 'club' || s === 'clubs' || s === '♣' || s === 'chuồn' || s === 'nhép';
+        });
+      }
     }),
     new SkillContract({
       id: 'hoa_tien',
@@ -232,6 +256,7 @@ export const TienDung = {
       id: 'duyen_tien',
       name: 'Duyên Tiên',
       type: 'reactive',
+      frequency: 'unlimited',
       trigger: 'ON_TRICK_PLAYED',
       filter: (ctx) => ctx.ownerId === ctx.actorId,
       description: 'Mỗi khi sử dụng Cẩm Nang Thường, rút 1 lá bài.',

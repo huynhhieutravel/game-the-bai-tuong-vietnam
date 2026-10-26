@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { VipHeroSelectorModal } from '../modals/VipHeroSelectorModal';
 import { HEROES } from 'shared/data/gameData';
+import { normalizeSkillType } from 'shared/utils/translationHelper';
 import { ChatWidget } from './ChatWidget';
 
 /**
@@ -543,17 +544,20 @@ export function DraftScreen(props) {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                                {inspectedHero.skills && inspectedHero.skills.map((skill, idx) => (
+                                {inspectedHero.skills && inspectedHero.skills.filter((s, idx, arr) => arr.findIndex(o => (o.id && o.id === s.id) || (o.name && o.name === s.name)) === idx).map((skill, idx) => (
                                     <div key={idx} style={{ background: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(212, 168, 67, 0.3)', borderRadius: '10px', padding: '12px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                                             <span style={{ color: 'var(--color-gold)', fontWeight: 'bold', fontSize: '1.05rem' }}>
                                                 {skill.name}
                                             </span>
-                                            {skill.type && (
-                                                <span style={{ fontSize: '0.7rem', padding: '1px 6px', background: 'rgba(212, 168, 67, 0.2)', color: '#fef08a', borderRadius: '4px' }}>
-                                                    {skill.type}
-                                                </span>
-                                            )}
+                                            {skill.type && (() => {
+                                                const norm = normalizeSkillType(skill.type);
+                                                return (
+                                                    <span style={{ fontSize: '0.7rem', padding: '1px 6px', background: norm.badgeColor, color: '#ffffff', borderRadius: '4px', fontWeight: 'bold' }}>
+                                                        {norm.label}
+                                                    </span>
+                                                );
+                                            })()}
                                         </div>
                                         <div style={{ color: '#e2e8f0', fontSize: '0.9rem', lineHeight: '1.45' }}>
                                             {skill.desc}

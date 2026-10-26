@@ -169,5 +169,77 @@ describe('QA Hero: Nguyễn Trãi (nguyen_trai) — Bình Ngô & Tâm Công', ()
     const skill = globalHeroRegistry.getSkill('tam_cong');
 
     expect(skill.canUse(state, { owner: nguyenTrai })).toBe(false);
+
+    expect(() => {
+      dispatcher.dispatch({
+        type: 'ACTION_SKILL',
+        throwOnError: true,
+        payload: {
+          playerId: 0,
+          skillId: 'tam_cong',
+          targets: [1]
+        }
+      });
+    }).toThrow('[Tâm Công] Bạn không có bài trên tay để đối thủ rút!');
+  });
+
+  it('Tâm Công: Có thể sử dụng bình thường sau khi đã đánh 1 lá Chém trong cùng lượt (không bị chặn bởi assertSlashLimit)', () => {
+    const { state, dispatcher } = setupGame([
+      { id: 'c_slash', name: 'Chém', suit: 'spade', rank: 7 },
+      { id: 'c_card', name: 'Hóa Giải', suit: 'heart', rank: 8 }
+    ]);
+    const nguyenTrai = state.getPlayer(0);
+
+    // Đánh 1 lá Chém trước
+    dispatcher.dispatch({
+      type: 'ACTION_PLAY_CARD',
+      payload: {
+        sourceId: 0,
+        cardId: 'c_slash',
+        targetIds: [1]
+      }
+    });
+
+    expect(nguyenTrai.turnStats?.slashCount).toBe(1);
+
+    // Kế tiếp dùng Tâm Công lên người chơi 1 -> Phải thành công không lỗi!
+    expect(() => {
+      dispatcher.dispatch({
+        type: 'ACTION_SKILL',
+        payload: {
+          playerId: 0,
+          skillId: 'tam_cong',
+          targets: [1]
+        }
+      });
+    }).not.toThrow();
+
+    const frame = state.priorityStack.peek();
+    expect(frame?.type).toBe('ASK_SUIT');
+    expect(frame?.targetId).toBe(1);
+  });
+
+  it('Tâm Công: Khớp chất dạng từ tiếng Anh (heart / diamond / spade / club) với chất bài tiếng Việt', () => {
+    const { state, dispatcher } = setupGame([{ id: 'c1', name: 'Chém', suit: 'heart', rank: 7 }]);
+    const target = state.getPlayer(1);
+
+    dispatcher.dispatch({
+      type: 'ACTION_SKILL',
+      payload: { playerId: 0, skillId: 'tam_cong', targets: [1] }
+    });
+
+    // Bot trả về dạng 'heart'
+    dispatcher.dispatch({
+      type: 'ACTION_REACT',
+      payload: {
+        playerId: 1,
+        responseType: 'confirm',
+        data: { suit: 'heart' }
+      }
+    });
+
+    // Khớp chất an toàn -> không mất máu
+    expect(target.hp).toBe(4);
+    expect(target.hand.length).toBe(1);
   });
 });

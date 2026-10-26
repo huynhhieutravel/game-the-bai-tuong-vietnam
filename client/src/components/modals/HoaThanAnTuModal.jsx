@@ -1,6 +1,7 @@
 import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
 import { getFullPlayerName } from 'shared/utils/playerHelpers';
+import { getEffectiveSuit } from 'shared/engine_v4/heroes/HeroRegistry.js';
 
 export function HoaThanAnTuModal({ req, gameState, onConfirm }) {
   const [selectedTarget, setSelectedTarget] = useState(null);
@@ -9,16 +10,20 @@ export function HoaThanAnTuModal({ req, gameState, onConfirm }) {
   const me = gameState.players.find(p => p.id === req.sourceId);
   const validTargets = gameState.players.filter(p => p.id !== me.id && p.isAlive && (!p.judgementArea || !p.judgementArea.some(c => c.name === 'Hỗn Loạn' || c.virtualName === 'hon-loan')));
 
+  const isDiamond = (card) => {
+    const eff = (getEffectiveSuit(me, card) || card.suit || '').toString().toLowerCase();
+    return eff === 'diamond' || eff === 'diamonds' || eff === '♦' || eff === 'rô';
+  };
+
   // Filter diamond cards from hand and equipment
   const validCards = [];
-  me.hand.forEach((c, idx) => {
-    if (c.suit === 'diamond' || c.suit === 'Rô') validCards.push({ ...c, originalIndex: idx, from: 'hand' });
+  (me.hand || []).forEach((c, idx) => {
+    if (isDiamond(c)) validCards.push({ ...c, originalIndex: idx, from: 'hand' });
   });
-  if (me.equipment) {
-    me.equipment.forEach((c, idx) => {
-      if (c.suit === 'diamond' || c.suit === 'Rô') validCards.push({ ...c, originalIndex: idx, from: 'equip' });
-    });
-  }
+  const equips = Array.isArray(me.equipment) ? me.equipment : Object.values(me.equipment || {}).filter(Boolean);
+  equips.forEach((c, idx) => {
+    if (isDiamond(c)) validCards.push({ ...c, originalIndex: idx, from: 'equip' });
+  });
 
   const handleSelectCard = (cardRef) => {
     // encode card reference to string for unique state

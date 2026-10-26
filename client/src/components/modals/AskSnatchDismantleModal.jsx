@@ -9,13 +9,18 @@ export function AskSnatchDismantleModal({ req, gameState, onConfirm, isSnatch })
   const target = gameState.players.find(p => p.id === req.targetId);
   if (!target) return null;
 
+  const equipCards = Array.isArray(target.equipment)
+    ? target.equipment.filter(Boolean)
+    : Object.values(target.equipment || {}).filter(Boolean);
+
+  const judgementCards = target.judgementArea || target.judges || [];
+
   const handleSelectCard = (cardId, zone) => {
       setSelectedCardId(cardId);
       setSelectedZone(zone);
   };
 
   const handleConfirm = () => {
-      console.log(`[DEBUG_UI_MODAL] Confirm clicked! selectedCardId:`, selectedCardId, `zone:`, selectedZone);
       onConfirm({ cardId: selectedCardId, zone: selectedZone });
   };
 
@@ -31,17 +36,17 @@ export function AskSnatchDismantleModal({ req, gameState, onConfirm, isSnatch })
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
          {/* Bài trên tay */}
          {target.hand && target.hand.length > 0 && (
-            <div style={{ border: '1px solid #444', padding: '10px', width: '100%' }}>
-               <div style={{ marginBottom: '5px', color: '#a8a29e' }}>Bài trên tay ({target.hand.length} lá)</div>
+            <div style={{ border: '1px solid #444', padding: '10px', width: '100%', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.02)' }}>
+               <div style={{ marginBottom: '5px', color: '#a8a29e', fontSize: '0.85rem' }}>Bài trên tay ({target.hand.length} lá)</div>
                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', justifyContent: 'center' }}>
                   {target.hand.map((c, idx) => (
                      <button 
                        key={'hand' + idx} 
                        className={`btn-action ${selectedCardId === c.id ? 'primary' : 'secondary'}`}
                        onClick={() => handleSelectCard(c.id, 'hand')}
-                       style={{ padding: '5px 10px' }}
+                       style={{ padding: '6px 12px', fontSize: '0.82rem' }}
                      >
-                       Lá bài úp {idx + 1}
+                       🃏 Lá bài úp {idx + 1}
                      </button>
                   ))}
                </div>
@@ -49,18 +54,18 @@ export function AskSnatchDismantleModal({ req, gameState, onConfirm, isSnatch })
          )}
          
          {/* Trang bị */}
-         {target.equipment && target.equipment.length > 0 && (
-            <div style={{ border: '1px solid #444', padding: '10px', width: '100%' }}>
-               <div style={{ marginBottom: '5px', color: '#a8a29e' }}>Trang bị</div>
+         {equipCards.length > 0 && (
+            <div style={{ border: '1px solid #444', padding: '10px', width: '100%', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.02)' }}>
+               <div style={{ marginBottom: '5px', color: '#a8a29e', fontSize: '0.85rem' }}>Khu vực Trang bị ({equipCards.length} món)</div>
                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', justifyContent: 'center' }}>
-                  {target.equipment.map(c => (
+                  {equipCards.map(c => (
                      <button 
                        key={c.id} 
                        className={`btn-action ${selectedCardId === c.id ? 'primary' : 'secondary'}`}
                        onClick={() => handleSelectCard(c.id, 'equip')}
-                       style={{ padding: '5px 10px', borderColor: selectedCardId === c.id ? '' : '#3b82f6', color: selectedCardId === c.id ? '' : '#60a5fa' }}
+                       style={{ padding: '6px 12px', fontSize: '0.82rem', borderColor: selectedCardId === c.id ? '' : '#3b82f6', color: selectedCardId === c.id ? '' : '#60a5fa' }}
                      >
-                       {c.name}
+                       ⚔️ {c.name}
                      </button>
                   ))}
                </div>
@@ -68,18 +73,18 @@ export function AskSnatchDismantleModal({ req, gameState, onConfirm, isSnatch })
          )}
          
          {/* Phán xét */}
-         {target.judgementArea && target.judgementArea.length > 0 && (
-            <div style={{ border: '1px solid #444', padding: '10px', width: '100%' }}>
-               <div style={{ marginBottom: '5px', color: '#a8a29e' }}>Khu vực Phán Xét</div>
+         {judgementCards.length > 0 && (
+            <div style={{ border: '1px solid #444', padding: '10px', width: '100%', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.02)' }}>
+               <div style={{ marginBottom: '5px', color: '#a8a29e', fontSize: '0.85rem' }}>Khu vực Phán Xét ({judgementCards.length} lá)</div>
                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', justifyContent: 'center' }}>
-                  {target.judgementArea.map(c => (
+                  {judgementCards.map(c => (
                      <button 
                        key={c.id} 
                        className={`btn-action ${selectedCardId === c.id ? 'primary' : 'secondary'}`}
                        onClick={() => handleSelectCard(c.id, 'judge')}
-                       style={{ padding: '5px 10px', borderColor: selectedCardId === c.id ? '' : '#ec4899', color: selectedCardId === c.id ? '' : '#f472b6' }}
+                       style={{ padding: '6px 12px', fontSize: '0.82rem', borderColor: selectedCardId === c.id ? '' : '#ec4899', color: selectedCardId === c.id ? '' : '#f472b6' }}
                      >
-                       {c.name}
+                       📜 {c.name}
                      </button>
                   ))}
                </div>

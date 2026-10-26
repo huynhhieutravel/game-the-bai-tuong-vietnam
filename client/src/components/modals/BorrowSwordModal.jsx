@@ -1,7 +1,7 @@
 import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
 import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
-import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine_v4/application/index.js';
+import { hasSkill, hasSkillEvenIfHidden, getEffectiveColor } from 'shared/engine_v4/application/index.js';
 
 
 export function BorrowSwordModal({ req, gameState, onConfirm }) {
@@ -20,7 +20,7 @@ export function BorrowSwordModal({ req, gameState, onConfirm }) {
   const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => {
      if (c.name === 'Chém') return true;
      if (hasDoiNui && c.name === 'Né') return true;
-     if (hasKhaiThien && c.color === 'red') return true;
+     if (hasKhaiThien && getEffectiveColor(me, c) === 'red') return true;
      return false;
   }).map(c => ({
      ...c,

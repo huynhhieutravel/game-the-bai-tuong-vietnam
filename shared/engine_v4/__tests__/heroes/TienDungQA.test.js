@@ -139,6 +139,35 @@ describe('QA Toàn Diện Tướng Hệ Lạc: Tiên Dung (Tien Dung QA Suite v4
       expect(p0.hand.length).toBe(1);
     });
 
+    it('khi Tiên Dung dùng liên tiếp nhiều lá Cẩm Nang Thường trong cùng 1 lượt: Duyên Tiên rút bài cho TỪNG LÁ (frequency: unlimited)', () => {
+      const state = createMockGameState();
+      const dispatcher = new DispatcherV4(state);
+      const p0 = state.getPlayer(0);
+
+      p0.hand = [
+        { id: 't1', idKey: 'tuoc_bai', name: 'Tước Bài', type: 'trick' },
+        { id: 't2', idKey: 'quyet_dau', name: 'Quyết Đấu', type: 'trick' },
+        { id: 't3', idKey: 'cuop_bai', name: 'Cướp Bài', type: 'trick' }
+      ];
+
+      // Đánh lá 1: Tước Bài
+      dispatcher.dispatchAction({ type: 'PLAY_CARD', playerId: 0, cardId: 't1', targetIds: [1] });
+      // Đã đánh 1 lá (-1) và rút 1 lá (+1) -> Số lá vẫn là 3
+      expect(p0.hand.length).toBe(3);
+      while (!state.priorityStack.isEmpty()) state.priorityStack.pop();
+
+      // Đánh lá 2: Quyết Đấu
+      dispatcher.dispatchAction({ type: 'PLAY_CARD', playerId: 0, cardId: 't2', targetIds: [1] });
+      // Đã đánh thêm 1 lá (-1) và rút thêm 1 lá (+1) -> Số lá vẫn là 3
+      expect(p0.hand.length).toBe(3);
+      while (!state.priorityStack.isEmpty()) state.priorityStack.pop();
+
+      // Đánh lá 3: Cướp Bài
+      dispatcher.dispatchAction({ type: 'PLAY_CARD', playerId: 0, cardId: 't3', targetIds: [1] });
+      // Đã đánh thêm 1 lá (-1) và rút thêm 1 lá (+1) -> Số lá vẫn là 3
+      expect(p0.hand.length).toBe(3);
+    });
+
     it('khi Tiên Dung đặt cẩm nang trì hoãn [Sấm Sét]: KHÔNG kích hoạt Duyên Tiên', () => {
       const state = createMockGameState();
       const p0 = state.getPlayer(0);

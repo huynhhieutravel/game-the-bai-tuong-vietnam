@@ -56,7 +56,11 @@ export function DuyenThoModal({ req, gameState, onConfirm }) {
           <button 
              className="btn-action success" 
              disabled={selectedIndexes.length !== 2}
-             onClick={() => onConfirm({ targetId: req.targetId, cardIndexes: selectedIndexes })}
+             onClick={() => onConfirm({ 
+               targetId: req.targetId, 
+               cardIds: selectedIndexes.map(i => validCards[i]?.id).filter(Boolean),
+               cardIndexes: selectedIndexes 
+             })}
           >
              Bỏ 2 lá & Hồi HP
           </button>

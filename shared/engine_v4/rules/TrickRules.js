@@ -7,6 +7,18 @@
 import { RangeSystem } from './RangeSystem.js';
 import { CombatRules } from './CombatRules.js';
 import { globalHeroRegistry } from '../heroes/HeroRegistry.js';
+import { 
+  normalizeSuit, 
+  getSuitColor, 
+  isSameSuit, 
+  isEquip, 
+  normalizeCardKey, 
+  isTrick, 
+  isDelayedTrick, 
+  isAOETrick, 
+  isBasicCard 
+} from '../../utils/translationHelper.js';
+import { GameInvariants } from '../core/Invariants.js';
 
 export class TrickRules {
   /**
@@ -21,7 +33,7 @@ export class TrickRules {
     const targets = Array.isArray(targetIds) ? targetIds : [targetIds];
 
     // 0. Kiểm tra Đạm Bạc (Lang Liêu) nếu là Quyết Đấu
-    if ((card.name === 'Quyết Đấu' || card.type === 'duel') && targets.length > 0) {
+    if ((isTrick(card, 'quyet_dau') || card.type === 'duel') && targets.length > 0) {
       const target = state.getPlayer(targets[0]);
       if (target && globalHeroRegistry.hasSkill(target, 'dam_bac', true) && (!target.hand || target.hand.length === 0)) {
         throw new Error(`[TrickRules] ${target.name} đang kích hoạt [Đạm Bạc] (hết bài trên tay), không thể bị Quyết Đấu!`);
@@ -29,7 +41,7 @@ export class TrickRules {
     }
 
     // 0b. Kiểm tra Nghệ An Kế (Nguyễn Chích) nếu là Cướp Bài
-    if (!extraArgs?.isIronChain && (card.name === 'Cướp Bài' || card.idKey === 'cuop_bai') && targets.length > 0) {
+    if (!extraArgs?.isIronChain && isTrick(card, 'cuop_bai') && targets.length > 0) {
       const target = state.getPlayer(targets[0]);
       if (target && (globalHeroRegistry.hasSkill(target, 'nghe_an_ke', true) || target.skills?.includes('nghe_an_ke'))) {
         throw new Error(`[Nghệ An Kế] ${target.name} không thể trở thành mục tiêu của [Cướp Bài]!`);
@@ -37,7 +49,7 @@ export class TrickRules {
     }
 
     // 1. Phân loại Cẩm nang thường vs Cẩm nang Trì hoãn (Sấm Sét, Hỗn Loạn, Binh Lương Thốn Đoạn)
-    const isDelayed = ['Sấm Sét', 'Hỗn Loạn', 'Binh Lương Thốn Đoạn', 'Binh Lương'].includes(card.name) || (!card.virtual && ['sam_set', 'hon_loan', 'binh_luong'].includes(card.idKey || card.id));
+    const isDelayed = isDelayedTrick(card);
     if (isDelayed) {
       return this._playDelayedTrick(state, sourceId, targets[0] ?? sourceId, card);
     }
@@ -50,7 +62,7 @@ export class TrickRules {
     globalHeroRegistry.dispatchTrigger('ON_TRICK_PLAYED', { sourceId, targetIds: targets, card }, state);
 
     // 3. Kiểm tra Xiềng Xích Rèn Lại (Reforge): Bỏ lá bài rút 1 lá mới, không mở hỏi Hóa Giải
-    const isXiengXich = card.name === 'Xiềng Xích' || card.idKey === 'xieng_xich' || extraArgs.isIronChain || extraArgs.reforge;
+    const isXiengXich = isTrick(card, 'xieng_xich') || extraArgs.isIronChain || extraArgs.reforge;
     const isReforge = isXiengXich && (extraArgs.reforge || !targets || targets.length === 0);
 
     if (isReforge) {
@@ -62,8 +74,7 @@ export class TrickRules {
     // 3.5. Cẩm nang Toàn Bàn (AOE: Loạn Tiễn, Dã Man, Hồi Xuân):
     // Theo quy tắc Việt Sát / Tam Quốc Sát: Hóa Giải chỉ hóa giải đơn thể (không có Hóa Giải Vương).
     // Do đó cẩm nang AOE không thể bị hủy toàn bàn, mà thực thi ngay; mỗi cá nhân mục tiêu được Hóa Giải độc lập.
-    const isAOE = ['loan_tien', 'da_man', 'hoi_xuan'].includes(card.idKey || card.id) || 
-                  ['Loạn Tiễn', 'Dã Man', 'Hồi Xuân', 'Nam Man Xâm Nhập', 'Vạn Tiễn Quy Tâm', 'Đào Viên Kết Nghĩa'].includes(card.name);
+    const isAOE = isAOETrick(card);
 
     if (isAOE) {
       state.addLog(`⚡ Cẩm nang toàn bàn [${card.name}] có hiệu lực!`);
@@ -76,26 +87,65 @@ export class TrickRules {
   }
 
   /**
-   * Cẩm nang trì hoãn (Sấm Sét, Hỗn Loạn)
+   * Kiểm tra xem trên bàn chơi có bất kỳ ai sở hữu lá bài hoặc kỹ năng Hóa Giải không
    */
-  static _playDelayedTrick(state, sourceId, targetId, card) {
+  static hasAnyNegatePlayer(state) {
+    if (!state || !state.players) return false;
+    return state.players.some(p => {
+      if (!p.isAlive) return false;
+      // Lá Hóa Giải trên tay
+      if (p.hand && p.hand.some(c => isTrick(c, 'hoa_giai'))) {
+        return true;
+      }
+      // Kỹ năng Linh Giám: bài đen dùng làm Hóa Giải
+      if (globalHeroRegistry.hasSkill(p, 'linh_giam', true) || p.skills?.includes('linh_giam')) {
+        if (p.hand && p.hand.some(c => {
+          const col = globalHeroRegistry.getEffectiveColor(p, c);
+          return col ? col === 'black' : Boolean(c.color === 'black' || c.suit === 'spade' || c.suit === 'club' || c.suit === '♠' || c.suit === '♣');
+        })) {
+          return true;
+        }
+      }
+      // Kỹ năng Chương Dương: trang bị dùng làm Hóa Giải
+      if (globalHeroRegistry.hasSkill(p, 'chuong_duong', true) || p.skills?.includes('chuong_duong')) {
+        const hasEquip = p.equipment && (Array.isArray(p.equipment) ? p.equipment.length > 0 : Object.values(p.equipment).some(Boolean));
+        if (hasEquip) return true;
+      }
+      return false;
+    });
+  }
+
+  /**
+   * Cẩm nang trì hoãn (Sấm Sét, Hỗn Loạn, Binh Lương Thốn Đoạn)
+   */
+  static _playDelayedTrick(state, sourceId, targetId, card, options = {}) {
     const target = state.getPlayer(targetId);
     if (!target) {
       throw new Error(`[TrickRules] Không tìm thấy mục tiêu ${targetId} cho cẩm nang trì hoãn!`);
     }
 
     target.judgementArea = target.judgementArea || [];
-    if (target.judgementArea.some(c => (c.idKey || c.id) === (card.idKey || card.id))) {
+    if (target.judgementArea.some(c => normalizeCardKey(c) === normalizeCardKey(card))) {
       throw new Error(`[TrickRules] Mục tiêu đã có cẩm nang trì hoãn này trong khu phán xét!`);
     }
 
-    if ((card.name === 'Hỗn Loạn' || card.idKey === 'hon_loan') && (globalHeroRegistry.hasSkill(target, 'nghe_an_ke', true) || target.skills?.includes('nghe_an_ke'))) {
+    if (isTrick(card, 'hon_loan') && (globalHeroRegistry.hasSkill(target, 'nghe_an_ke', true) || target.skills?.includes('nghe_an_ke'))) {
       throw new Error(`[Nghệ An Kế] ${target.name} không thể trở thành mục tiêu của [Hỗn Loạn]!`);
     }
 
-    // Chuyển trực tiếp từ tay người chơi vào khu phán xét (KHÔNG bỏ vào discardPile)
+    // Chuyển trực tiếp từ tay người chơi
     const source = state.getPlayer(sourceId);
     source.hand = source.hand.filter(c => c.id !== card.id);
+    state.addLog(`${source.name} sử dụng cẩm nang trì hoãn [${card.name}] lên ${target.name}.`);
+
+    // Mở vòng hỏi Hóa Giải nếu có người chơi sở hữu Hóa Giải trên bàn
+    const canNegate = !options.skipNegate && this.hasAnyNegatePlayer(state);
+    if (canNegate) {
+      this._startNegateChain(state, sourceId, [targetId], card, { isDelayedTrick: true, delayedTargetId: targetId });
+      return;
+    }
+
+    // Không ai có Hóa Giải -> Đặt trực tiếp vào khu phán xét của mục tiêu
     target.judgementArea.push(card);
     state.addLog(`[${card.name}] được đặt vào khu phán xét của ${target.name}.`);
   }
@@ -122,6 +172,7 @@ export class TrickRules {
         card,
         targets,
         extraArgs,
+        ...extraArgs,
         negateCount: 0 // Số lần Hóa Giải được kích hoạt liên tiếp
       }
     });
@@ -149,7 +200,7 @@ export class TrickRules {
             player.equipment[slot] = null;
             state.discardPile.push(negateCard);
             state.addLog(`🛡️ [Chương Dương] ${player.name} tháo trang bị [${negateCard.name}] làm [Hóa Giải]!`);
-            if (negateCard.name === 'Bạch Ngân' || negateCard.idKey === 'bach_ngan' || negateCard.id?.includes('bach_ngan')) {
+            if (negateCard.name === 'Bạch Ngân' || negateCard.name === 'Bạch Ngân Sư Tử' || isEquip(negateCard, 'bach_ngan') || negateCard.idKey === 'bach_ngan' || negateCard.id?.includes('bach_ngan')) {
               player.hp = Math.min(player.maxHp, player.hp + 1);
               state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${player.name}, hồi 1 HP!`);
             }
@@ -159,21 +210,31 @@ export class TrickRules {
         }
       }
       frame.context.negateCount += 1;
+      frame.context.lastNegaterId = rescuerId;
       state.addLog(`🛡️ ${player.name} sử dụng [Hóa Giải]! (Chuỗi: ${frame.context.negateCount})`);
 
-      // Reset lại vòng hỏi để người khác có cơ hội Hóa Giải lá Hóa Giải vừa rồi
+      // Reset lại vòng hỏi để người khác có cơ hội Hóa Giải lá Hóa Giải vừa rồi (loại trừ chính người vừa Hóa Giải)
       const alivePlayers = state.getAlivePlayers();
       const pIdx = alivePlayers.findIndex(p => p.id === rescuerId);
       frame.priorityQueue = [];
-      for (let i = 0; i < alivePlayers.length; i++) {
+      for (let i = 1; i < alivePlayers.length; i++) {
         const idx = (pIdx + i) % alivePlayers.length;
         frame.priorityQueue.push(alivePlayers[idx].id);
       }
-      frame.currentActorId = frame.priorityQueue[0];
-      return { negated: true, chainActive: true };
+      if (frame.priorityQueue.length > 0) {
+        frame.currentActorId = frame.priorityQueue[0];
+        GameInvariants.assertNoSelfNegate(frame, frame.currentActorId);
+        GameInvariants.assertNoPriorityQueueDeadlock(frame);
+        return { negated: true, chainActive: true };
+      } else {
+        return this.respondNegate(state, rescuerId, null);
+      }
     } else {
       // Người chơi này không dùng Hóa Giải -> Chuyển người tiếp theo
       const nextActor = frame.nextActor();
+      if (nextActor !== null) {
+        GameInvariants.assertNoSelfNegate(frame, frame.currentActorId);
+      }
       if (nextActor === null) {
         // Hết vòng hỏi Hóa Giải!
         const finalNegateCount = frame.context.negateCount;
@@ -184,6 +245,44 @@ export class TrickRules {
 
         state.priorityStack.pop(); // Giải phóng frame ASK_NEGATE
 
+        // 1. Cẩm nang phán xét trong Judge Phase
+        if (frame.context.isJudgementNegate) {
+          const delayedCard = frame.context.delayedCard;
+          const player = state.getPlayer(frame.targetId);
+
+          if (finalNegateCount % 2 === 1) {
+            state.discardPile.push(delayedCard);
+            state.addLog(`🛡️ [${delayedCard.name}] đã bị [Hóa Giải] vô hiệu hóa thành công, hủy bỏ phán xét!`);
+            if (player && player.judgementArea && player.judgementArea.length > 0) {
+              this.resolveJudgementPhase(state, player.id);
+            }
+            return { negated: true, resolved: true };
+          } else {
+            this._executeJudgementRoll(state, player, delayedCard);
+            return { negated: false, resolved: true };
+          }
+        }
+
+        // 2. Cẩm nang trì hoãn khi được đánh ra bàn
+        if (extraArgs?.isDelayedTrick) {
+          const target = state.getPlayer(extraArgs.delayedTargetId);
+          if (finalNegateCount % 2 === 1) {
+            state.discardPile.push(card);
+            state.addLog(`❌ Cẩm nang trì hoãn [${card.name}] đã bị [Hóa Giải] vô hiệu hóa thành công!`);
+            return { negated: true, resolved: true };
+          } else {
+            if (target && target.isAlive) {
+              target.judgementArea = target.judgementArea || [];
+              target.judgementArea.push(card);
+              state.addLog(`[${card.name}] được đặt vào khu phán xét của ${target.name}.`);
+            } else {
+              state.discardPile.push(card);
+            }
+            return { negated: false, resolved: true };
+          }
+        }
+
+        // 3. Cẩm nang thông thường
         if (finalNegateCount % 2 === 1) {
           // Số Hóa Giải là lẻ -> Cẩm nang bị HỦY HOÀN TOÀN
           state.addLog(`❌ Cẩm nang [${card.name}] đã bị [Hóa Giải] vô hiệu hóa thành công!`);
@@ -249,66 +348,37 @@ export class TrickRules {
         const targetId = targets[0];
         const target = state.getPlayer(targetId);
         const source = state.getPlayer(sourceId);
-        let stolenCard = null;
-        let fromZoneDesc = 'trên tay';
 
-        if (extraArgs?.targetCardId) {
-          const hIdx = target.hand.findIndex(c => c.id === extraArgs.targetCardId);
-          if (hIdx !== -1) {
-            [stolenCard] = target.hand.splice(hIdx, 1);
-          } else {
-            for (const slot of ['weapon', 'armor', 'horse_attack', 'horse_defense']) {
-              if (target.equipment?.[slot]?.id === extraArgs.targetCardId) {
-                stolenCard = target.equipment[slot];
-                target.equipment[slot] = null;
-                fromZoneDesc = `trang bị [${stolenCard.name}]`;
-                if (stolenCard.name === 'Bạch Ngân' || stolenCard.id?.includes('bach_ngan')) {
-                  target.hp = Math.min(target.maxHp, target.hp + 1);
-                  state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${target.name}, hồi 1 HP!`);
-                }
-                break;
-              }
-            }
-            if (!stolenCard && target.judgementArea) {
-              const jIdx = target.judgementArea.findIndex(c => c.id === extraArgs.targetCardId);
-              if (jIdx !== -1) {
-                [stolenCard] = target.judgementArea.splice(jIdx, 1);
-                fromZoneDesc = `khu phán xét [${stolenCard.name}]`;
-              }
-            }
-          }
-        } else {
-          // Mặc định tự động chọn nếu không chỉ định ID cụ thể: Ưu tiên Hand -> Equipment -> JudgementArea
-          if (target.hand.length > 0) {
-            stolenCard = target.hand.pop();
-          } else {
-            const equipSlots = ['weapon', 'armor', 'horse_attack', 'horse_defense'].filter(s => target.equipment && target.equipment[s]);
-            if (equipSlots.length > 0) {
-              const slot = equipSlots[0];
-              stolenCard = target.equipment[slot];
-              target.equipment[slot] = null;
-              fromZoneDesc = `trang bị [${stolenCard.name}]`;
-              if (stolenCard.name === 'Bạch Ngân' || stolenCard.id?.includes('bach_ngan')) {
-                target.hp = Math.min(target.maxHp, target.hp + 1);
-                state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${target.name}, hồi 1 HP!`);
-              }
-            } else if (target.judgementArea && target.judgementArea.length > 0) {
-              stolenCard = target.judgementArea.pop();
-              fromZoneDesc = `khu phán xét [${stolenCard.name}]`;
-            }
-          }
+        const hasCards = (target.hand && target.hand.length > 0) ||
+          Object.values(target.equipment || {}).some(Boolean) ||
+          (target.judgementArea && target.judgementArea.length > 0);
+
+        if (!hasCards) {
+          state.addLog(`⚠️ ${target.name} không có bất kỳ lá bài nào để cướp!`);
+          break;
         }
 
-        if (stolenCard) {
-          source.hand.push(stolenCard);
-          state.addLog(`🤏 ${source.name} đã cướp 1 lá bài (${fromZoneDesc}) của ${target.name}.`);
-          if (fromZoneDesc.startsWith('trang bị')) {
-            globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId, card: stolenCard }, state);
-          }
-          if (fromZoneDesc.startsWith('trên tay') && target.hand.length === 0 && (target.skills?.includes('hien_ke') || globalHeroRegistry.hasSkill(target, 'hien_ke', true))) {
-            state.drawCards(targetId, 1);
-            state.addLog(`📜 [Hiến Kế] ${target.name} mất lá bài cuối cùng trên tay, lập tức rút 1 lá bài!`);
-          }
+        if (extraArgs?.targetCardId) {
+          this.resolveSteal(state, sourceId, targetId, extraArgs.targetCardId);
+          break;
+        }
+
+        // Với Người chơi thật (Human khi chơi qua Dispatcher có cờ interactive: true) -> Mở popup chọn bài như v3
+        if (extraArgs?.interactive && state.priorityStack && typeof state.priorityStack.push === 'function') {
+          state.priorityStack.push({
+            type: 'ASK_SNATCH',
+            sourceId,
+            targetId,
+            currentActorId: sourceId,
+            priorityQueue: [sourceId],
+            context: {
+              trickType: 'snatch',
+              card,
+              targetId
+            }
+          });
+        } else {
+          this.resolveSteal(state, sourceId, targetId, null);
         }
         break;
       }
@@ -317,72 +387,53 @@ export class TrickRules {
         const targetId = targets[0];
         const target = state.getPlayer(targetId);
         const source = state.getPlayer(sourceId);
-        let removedCard = null;
-        let fromZoneDesc = 'trên tay';
 
-        if (extraArgs?.targetCardId) {
-          const hIdx = target.hand.findIndex(c => c.id === extraArgs.targetCardId);
-          if (hIdx !== -1) {
-            [removedCard] = target.hand.splice(hIdx, 1);
-          } else {
-            for (const slot of ['weapon', 'armor', 'horse_attack', 'horse_defense']) {
-              if (target.equipment?.[slot]?.id === extraArgs.targetCardId) {
-                removedCard = target.equipment[slot];
-                target.equipment[slot] = null;
-                fromZoneDesc = `trang bị [${removedCard.name}]`;
-                if (removedCard.name === 'Bạch Ngân' || removedCard.id?.includes('bach_ngan')) {
-                  target.hp = Math.min(target.maxHp, target.hp + 1);
-                  state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${target.name}, hồi 1 HP!`);
-                }
-                break;
-              }
-            }
-            if (!removedCard && target.judgementArea) {
-              const jIdx = target.judgementArea.findIndex(c => c.id === extraArgs.targetCardId);
-              if (jIdx !== -1) {
-                [removedCard] = target.judgementArea.splice(jIdx, 1);
-                fromZoneDesc = `khu phán xét [${removedCard.name}]`;
-              }
-            }
-          }
-        } else {
-          if (target.hand.length > 0) {
-            removedCard = target.hand.pop();
-          } else {
-            const equipSlots = ['weapon', 'armor', 'horse_attack', 'horse_defense'].filter(s => target.equipment && target.equipment[s]);
-            if (equipSlots.length > 0) {
-              const slot = equipSlots[0];
-              removedCard = target.equipment[slot];
-              target.equipment[slot] = null;
-              fromZoneDesc = `trang bị [${removedCard.name}]`;
-              if (removedCard.name === 'Bạch Ngân' || removedCard.id?.includes('bach_ngan')) {
-                target.hp = Math.min(target.maxHp, target.hp + 1);
-                state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${target.name}, hồi 1 HP!`);
-              }
-            } else if (target.judgementArea && target.judgementArea.length > 0) {
-              removedCard = target.judgementArea.pop();
-              fromZoneDesc = `khu phán xét [${removedCard.name}]`;
-            }
-          }
+        const hasCards = (target.hand && target.hand.length > 0) ||
+          Object.values(target.equipment || {}).some(Boolean) ||
+          (target.judgementArea && target.judgementArea.length > 0);
+
+        if (!hasCards) {
+          state.addLog(`⚠️ ${target.name} không có bất kỳ lá bài nào để tước!`);
+          break;
         }
 
-        if (removedCard) {
-          state.discardPile.push(removedCard);
-          state.addLog(`💥 ${source.name} đã tước 1 lá bài (${fromZoneDesc}) của ${target.name}.`);
-          if (fromZoneDesc.startsWith('trang bị')) {
-            globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId, card: removedCard }, state);
-          }
-          if (fromZoneDesc.startsWith('trên tay') && target.hand.length === 0 && (target.skills?.includes('hien_ke') || globalHeroRegistry.hasSkill(target, 'hien_ke', true))) {
-            state.drawCards(targetId, 1);
-            state.addLog(`📜 [Hiến Kế] ${target.name} mất lá bài cuối cùng trên tay, lập tức rút 1 lá bài!`);
-          }
+        if (extraArgs?.targetCardId) {
+          this.resolveDismantle(state, sourceId, targetId, extraArgs.targetCardId);
+          break;
+        }
+
+        // Với Người chơi thật (Human khi chơi qua Dispatcher có cờ interactive: true) -> Mở popup chọn bài như v3
+        if (extraArgs?.interactive && state.priorityStack && typeof state.priorityStack.push === 'function') {
+          state.priorityStack.push({
+            type: 'ASK_DISMANTLE',
+            sourceId,
+            targetId,
+            currentActorId: sourceId,
+            priorityQueue: [sourceId],
+            context: {
+              trickType: 'dismantle',
+              card,
+              targetId
+            }
+          });
+        } else {
+          this.resolveDismantle(state, sourceId, targetId, null);
         }
         break;
       }
 
       case 'loan_tien': {
         // Mọi người chơi khác phải đánh Né hoặc chịu 1 sát thương
-        for (const tid of targets) {
+        // Vì PriorityStack là cấu trúc LIFO, để giải quyết theo đúng chiều kim đồng hồ (người kề bên trước tiên),
+        // ta đẩy các frame vào stack theo thứ tự đảo ngược (reverse).
+        const vanTienAoe = {
+          trickName: 'Vạn Tiễn',
+          defended: [],
+          damaged: [],
+          total: targets.length
+        };
+        const reversedTargets = [...targets].reverse();
+        for (const tid of reversedTargets) {
           state.priorityStack.push({
             type: 'ASK_DODGE',
             sourceId,
@@ -395,7 +446,8 @@ export class TrickRules {
               dodgesProvided: 0,
               damageAmount: 1,
               reason: 'van-tien',
-              trickType: 'arrow_rain'
+              trickType: 'arrow_rain',
+              aoeResult: vanTienAoe
             }
           });
         }
@@ -404,7 +456,15 @@ export class TrickRules {
 
       case 'da_man': {
         // Mọi người chơi khác phải đánh Chém hoặc chịu 1 sát thương
-        for (const tid of targets) {
+        // Đẩy theo thứ tự đảo ngược để giải quyết theo đúng chiều kim đồng hồ
+        const daManAoe = {
+          trickName: 'Dã Man',
+          defended: [],
+          damaged: [],
+          total: targets.length
+        };
+        const reversedTargets = [...targets].reverse();
+        for (const tid of reversedTargets) {
           state.priorityStack.push({
             type: 'ASK_SLASH_RESPONSE',
             sourceId,
@@ -415,7 +475,8 @@ export class TrickRules {
               card,
               damageAmount: 1,
               reason: 'nam-man',
-              trickType: 'barbarian'
+              trickType: 'barbarian',
+              aoeResult: daManAoe
             }
           });
         }
@@ -423,9 +484,11 @@ export class TrickRules {
       }
 
       case 'hoi_xuan': {
-        // Toàn bộ người chơi bị thương hồi 1 HP
-        for (const p of state.getAlivePlayers()) {
-          if (p.hp < p.maxHp) {
+        // Toàn bộ người chơi bị thương hồi 1 HP theo đúng chiều kim đồng hồ
+        const effectiveTargets = (targets && targets.length > 0) ? targets : state.getAlivePlayers().map(p => p.id);
+        for (const tid of effectiveTargets) {
+          const p = state.getPlayer(tid);
+          if (p && p.isAlive && p.hp < p.maxHp) {
             p.hp += 1;
             state.addLog(`🌸 [Hồi Xuân] hồi phục 1 HP cho ${p.name} (${p.hp}/${p.maxHp}).`);
           }
@@ -546,6 +609,7 @@ export class TrickRules {
       if (weaponCard) {
         targetA.equipment.weapon = null;
         borrower.hand.push(weaponCard);
+        globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: targetA.id, card: weaponCard }, state);
         state.addLog(`🗡️ ${targetA.name} không dùng Chém, bị ${borrower.name} tịch thu vũ khí [${weaponCard.name}]!`);
         return { surrenderedWeapon: true, weapon: weaponCard };
       }
@@ -658,21 +722,43 @@ export class TrickRules {
 
     state.priorityStack.pop();
 
+    const aoe = frame.context?.aoeResult;
+    let result;
+
     if (slashCard) {
-      const isNegate = slashCard.name === 'Hóa Giải' || slashCard.idKey === 'hoa_giai';
+      const isNegate = isTrick(slashCard, 'hoa_giai') ||
+        slashCard.virtualCardName === 'Hóa Giải' || data?.virtualCardName === 'Hóa Giải' || data?.activeSkill === 'Linh Giám' || data?.asNegate;
       state.discardFromHand(targetId, [slashCard.id]);
       if (isNegate) {
         state.addLog(`🛡️ ${target.name} dùng lá [Hóa Giải] hóa giải thành công đợt [Dã Man] cho riêng mình!`);
-        return { defended: true, negatedSingle: true };
+        if (aoe) aoe.defended.push(`${target.name} (Hóa Giải)`);
+        result = { defended: true, negatedSingle: true };
+      } else {
+        state.addLog(`${target.name} đánh ra lá [Chém] để cản [Dã Man]!`);
+        if (aoe) aoe.defended.push(target.name);
+        result = { defended: true };
       }
-      state.addLog(`${target.name} đánh ra lá [Chém] để cản [Dã Man]!`);
-      return { defended: true };
     } else {
       const damageAmount = frame.context?.damageAmount || 1;
       state.addLog(`💥 ${target.name} không có Chém, chịu ${damageAmount} sát thương từ [Dã Man]!`);
+      if (aoe) aoe.damaged.push(target.name);
       CombatRules.applyDamage(state, frame.sourceId, targetId, damageAmount, 'barbarian');
-      return { defended: false };
+      result = { defended: false };
     }
+
+    if (aoe && (aoe.defended.length + aoe.damaged.length >= aoe.total)) {
+      let summaryText = '';
+      if (aoe.damaged.length === 0) {
+        summaryText = `🏹 [Dã Man]: ${aoe.defended.join(', ')} đều dùng [Chém] cản đòn!`;
+      } else if (aoe.defended.length === 0) {
+        summaryText = `🏹 [Dã Man]: ${aoe.damaged.join(', ')} đều không có Chém, mất máu!`;
+      } else {
+        summaryText = `🏹 [Dã Man]: ${aoe.defended.join(', ')} dùng [Chém] cản; ${aoe.damaged.join(', ')} mất máu!`;
+      }
+      state.addLog(summaryText);
+    }
+
+    return result;
   }
 
   // Backward-compatible static helper methods
@@ -680,26 +766,183 @@ export class TrickRules {
     return this.playTrick(state, sourceId, [targetId], card);
   }
 
-  static playDismantle(state, sourceId, targetId, card) {
-    return this.playTrick(state, sourceId, [targetId], card);
+  static resolveSteal(state, sourceId, targetId, targetCardId = null) {
+    const target = state.getPlayer(targetId);
+    const source = state.getPlayer(sourceId);
+    if (!target || !source) return null;
+
+    let stolenCard = null;
+    let fromZoneDesc = 'trên tay';
+
+    if (targetCardId) {
+      const hIdx = (target.hand || []).findIndex(c => c.id === targetCardId);
+      if (hIdx !== -1) {
+        [stolenCard] = target.hand.splice(hIdx, 1);
+      } else {
+        for (const slot of ['weapon', 'armor', 'horse_attack', 'horse_defense']) {
+          if (target.equipment?.[slot]?.id === targetCardId) {
+            stolenCard = target.equipment[slot];
+            target.equipment[slot] = null;
+            fromZoneDesc = `trang bị [${stolenCard.name}]`;
+            if (stolenCard.name === 'Bạch Ngân' || stolenCard.name === 'Bạch Ngân Sư Tử' || isEquip(stolenCard, 'bach_ngan') || stolenCard.id?.includes('bach_ngan')) {
+              target.hp = Math.min(target.maxHp, target.hp + 1);
+              state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${target.name}, hồi 1 HP!`);
+            }
+            break;
+          }
+        }
+        if (!stolenCard && target.judgementArea) {
+          const jIdx = target.judgementArea.findIndex(c => c.id === targetCardId);
+          if (jIdx !== -1) {
+            [stolenCard] = target.judgementArea.splice(jIdx, 1);
+            fromZoneDesc = `khu phán xét [${stolenCard.name}]`;
+          }
+        }
+      }
+    }
+
+    if (!stolenCard) {
+      if (target.hand && target.hand.length > 0) {
+        stolenCard = target.hand.pop();
+      } else {
+        const equipSlots = ['weapon', 'armor', 'horse_attack', 'horse_defense'].filter(s => target.equipment && target.equipment[s]);
+        if (equipSlots.length > 0) {
+          const slot = equipSlots[0];
+          stolenCard = target.equipment[slot];
+          target.equipment[slot] = null;
+          fromZoneDesc = `trang bị [${stolenCard.name}]`;
+          if (stolenCard.name === 'Bạch Ngân' || stolenCard.name === 'Bạch Ngân Sư Tử' || isEquip(stolenCard, 'bach_ngan') || stolenCard.id?.includes('bach_ngan')) {
+            target.hp = Math.min(target.maxHp, target.hp + 1);
+            state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${target.name}, hồi 1 HP!`);
+          }
+        } else if (target.judgementArea && target.judgementArea.length > 0) {
+          stolenCard = target.judgementArea.pop();
+          fromZoneDesc = `khu phán xét [${stolenCard.name}]`;
+        }
+      }
+    }
+
+    if (stolenCard) {
+      source.hand.push(stolenCard);
+      state.addLog(`🤏 ${source.name} đã cướp 1 lá bài (${fromZoneDesc}) của ${target.name}.`);
+      if (fromZoneDesc.startsWith('trang bị')) {
+        globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId, card: stolenCard }, state);
+      }
+      if (fromZoneDesc.startsWith('trên tay') && target.hand.length === 0 && (target.skills?.includes('hien_ke') || globalHeroRegistry.hasSkill(target, 'hien_ke', true))) {
+        state.drawCards(targetId, 1);
+        state.addLog(`📜 [Hiến Kế] ${target.name} mất lá bài cuối cùng trên tay, lập tức rút 1 lá bài!`);
+      }
+    }
+    return stolenCard;
   }
 
-  static playSteal(state, sourceId, targetId, card) {
-    return this.playTrick(state, sourceId, [targetId], card);
+  static resolveDismantle(state, sourceId, targetId, targetCardId = null) {
+    const target = state.getPlayer(targetId);
+    const source = state.getPlayer(sourceId);
+    if (!target || !source) return null;
+
+    let removedCard = null;
+    let fromZoneDesc = 'trên tay';
+
+    if (targetCardId) {
+      const hIdx = (target.hand || []).findIndex(c => c.id === targetCardId);
+      if (hIdx !== -1) {
+        [removedCard] = target.hand.splice(hIdx, 1);
+      } else {
+        for (const slot of ['weapon', 'armor', 'horse_attack', 'horse_defense']) {
+          if (target.equipment?.[slot]?.id === targetCardId) {
+            removedCard = target.equipment[slot];
+            target.equipment[slot] = null;
+            fromZoneDesc = `trang bị [${removedCard.name}]`;
+            if (removedCard.name === 'Bạch Ngân' || removedCard.name === 'Bạch Ngân Sư Tử' || isEquip(removedCard, 'bach_ngan') || removedCard.id?.includes('bach_ngan')) {
+              target.hp = Math.min(target.maxHp, target.hp + 1);
+              state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${target.name}, hồi 1 HP!`);
+            }
+            break;
+          }
+        }
+        if (!removedCard && target.judgementArea) {
+          const jIdx = target.judgementArea.findIndex(c => c.id === targetCardId);
+          if (jIdx !== -1) {
+            [removedCard] = target.judgementArea.splice(jIdx, 1);
+            fromZoneDesc = `khu phán xét [${removedCard.name}]`;
+          }
+        }
+      }
+    }
+
+    if (!removedCard) {
+      if (target.hand && target.hand.length > 0) {
+        removedCard = target.hand.pop();
+      } else {
+        const equipSlots = ['weapon', 'armor', 'horse_attack', 'horse_defense'].filter(s => target.equipment && target.equipment[s]);
+        if (equipSlots.length > 0) {
+          const slot = equipSlots[0];
+          removedCard = target.equipment[slot];
+          target.equipment[slot] = null;
+          fromZoneDesc = `trang bị [${removedCard.name}]`;
+          if (removedCard.name === 'Bạch Ngân' || removedCard.name === 'Bạch Ngân Sư Tử' || isEquip(removedCard, 'bach_ngan') || removedCard.id?.includes('bach_ngan')) {
+            target.hp = Math.min(target.maxHp, target.hp + 1);
+            state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${target.name}, hồi 1 HP!`);
+          }
+        } else if (target.judgementArea && target.judgementArea.length > 0) {
+          removedCard = target.judgementArea.pop();
+          fromZoneDesc = `khu phán xét [${removedCard.name}]`;
+        }
+      }
+    }
+
+    if (removedCard) {
+      state.discardPile.push(removedCard);
+      state.addLog(`💥 ${source.name} đã tước 1 lá bài (${fromZoneDesc}) của ${target.name}.`);
+      if (fromZoneDesc.startsWith('trang bị')) {
+        globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId, card: removedCard }, state);
+      }
+      if (fromZoneDesc.startsWith('trên tay') && target.hand.length === 0 && (target.skills?.includes('hien_ke') || globalHeroRegistry.hasSkill(target, 'hien_ke', true))) {
+        state.drawCards(targetId, 1);
+        state.addLog(`📜 [Hiến Kế] ${target.name} mất lá bài cuối cùng trên tay, lập tức rút 1 lá bài!`);
+      }
+    }
+    return removedCard;
+  }
+
+  static playDismantle(state, sourceId, targetId, card, extraArgs = {}) {
+    return this.playTrick(state, sourceId, [targetId], card, extraArgs);
+  }
+
+  static playSteal(state, sourceId, targetId, card, extraArgs = {}) {
+    return this.playTrick(state, sourceId, [targetId], card, extraArgs);
+  }
+
+  /**
+   * Lấy danh sách người chơi còn sống theo chiều kim đồng hồ bắt đầu từ người kế tiếp
+   */
+  static getClockwiseTargets(state, sourceId, includeSelf = false) {
+    const alive = state.getAlivePlayers();
+    const sourceIdx = alive.findIndex(p => p.id === sourceId);
+    if (sourceIdx === -1) return alive.map(p => p.id);
+    const result = [];
+    const count = includeSelf ? alive.length : alive.length - 1;
+    const startOffset = includeSelf ? 0 : 1;
+    for (let i = startOffset; i < startOffset + count; i++) {
+      const idx = (sourceIdx + i) % alive.length;
+      result.push(alive[idx].id);
+    }
+    return result;
   }
 
   static playArrowRain(state, sourceId, card) {
-    const targets = state.getAlivePlayers().filter(p => p.id !== sourceId).map(p => p.id);
+    const targets = this.getClockwiseTargets(state, sourceId, false);
     return this.playTrick(state, sourceId, targets, card);
   }
 
   static playBarbarian(state, sourceId, card) {
-    const targets = state.getAlivePlayers().filter(p => p.id !== sourceId).map(p => p.id);
+    const targets = this.getClockwiseTargets(state, sourceId, false);
     return this.playTrick(state, sourceId, targets, card);
   }
 
   static playPeachGarden(state, sourceId, card) {
-    const targets = state.getAlivePlayers().map(p => p.id);
+    const targets = this.getClockwiseTargets(state, sourceId, true);
     return this.playTrick(state, sourceId, targets, card);
   }
 
@@ -714,8 +957,10 @@ export class TrickRules {
   static playStarvation(state, sourceId, targetId, card) {
     const target = state.getPlayer(targetId);
     if (!target) throw new Error(`[TrickRules] Mục tiêu ${targetId} không hợp lệ!`);
-    const dist = RangeSystem.calculateDistance(state.getPlayer(sourceId), target, state.getAlivePlayers());
-    if (dist > 1) {
+    const source = state.getPlayer(sourceId);
+    const hasInfiniteTrickRange = globalHeroRegistry.hasSkill(source, 'tien_duyen_khoang_cach', true);
+    const dist = RangeSystem.calculateDistance(source, target, state.getAlivePlayers());
+    if (!hasInfiniteTrickRange && dist > 1) {
       throw new Error(`[TrickRules] Mục tiêu Binh Lương Thốn Đoạn phải ở cự ly <= 1 (Khoảng cách hiện tại: ${dist})!`);
     }
     return this.playTrick(state, sourceId, [targetId], card);
@@ -740,59 +985,101 @@ export class TrickRules {
   }
 
   /**
-   * Xử lý toàn bộ cẩm nang trong khu phán xét của người chơi (Sấm Sét, Hỗn Loạn)
+   * Xử lý cẩm nang trong khu phán xét của người chơi (Sấm Sét, Hỗn Loạn, Binh Lương Thốn Đoạn)
    */
-  static resolveJudgementPhase(state, playerId) {
+  static resolveJudgementPhase(state, playerId, options = {}) {
     const player = state.getPlayer(playerId);
-    if (!player || !player.judgementArea || player.judgementArea.length === 0) {
+    if (!player || !player.judgementArea || player.judgementArea.length === 0 || !player.isAlive) {
       return;
     }
 
-    // Xử lý lần lượt từng lá bài (LIFO: lá đặt vào sau cùng được xử lý trước)
-    while (player.judgementArea.length > 0 && player.isAlive) {
-      const delayedCard = player.judgementArea.pop();
-      const cardKey = delayedCard.idKey || (delayedCard.name === 'Sấm Sét' ? 'sam_set' : (delayedCard.name === 'Hỗn Loạn' ? 'hon_loan' : delayedCard.id));
+    // Lấy lá cẩm nang trên đỉnh khu phán xét (LIFO)
+    const delayedCard = player.judgementArea.pop();
 
-      state.addLog(`⚖️ Bắt đầu phán xét [${delayedCard.name}] cho ${player.name}...`);
-
-      // Lật bài phán xét từ đầu drawPile
-      const judgeCard = state.drawCardFromDeck();
-      if (!judgeCard) {
-        state.addLog(`Không còn bài để phán xét! Bỏ qua [${delayedCard.name}].`);
-        state.discardPile.push(delayedCard);
-        continue;
+    // Kiểm tra xem trên bàn có ai sở hữu lá bài hoặc kỹ năng Hóa Giải không (Judgement Negate Window theo ADR 0005)
+    const canNegate = !options.skipNegate && this.hasAnyNegatePlayer(state);
+    if (canNegate) {
+      state.addLog(`⚖️ Chuẩn bị phán xét [${delayedCard.name}] cho ${player.name}...`);
+      const alivePlayers = state.getAlivePlayers();
+      const pIdx = alivePlayers.findIndex(p => p.id === playerId);
+      const priorityQueue = [];
+      for (let i = 0; i < alivePlayers.length; i++) {
+        const idx = (pIdx + i) % alivePlayers.length;
+        priorityQueue.push(alivePlayers[idx].id);
       }
 
-      // Kiểm tra xem có người chơi nào có kỹ năng đổi phán xét (Mạc Đĩnh Chi - Ứng Biến, Đinh Điền - Quân Cơ)
-      const candidateIds = state.players
-        .filter(p => p.isAlive && p.hand && p.hand.length > 0 && (
-          globalHeroRegistry.hasSkill(p, 'ung_bien', true) ||
-          p.skills?.includes('ung_bien') ||
-          globalHeroRegistry.hasSkill(p, 'quan_co', true) ||
-          p.skills?.includes('quan_co')
-        ))
-        .map(p => p.id);
+      state.priorityStack.push({
+        type: 'ASK_NEGATE',
+        sourceId: playerId,
+        targetId: playerId,
+        currentActorId: priorityQueue[0],
+        priorityQueue,
+        context: {
+          card: delayedCard,
+          delayedCard,
+          isJudgementNegate: true,
+          reason: 'judgement',
+          negateCount: 0
+        }
+      });
+      return;
+    }
 
-      if (candidateIds.length > 0) {
-        state.priorityStack.push({
-          type: 'ASK_CHANGE_JUDGE',
-          sourceId: player.id,
-          targetId: player.id,
-          priorityQueue: candidateIds,
-          currentActorId: candidateIds[0],
-          context: {
-            delayedCard,
-            judgeCard,
-            reason: cardKey,
-            candidateIds,
-            candidateIndex: 0
-          }
-        });
-        return; // Dừng lại chờ phản hồi từ người đổi phán xét
+    // Không ai có Hóa Giải -> Phán xét trực tiếp
+    this._executeJudgementRoll(state, player, delayedCard);
+  }
+
+  /**
+   * Thực hiện lật bài phán xét và xử lý đổi bài phán xét
+   */
+  static _executeJudgementRoll(state, player, delayedCard) {
+    const cardKey = normalizeCardKey(delayedCard);
+
+    state.addLog(`⚖️ Bắt đầu phán xét [${delayedCard.name}] cho ${player.name}...`);
+
+    // Lật bài phán xét từ đầu drawPile
+    const judgeCard = state.drawCardFromDeck();
+    if (!judgeCard) {
+      state.addLog(`Không còn bài để phán xét! Bỏ qua [${delayedCard.name}].`);
+      state.discardPile.push(delayedCard);
+      if (player.judgementArea && player.judgementArea.length > 0 && player.isAlive) {
+        this.resolveJudgementPhase(state, player.id);
       }
+      return;
+    }
 
-      // Không có ai đổi bài -> Xử lý kết quả phán xét trực tiếp
-      this._finalizeDelayedJudgement(state, player, delayedCard, judgeCard);
+    // Kiểm tra xem có người chơi nào có kỹ năng đổi phán xét (Mạc Đĩnh Chi - Ứng Biến, Đinh Điền - Quân Cơ)
+    const candidateIds = state.players
+      .filter(p => p.isAlive && p.hand && p.hand.length > 0 && (
+        globalHeroRegistry.hasSkill(p, 'ung_bien', true) ||
+        p.skills?.includes('ung_bien') ||
+        globalHeroRegistry.hasSkill(p, 'quan_co', true) ||
+        p.skills?.includes('quan_co')
+      ))
+      .map(p => p.id);
+
+    if (candidateIds.length > 0) {
+      state.priorityStack.push({
+        type: 'ASK_CHANGE_JUDGE',
+        sourceId: player.id,
+        targetId: player.id,
+        priorityQueue: candidateIds,
+        currentActorId: candidateIds[0],
+        context: {
+          delayedCard,
+          judgeCard,
+          reason: cardKey,
+          candidateIds,
+          candidateIndex: 0
+        }
+      });
+      return; // Dừng lại chờ phản hồi từ người đổi phán xét
+    }
+
+    // Không có ai đổi bài -> Xử lý kết quả phán xét trực tiếp
+    this._finalizeDelayedJudgement(state, player, delayedCard, judgeCard);
+    if (player.judgementArea && player.judgementArea.length > 0 && player.isAlive) {
+      this.resolveJudgementPhase(state, player.id);
     }
   }
 
@@ -814,13 +1101,8 @@ export class TrickRules {
       const hasUngBien = globalHeroRegistry.hasSkill(responder, 'ung_bien', true) || responder.skills?.includes('ung_bien');
       const hasQuanCo = globalHeroRegistry.hasSkill(responder, 'quan_co', true) || responder.skills?.includes('quan_co');
       if (hasQuanCo && !hasUngBien) {
-        const isBlack = replaceCard.color === 'black' || 
-                        replaceCard.suit === 'spades' || 
-                        replaceCard.suit === 'clubs' || 
-                        replaceCard.suit === 'spade' || 
-                        replaceCard.suit === 'club' || 
-                        replaceCard.suit === '♠' || 
-                        replaceCard.suit === '♣';
+        const effColor = replaceCard && responder ? globalHeroRegistry.getEffectiveColor(responder, replaceCard) : replaceCard.color;
+        const isBlack = effColor ? effColor === 'black' : Boolean(replaceCard.color === 'black' || getSuitColor(replaceCard.suit) === 'black');
         if (!isBlack) {
           throw new Error(`[Quân Cơ] Đinh Điền chỉ được dùng lá bài màu Đen để thay thế bài phán xét!`);
         }
@@ -832,6 +1114,9 @@ export class TrickRules {
       const skillName = hasUngBien ? 'Ứng Biến' : 'Quân Cơ';
       state.addLog(`☯️ [${skillName}] ${responder.name} đánh ra lá [${replaceCard.name} ${replaceCard.suit || ''}] thay thế lá phán xét!`);
       this._finalizeDelayedJudgement(state, player, delayedCard, finalJudgeCard);
+      if (player && player.judgementArea && player.judgementArea.length > 0 && player.isAlive) {
+        this.resolveJudgementPhase(state, player.id);
+      }
       return { changed: true, newCard: replaceCard };
     } else {
       // Bỏ qua / Từ chối đổi -> Chuyển sang candidate tiếp theo nếu có
@@ -846,6 +1131,9 @@ export class TrickRules {
         // Hết người muốn đổi -> Chốt phán xét với lá ban đầu
         state.priorityStack.pop();
         this._finalizeDelayedJudgement(state, player, delayedCard, finalJudgeCard);
+        if (player && player.judgementArea && player.judgementArea.length > 0 && player.isAlive) {
+          this.resolveJudgementPhase(state, player.id);
+        }
         return { changed: false, finalCard: finalJudgeCard };
       }
     }
@@ -855,14 +1143,14 @@ export class TrickRules {
    * Thực thi kết quả phán xét cuối cùng cho Cẩm nang Trì hoãn
    */
   static _finalizeDelayedJudgement(state, player, delayedCard, judgeCard) {
-    const cardKey = delayedCard.idKey || (delayedCard.name === 'Sấm Sét' ? 'sam_set' : (delayedCard.name === 'Hỗn Loạn' ? 'hon_loan' : delayedCard.id));
+    const cardKey = normalizeCardKey(delayedCard);
     state.discardPile.push(judgeCard);
 
     // Kích hoạt phản ứng phán xét (Ngọc Hân Công Chúa - Thông Ngôn...)
     globalHeroRegistry.dispatchTrigger('ON_JUDGED', { targetId: player.id, judgeCard }, state);
 
     if (cardKey === 'sam_set') {
-      const isSpade = judgeCard.suit === 'spade' || judgeCard.suit === '♠';
+      const isSpade = normalizeSuit(judgeCard.suit).code === 'spade';
       const rank = typeof judgeCard.rank === 'number' ? judgeCard.rank : parseInt(judgeCard.rank, 10);
       const isExploded = isSpade && rank >= 2 && rank <= 9;
 
@@ -871,15 +1159,29 @@ export class TrickRules {
         state.discardPile.push(delayedCard);
         CombatRules.applyDamage(state, null, player.id, 3, 'lightning');
       } else {
-        state.addLog(`⚡ [Sấm Sét] Không nổ (${judgeCard.name} ${judgeCard.suit} ${judgeCard.rank || ''})! Chuyển cẩm nang sang người chơi còn sống kế tiếp.`);
+        state.addLog(`⚡ [Sấm Sét] Không nổ (${judgeCard.name} ${judgeCard.suit} ${judgeCard.rank || ''})!`);
         const alive = state.getAlivePlayers();
         const currIdx = alive.findIndex(p => p.id === player.id);
-        const nextPlayer = alive[(currIdx + 1) % alive.length];
-        nextPlayer.judgementArea = nextPlayer.judgementArea || [];
-        nextPlayer.judgementArea.push(delayedCard);
+        let nextPlayer = null;
+        for (let step = 1; step < alive.length; step++) {
+          const candidate = alive[(currIdx + step) % alive.length];
+          const hasLightning = candidate.judgementArea && candidate.judgementArea.some(c => isDelayedTrick(c, 'sam_set'));
+          if (!hasLightning) {
+            nextPlayer = candidate;
+            break;
+          }
+        }
+        if (nextPlayer) {
+          nextPlayer.judgementArea = nextPlayer.judgementArea || [];
+          nextPlayer.judgementArea.push(delayedCard);
+          state.addLog(`⚡ [Sấm Sét] Chuyển sang khu phán xét của ${nextPlayer.name}.`);
+        } else {
+          state.discardPile.push(delayedCard);
+          state.addLog(`⚡ [Sấm Sét] Tất cả người chơi đều đã có Sấm Sét, lá bài được đưa vào chồng bài bỏ.`);
+        }
       }
     } else if (cardKey === 'hon_loan') {
-      const isHeart = judgeCard.suit === 'heart' || judgeCard.suit === '♥' || (judgeCard.color === 'red' && judgeCard.suit !== 'diamond' && judgeCard.suit !== '♦');
+      const isHeart = normalizeSuit(judgeCard.suit).code === 'heart';
       state.discardPile.push(delayedCard);
 
       if (!isHeart) {
@@ -890,7 +1192,7 @@ export class TrickRules {
         state.addLog(`✨ [Hỗn Loạn] Phán xét ra CƠ (${judgeCard.name})! ${player.name} thoát khỏi Hỗn Loạn thành công.`);
       }
     } else if (cardKey === 'binh_luong' || cardKey === 'binh-luong') {
-      const isClub = judgeCard.suit === 'club' || judgeCard.suit === '♣';
+      const isClub = normalizeSuit(judgeCard.suit).code === 'club';
       state.discardPile.push(delayedCard);
 
       if (!isClub) {
@@ -970,8 +1272,13 @@ export class TrickRules {
     state.priorityStack.pop();
 
     if (discardCard) {
-      const match = (discardCard.suit && discardCard.suit === revealedCard.suit) || 
-                    (discardCard.color && discardCard.color === revealedCard.color);
+      const sourceSuit = globalHeroRegistry.getEffectiveSuit(source, discardCard) || discardCard.suit;
+      const targetSuit = globalHeroRegistry.getEffectiveSuit(target, revealedCard) || revealedCard.suit;
+      const sourceColor = globalHeroRegistry.getEffectiveColor(source, discardCard) || discardCard.color;
+      const targetColor = globalHeroRegistry.getEffectiveColor(target, revealedCard) || revealedCard.color;
+
+      const match = (sourceSuit && isSameSuit(sourceSuit, targetSuit)) || 
+                    (sourceColor && sourceColor === targetColor);
       if (!match) {
         state.addLog(`❌ [Hỏa Công]: Lá bài [${discardCard.name}] không cùng chất (${revealedCard.suit}) với lá bài đã lộ!`);
         return { success: false, reason: 'SUIT_MISMATCH' };

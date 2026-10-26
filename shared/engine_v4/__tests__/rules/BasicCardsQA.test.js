@@ -241,8 +241,8 @@ describe('QA Toàn Diện Thẻ Bài Cơ Bản (Basic Cards QA: Chém, Né, Đà
       p1.hp = 3;
 
       CombatRules.playSlash(state, 0, 1, p0.hand[0]);
-      // p1 né, nhưng Rìu Đá tự động bỏ 2 bài xuyên phá
-      const res = CombatRules.respondDodge(state, 1, p1.hand[0]);
+      // p1 né, chủ công chọn bỏ 2 bài c_card_a và c_card_b để xuyên phá
+      const res = CombatRules.respondDodge(state, 1, p1.hand[0], { rockAxeCardIds: ['c_card_a', 'c_card_b'] });
 
       expect(res.penetrated).toBe(true);
       expect(p1.hp).toBe(2); // Vẫn bị mất 1 máu

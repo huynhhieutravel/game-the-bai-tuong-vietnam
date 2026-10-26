@@ -11,7 +11,8 @@ import {
 import { BotBrain } from '../ai/BotBrain.js';
 import { PHASES } from '../../constants/phases.js';
 
-console.log('🚀 Bắt đầu Đại Giả Lập 1.000 Trận Tầng Ứng Dụng (Application Layer & Dispatcher V4)...');
+const MATCH_COUNT = parseInt(process.argv[2] || process.env.MATCHES || '1000', 10);
+console.log(`🚀 Bắt đầu Đại Giả Lập ${MATCH_COUNT.toLocaleString()} Trận Tầng Ứng Dụng (Application Layer & Dispatcher V4)...`);
 
 const allHeroes = globalHeroRegistry.getAllHeroes();
 const heroesByFaction = {
@@ -24,7 +25,7 @@ const heroesByFaction = {
 const factions = ['lac', 'viet', 'ha', 'son'];
 
 const stats = {
-  totalMatches: 1000,
+  totalMatches: MATCH_COUNT,
   completedMatches: 0,
   timeouts: 0,
   deadlocks: 0,
@@ -33,12 +34,15 @@ const stats = {
   factionWins: { lac: 0, viet: 0, ha: 0, son: 0, draw: 0 },
   totalActions: 0,
   totalResponses: 0,
-  totalTricks: 0
+  totalTricks: 0,
+  totalSkillExecutions: 0,
+  skillMetrics: {},
+  heroDraftCounts: {}
 };
 
 const startTime = Date.now();
 
-for (let g = 0; g < 1000; g++) {
+for (let g = 0; g < MATCH_COUNT; g++) {
   try {
     // 1. Khởi tạo Draft State
     let rawState = createGameState(4);
@@ -53,6 +57,8 @@ for (let g = 0; g < 1000; g++) {
       if (h1.id === h2.id) {
         h2 = pool.find(h => h.id !== h1.id) || h1;
       }
+      stats.heroDraftCounts[h1.id] = (stats.heroDraftCounts[h1.id] || 0) + 1;
+      stats.heroDraftCounts[h2.id] = (stats.heroDraftCounts[h2.id] || 0) + 1;
       rawState = selectDraftHeroes(rawState, i, h1.id, h2.id);
     }
 
@@ -63,9 +69,13 @@ for (let g = 0; g < 1000; g++) {
     let isSubmittingGlobal = false;
     let throttleWarnings = 0;
 
-    // Dispatcher subscription reset cờ throttle giống GameProvider.jsx
+    // Dispatcher subscription reset cờ throttle và map ViewModel giống hệt GameProvider.jsx
     dispatcher.subscribe((engineState) => {
       isSubmittingGlobal = false;
+      // KIỂM ĐỊNH TẦNG UI VIEWMODEL: Gọi toViewModel trên từng bước cho cả 4 góc nhìn người chơi (0, 1, 2, 3) kể cả khi còn sống hay đã tử trận
+      for (let pId = 0; pId < 4; pId++) {
+        toViewModel(engineState, pId);
+      }
     });
 
     const proxiedAPI = new Proxy(rawAPI, {
@@ -204,7 +214,7 @@ for (let g = 0; g < 1000; g++) {
           stats.totalActions++;
           stats.totalTricks++;
         } else if (action && action.type === 'USE_SKILL') {
-          proxiedAPI.useSkill(
+          const sRes = proxiedAPI.useSkill(
             currentTurnId,
             action.skillId,
             action.cardIds || [],
@@ -212,6 +222,9 @@ for (let g = 0; g < 1000; g++) {
             action.options || {}
           );
           stats.totalActions++;
+          stats.totalSkillExecutions++;
+          const skey = action.skillId || 'unknown_skill';
+          stats.skillMetrics[skey] = (stats.skillMetrics[skey] || 0) + 1;
         } else if (action && action.type === 'REVEAL_HERO') {
           proxiedAPI.revealHero(currentTurnId, action.heroIndex);
           stats.totalActions++;
@@ -233,8 +246,9 @@ for (let g = 0; g < 1000; g++) {
       stats.factionWins.draw++;
     }
 
-    if ((g + 1) % 200 === 0) {
-      console.log(`✅ Đã hoàn thành ${g + 1}/1000 trận tầng ứng dụng qua Dispatcher...`);
+    const progressInterval = Math.max(1, Math.floor(MATCH_COUNT / 5));
+    if ((g + 1) % progressInterval === 0 || g + 1 === MATCH_COUNT) {
+      console.log(`✅ Đã hoàn thành ${g + 1}/${MATCH_COUNT} trận tầng ứng dụng qua Dispatcher...`);
     }
   } catch (err) {
     stats.errors.push({ game: g, message: err.message, stack: err.stack });
@@ -243,8 +257,8 @@ for (let g = 0; g < 1000; g++) {
 }
 
 const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-console.log(`\n🎉 KẾT QUẢ ĐẠI GIẢ LẬP 1.000 TRẬN TẦNG ỨNG DỤNG DISPATCHER (Thời gian: ${duration}s):`);
-console.log(`- Trận hoàn thành: ${stats.completedMatches + stats.timeouts}/1000`);
+console.log(`\n🎉 KẾT QUẢ ĐẠI GIẢ LẬP ${MATCH_COUNT.toLocaleString()} TRẬN TẦNG ỨNG DỤNG DISPATCHER (Thời gian: ${duration}s):`);
+console.log(`- Trận hoàn thành: ${stats.completedMatches + stats.timeouts}/${MATCH_COUNT}`);
 console.log(`- Lỗi Ngoại Lệ / Deadlock: ${stats.deadlocks}`);
 console.log(`- Lệnh bị Throttle chặn ngoài ý muốn: ${stats.throttleBlocks}`);
 console.log(`- Số trận Timeout (>1000 steps): ${stats.timeouts}`);
@@ -253,6 +267,18 @@ console.log(`- Thống kê tương tác:`);
 console.log(`  + Tổng hành động chủ động (Actions): ${stats.totalActions}`);
 console.log(`  + Tổng phản hồi ngăn xếp (Responses): ${stats.totalResponses}`);
 console.log(`  + Thẻ Cẩm nang thi triển (Tricks): ${stats.totalTricks}`);
+console.log(`  + Tổng kích hoạt Kỹ Năng Chủ Động: ${stats.totalSkillExecutions}`);
+
+console.log(`\n📊 BẢNG KIỂM ĐỊNH CHỐNG THOÁI HÓA ÂM THẦM KỸ NĂNG (ANTI-SILENT DEGRADATION AUDIT):`);
+const sortedSkills = Object.entries(stats.skillMetrics).sort((a, b) => b[1] - a[1]);
+if (sortedSkills.length > 0) {
+  console.log(`- Top kỹ năng chủ động kích hoạt nhiều nhất:`);
+  sortedSkills.slice(0, 10).forEach(([sId, count], idx) => {
+    console.log(`  ${idx + 1}. [${sId}]: ${count} lần`);
+  });
+} else {
+  console.log(`⚠️ Cảnh báo: Không có kỹ năng chủ động nào được ghi nhận!`);
+}
 
 if (stats.errors.length > 0) {
   console.error(`\n❌ Danh sách lỗi:`, stats.errors.slice(0, 5));

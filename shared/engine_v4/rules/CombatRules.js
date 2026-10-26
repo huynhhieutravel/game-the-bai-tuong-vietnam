@@ -7,6 +7,17 @@
 import { RangeSystem } from './RangeSystem.js';
 import { GameInvariants } from '../core/Invariants.js';
 import { globalHeroRegistry, getPlayerGender } from '../heroes/HeroRegistry.js';
+import { 
+  isSameFaction, 
+  getCanonicalFaction, 
+  getFactionLabel,
+  normalizeSuit,
+  getSuitColor,
+  isSameSuit,
+  isEquip,
+  normalizeEquipKey,
+  isTrick
+} from '../../utils/translationHelper.js';
 
 export class CombatRules {
   /**
@@ -22,7 +33,9 @@ export class CombatRules {
     }
 
     const hasDoiNui = globalHeroRegistry.hasSkill(source, 'doi_nui', true) && (card?.name === 'Né' || card?.type === 'dodge');
-    const hasKhaiThien = globalHeroRegistry.hasSkill(source, 'khai_thien', true) && (card?.color === 'red' || card?.suit === 'heart' || card?.suit === 'diamond' || card?.suit === '♥' || card?.suit === '♦');
+    const effColor = card && source ? globalHeroRegistry.getEffectiveColor(source, card) : card?.color;
+    const isRed = effColor ? effColor === 'red' : Boolean(card && (card.color === 'red' || getSuitColor(card.suit) === 'red'));
+    const hasKhaiThien = globalHeroRegistry.hasSkill(source, 'khai_thien', true) && isRed;
     const isSlash = card?.name === 'Chém' || card?.type === 'slash' || card?.idKey === 'slash' || card?.idKey === 'chem' || card?.id?.includes('slash') || card?.id?.includes('chem') || card?.virtual || options.asSlash || hasDoiNui || hasKhaiThien;
     if (!isSlash) {
       throw new Error(`[CombatRules] Lá bài [${card?.name || card?.id}] không phải là lá [Chém] hợp lệ!`);
@@ -63,16 +76,17 @@ export class CombatRules {
     // 4. Kiểm tra Giáp Hắc Thuẫn của Target (Miễn nhiễm Chém màu Đen: ♠, ♣)
     const targetArmor = target.equipment?.armor;
     const effSuit = globalHeroRegistry.getEffectiveSuit(source, card);
-    const effColor = globalHeroRegistry.getEffectiveColor(source, card);
     const isBlackSlash = effSuit === 'spade' || effSuit === 'club' || effSuit === '♠' || effSuit === '♣' || effColor === 'black';
     const isHacThuan = targetArmor && (
       targetArmor.name === 'Hắc Thuẫn' || 
+      isEquip(targetArmor, 'hac_thuan') ||
       targetArmor.id === 'black_shield' || 
       targetArmor.key === 'black_shield' ||
       targetArmor.idKey === 'hac_thuan' ||
       targetArmor.idKey === 'black_shield' ||
       targetArmor.id?.includes('black_shield') ||
       targetArmor.id?.includes('hac_thuan') ||
+      targetArmor.id?.includes('hac-thuan') ||
       targetArmor.id?.includes('hắc-thuẫn')
     );
     if (isHacThuan && isBlackSlash) {
@@ -84,30 +98,50 @@ export class CombatRules {
     const sourceWeapon = source.equipment?.weapon;
     const isSongKiem = sourceWeapon && (
       sourceWeapon.name === 'Song Kiếm' || 
+      isEquip(sourceWeapon, 'song_kiem') ||
       sourceWeapon.idKey === 'song_kiem' ||
       sourceWeapon.idKey === 'song-kiem' ||
       sourceWeapon.id?.includes('song_kiem') || 
       sourceWeapon.id?.includes('song-kiem') ||
+      sourceWeapon.id?.includes('song-kiếm') ||
       sourceWeapon.key === 'song-kiem' ||
       sourceWeapon.key === 'song_kiem'
     );
+    let pendingSongKiemSkill = false;
     if (isSongKiem) {
       const pGender = getPlayerGender(source);
       const tGender = getPlayerGender(target);
       if (pGender !== 'none' && tGender !== 'none' && pGender !== tGender) {
-        if (target.hand && target.hand.length > 0) {
-          const [discarded] = target.hand.splice(0, 1);
-          state.discardPile.push(discarded);
-          state.addLog(`⚔️ [Song Kiếm] ${target.name} khác giới tính với ${source.name}, bị ép bỏ 1 lá bài [${discarded.name || discarded.id}]!`);
-        } else if (target.equipment && Object.values(target.equipment).some(Boolean)) {
-          const slot = Object.keys(target.equipment).find(k => target.equipment[k]);
-          const removed = target.equipment[slot];
-          target.equipment[slot] = null;
-          state.discardPile.push(removed);
-          state.addLog(`⚔️ [Song Kiếm] ${target.name} bị ép tháo bỏ trang bị [${removed.name || removed.id}]!`);
-        } else {
+        const hasHand = target.hand && target.hand.length > 0;
+        const hasEquip = target.equipment && Object.values(target.equipment).some(Boolean);
+        if (!hasHand && !hasEquip) {
           state.drawCards(source.id, 1);
           state.addLog(`⚔️ [Song Kiếm] ${target.name} không có bài để bỏ, ${source.name} được rút 1 lá bài!`);
+        } else if (options.songKiemDiscardCardId) {
+          state.discardFromHand(target.id, [options.songKiemDiscardCardId]);
+          state.addLog(`⚔️ [Song Kiếm] ${target.name} bỏ 1 lá bài chỉ định.`);
+        } else if (options.useSongKiem === false || options.skipSongKiemDiscard) {
+          state.drawCards(source.id, 1);
+          state.addLog(`⚔️ [Song Kiếm] ${target.name} không bỏ bài, ${source.name} được rút 1 lá bài!`);
+        } else if (options.interactiveSongKiem) {
+          pendingSongKiemSkill = true;
+        } else {
+          if (hasHand) {
+            const [discarded] = target.hand.splice(0, 1);
+            state.discardPile.push(discarded);
+            state.addLog(`⚔️ [Song Kiếm] ${target.name} khác giới tính với ${source.name}, bị ép bỏ 1 lá bài [${discarded.name || discarded.id}]!`);
+          } else if (hasEquip) {
+            const slot = Object.keys(target.equipment).find(k => target.equipment[k]);
+            const removed = target.equipment[slot];
+            target.equipment[slot] = null;
+            state.discardPile.push(removed);
+            if (isEquip(removed, 'bach_ngan') || removed.name === 'Bạch Ngân' || removed.name === 'Bạch Ngân Sư Tử') {
+              target.hp = Math.min(target.maxHp, target.hp + 1);
+              state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${target.name}, hồi 1 HP!`);
+            }
+            globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: target.id, card: removed }, state);
+            state.addLog(`⚔️ [Song Kiếm] ${target.name} bị ép tháo bỏ trang bị [${removed.name || removed.id}]!`);
+          }
         }
       }
     }
@@ -115,9 +149,12 @@ export class CombatRules {
     // 6. Kiểm tra Vũ khí: Phương Thiên Kích (Sky Halberd - Chém bài cuối cùng trên tay)
     const isPhuongThien = sourceWeapon && (
       sourceWeapon.name === 'Phương Thiên Kích' ||
+      isEquip(sourceWeapon, 'phuong_thien_kich') ||
       sourceWeapon.idKey === 'phuong_thien_kich' ||
       sourceWeapon.idKey === 'phuong-thien-kich' ||
       sourceWeapon.id?.includes('phuong_thien') ||
+      sourceWeapon.id?.includes('phuong-thien') ||
+      sourceWeapon.id?.includes('phương-thiên') ||
       sourceWeapon.key === 'phuong-thien-kich' ||
       sourceWeapon.key === 'phuong_thien_kich'
     );
@@ -210,6 +247,22 @@ export class CombatRules {
       });
     }
 
+    // 10. Nếu Song Kiếm kích hoạt tương tác khác giới -> Đẩy Frame ASK_WEAPON_SKILL lên đỉnh stack
+    if (pendingSongKiemSkill) {
+      state.priorityStack.push({
+        type: 'ASK_WEAPON_SKILL',
+        sourceId,
+        targetId,
+        currentActorId: targetId,
+        priorityQueue: [targetId],
+        context: {
+          weapon: 'Song Kiếm',
+          weaponName: 'Song Kiếm'
+        }
+      });
+      state.addLog(`⚔️ [Song Kiếm] ${target.name} khác giới tính với ${source.name}! ${target.name} có thể bỏ 1 lá bài hoặc để ${source.name} rút 1 lá.`);
+    }
+
     // Reset cờ Rượu sau khi đã chém
     if (source.temporaryFlags?.wineActive) {
       source.temporaryFlags.wineActive = false;
@@ -250,7 +303,7 @@ export class CombatRules {
             const eqCard = target.equipment[slot];
             target.equipment[slot] = null;
             state.discardPile.push(eqCard);
-            if (eqCard.name === 'Bạch Ngân' || eqCard.idKey === 'bach_ngan' || eqCard.id?.includes('bach_ngan')) {
+            if (isEquip(eqCard, 'bach_ngan') || eqCard.name === 'Bạch Ngân' || eqCard.name === 'Bạch Ngân Sư Tử' || eqCard.idKey === 'bach_ngan' || eqCard.id?.includes('bach_ngan')) {
               target.hp = Math.min(target.maxHp, target.hp + 1);
               state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${target.name}, hồi 1 HP!`);
             }
@@ -315,7 +368,7 @@ export class CombatRules {
         p.isAlive &&
         !p.isDaTam &&
         (p.revealedHeroes ? p.revealedHeroes.some(Boolean) : p.isRevealed !== false) &&
-        (p.faction === 'lac' || p.faction === 'Lạc')
+        getCanonicalFaction(p.faction) === 'lac'
       );
       if (allies.length > 0) {
         state.addLog(`🐉 ${target.name} phát động [Bọc Trăm Trứng], kêu gọi đồng minh hệ Lạc ra [Né] giùm!`);
@@ -342,7 +395,7 @@ export class CombatRules {
         p.isAlive &&
         !p.isDaTam &&
         (p.revealedHeroes ? p.revealedHeroes.some(Boolean) : p.isRevealed !== false) &&
-        (p.faction === 'viet' || p.faction === 'Việt')
+        getCanonicalFaction(p.faction) === 'viet'
       );
       if (allies.length > 0) {
         state.addLog(`👑 ${target.name} phát động [Tiên Phát], kêu gọi đồng minh hệ Việt ra [Né] giùm!`);
@@ -367,10 +420,13 @@ export class CombatRules {
     if (options.useBagua || options.doBagua) {
       const hasBaguaArmor = target.equipment?.armor && (
         target.equipment.armor.name === 'Bát Quái' ||
+        isEquip(target.equipment.armor, 'bat_quai') ||
         target.equipment.armor.id === 'bat_quai' ||
         target.equipment.armor.idKey === 'bat_quai' ||
         target.equipment.armor.key === 'bat_quai' ||
-        target.equipment.armor.id?.includes('bat_quai')
+        target.equipment.armor.id?.includes('bat_quai') ||
+        target.equipment.armor.id?.includes('bat-quai') ||
+        target.equipment.armor.id?.includes('bát-quái')
       );
       const hasThanGiap = !target.equipment?.armor && globalHeroRegistry.hasSkill(target, 'than_giap', true);
 
@@ -387,11 +443,7 @@ export class CombatRules {
       if (!judgeCard) return;
       state.discardPile.push(judgeCard);
 
-      const isRed = judgeCard.color === 'red' || 
-                    judgeCard.suit === 'heart' || 
-                    judgeCard.suit === 'diamond' || 
-                    judgeCard.suit === '♥' || 
-                    judgeCard.suit === '♦';
+      const isRed = judgeCard.color === 'red' || getSuitColor(judgeCard.suit) === 'red';
 
       if (isRed) {
         frame.context.dodgesProvided += 1;
@@ -411,16 +463,29 @@ export class CombatRules {
       }
     }
 
+    const aoe = frame.context?.aoeResult;
+
     if (dodgeCard) {
-      const isNegate = (dodgeCard.name === 'Hóa Giải' || dodgeCard.idKey === 'hoa_giai') && frame.context?.reason === 'van-tien';
+      const isNegate = (isTrick(dodgeCard, 'hoa_giai') ||
+        dodgeCard.virtualCardName === 'Hóa Giải' || (options && (options.virtualCardName === 'Hóa Giải' || options.activeSkill === 'Linh Giám' || options.asNegate))) && frame.context?.reason === 'van-tien';
       if (isNegate) {
         state.discardFromHand(targetId, [dodgeCard.id]);
         state.priorityStack.pop();
         state.addLog(`🛡️ ${target.name} dùng lá [Hóa Giải] hóa giải thành công [Loạn Tiễn] cho riêng mình!`);
+        if (aoe) aoe.defended.push(`${target.name} (Hóa Giải)`);
+        if (aoe && (aoe.defended.length + aoe.damaged.length >= aoe.total)) {
+          const sumText = aoe.damaged.length === 0
+            ? `🎯 [Vạn Tiễn]: ${aoe.defended.join(', ')} đều dùng [Né] cản đòn!`
+            : (aoe.defended.length === 0
+              ? `🎯 [Vạn Tiễn]: ${aoe.damaged.join(', ')} đều không có Né, mất máu!`
+              : `🎯 [Vạn Tiễn]: ${aoe.defended.join(', ')} dùng [Né] cản; ${aoe.damaged.join(', ')} mất máu!`);
+          state.addLog(sumText);
+        }
         return { dodged: true, negatedSingle: true };
       }
       const hasDoiNui = globalHeroRegistry.hasSkill(target, 'doi_nui', true) && (dodgeCard.name === 'Chém' || dodgeCard.type === 'slash');
-      const isBlackCard = dodgeCard && (dodgeCard.color === 'black' || dodgeCard.suit === 'spade' || dodgeCard.suit === 'club' || dodgeCard.suit === '♠' || dodgeCard.suit === '♣');
+      const effColor = dodgeCard && target ? globalHeroRegistry.getEffectiveColor(target, dodgeCard) : dodgeCard?.color;
+      const isBlackCard = effColor ? effColor === 'black' : Boolean(dodgeCard && (dodgeCard.color === 'black' || getSuitColor(dodgeCard.suit) === 'black'));
       const hasThinhChinh = (globalHeroRegistry.hasSkill(target, 'thinh_chinh', true) || target.skills?.includes('thinh_chinh')) && isBlackCard;
       const isDodge = dodgeCard.name === 'Né' || dodgeCard.type === 'dodge' || dodgeCard.idKey === 'ne' || dodgeCard.idKey === 'dodge' || dodgeCard.id?.includes('dodge') || dodgeCard.id?.includes('ne') || hasDoiNui || hasThinhChinh;
       if (!isDodge) {
@@ -434,7 +499,17 @@ export class CombatRules {
       if (frame.context.dodgesProvided >= frame.context.requiredDodges) {
         // Né thành công hoàn toàn -> Pop frame
         state.priorityStack.pop();
-        state.addLog(`${target.name} đã né thành công cú Chém!`);
+        const attackName = frame.context?.card?.name || (frame.context?.reason === 'van-tien' ? 'Loạn Tiễn' : 'cú Chém');
+        state.addLog(`${target.name} đã né thành công ${attackName === 'cú Chém' ? 'cú Chém' : `[${attackName}]`}!`);
+        if (aoe) aoe.defended.push(target.name);
+        if (aoe && (aoe.defended.length + aoe.damaged.length >= aoe.total)) {
+          const sumText = aoe.damaged.length === 0
+            ? `🎯 [Vạn Tiễn]: ${aoe.defended.join(', ')} đều dùng [Né] cản đòn!`
+            : (aoe.defended.length === 0
+              ? `🎯 [Vạn Tiễn]: ${aoe.damaged.join(', ')} đều không có Né, mất máu!`
+              : `🎯 [Vạn Tiễn]: ${aoe.defended.join(', ')} dùng [Né] cản; ${aoe.damaged.join(', ')} mất máu!`);
+          state.addLog(sumText);
+        }
         globalHeroRegistry.dispatchTrigger('ON_DODGE_SUCCESS', { sourceId: frame.sourceId, targetId, card: dodgeCard }, state);
         return this._handlePostDodgeWeapons(state, frame, target, options);
       }
@@ -446,6 +521,15 @@ export class CombatRules {
       const damageType = frame.context?.reason === 'van-tien' ? 'arrow_rain' : 'slash';
 
       state.priorityStack.pop(); // Giải phóng frame ASK_DODGE
+      if (aoe) aoe.damaged.push(target.name);
+      if (aoe && (aoe.defended.length + aoe.damaged.length >= aoe.total)) {
+        const sumText = aoe.damaged.length === 0
+          ? `🎯 [Vạn Tiễn]: ${aoe.defended.join(', ')} đều dùng [Né] cản đòn!`
+          : (aoe.defended.length === 0
+            ? `🎯 [Vạn Tiễn]: ${aoe.damaged.join(', ')} đều không có Né, mất máu!`
+            : `🎯 [Vạn Tiễn]: ${aoe.defended.join(', ')} dùng [Né] cản; ${aoe.damaged.join(', ')} mất máu!`);
+        state.addLog(sumText);
+      }
       this.applyDamage(state, sourceId, targetId, damageAmount, damageType, false, frame.context?.card || null);
       return { dodged: false };
     }
@@ -491,6 +575,10 @@ export class CombatRules {
       } else {
         // Hết đồng minh trợ giúp -> Trả lại quyền quyết định cho Lạc Long Quân
         state.priorityStack.pop();
+        const dodgeFrame = state.priorityStack.peek();
+        if (dodgeFrame && dodgeFrame.context) {
+          dodgeFrame.context.bocTramTrungFailed = true;
+        }
         state.addLog(`🐉 Đồng minh hệ Lạc không có ai ra [Né] thay cho ${llq.name}!`);
         return { defended: false };
       }
@@ -534,6 +622,10 @@ export class CombatRules {
         return { continued: true, nextAllyId };
       } else {
         state.priorityStack.pop();
+        const dodgeFrame = state.priorityStack.peek();
+        if (dodgeFrame && dodgeFrame.context) {
+          dodgeFrame.context.tienPhatFailed = true;
+        }
         state.addLog(`👑 Đồng minh hệ Việt không có ai ra [Né] thay cho ${ltk.name}!`);
         return { defended: false };
       }
@@ -578,6 +670,10 @@ export class CombatRules {
         return { continued: true, nextAllyId };
       } else {
         state.priorityStack.pop();
+        const underlyingFrame = state.priorityStack.peek();
+        if (underlyingFrame && underlyingFrame.context) {
+          underlyingFrame.context.bocTramTrungFailed = true;
+        }
         state.addLog(`🐉 Đồng minh hệ Lạc không có ai ra [Chém] giùm cho ${llq.name}!`);
         return { slashed: false };
       }
@@ -603,44 +699,129 @@ export class CombatRules {
     const weaponKey = sourceWeapon?.idKey || sourceWeapon?.key || '';
 
     // 1. Rìu Đá (Rock Axe): Bỏ 2 lá bài để bắt buộc Chém trúng đích (xuyên giáp)
-    const isRiuDa = weaponName === 'Rìu Đá' || weaponName === 'Quán Thạch Phủ' || weaponId.includes('riu_da') || weaponKey === 'riu-da' || weaponKey === 'riu_da';
-    if (isRiuDa && options.useRockAxe !== false) {
+    const isRiuDa = weaponName === 'Rìu Đá' || weaponName === 'Quán Thạch Phủ' || 
+      isEquip(sourceWeapon, 'riu_da') ||
+      weaponId.includes('riu_da') || weaponId.includes('riu-da') || weaponId.includes('rìu-đá') ||
+      weaponKey === 'riu-da' || weaponKey === 'riu_da';
+    if (isRiuDa) {
+      if (options.useRockAxe === false) {
+        return { dodged: true };
+      }
       if (options.rockAxeCardIds && Array.isArray(options.rockAxeCardIds) && options.rockAxeCardIds.length === 2) {
         state.discardFromHand(source.id, options.rockAxeCardIds);
         state.addLog(`🪓 [Rìu Đá] ${source.name} bỏ 2 lá bài chỉ định để xuyên phá cú Né của ${target.name}!`);
-        this.applyDamage(state, source.id, target.id, frame.context.damageAmount || 1, 'slash_penetrate');
+        this.applyDamage(state, source.id, target.id, frame.context.damageAmount || 1, 'slash_penetrate', false, frame.context?.card);
         return { dodged: false, penetrated: true };
-      } else if (source.hand && source.hand.length >= 2) {
+      }
+      if (options.autoResolveWeapons && source.hand && source.hand.length >= 2) {
         const discards = source.hand.slice(0, 2);
         state.discardFromHand(source.id, discards.map(c => c.id));
         state.addLog(`🪓 [Rìu Đá] ${source.name} bỏ 2 lá bài [${discards.map(c => c.name).join(', ')}] để xuyên phá cú Né của ${target.name}!`);
-        this.applyDamage(state, source.id, target.id, frame.context.damageAmount || 1, 'slash_penetrate');
+        this.applyDamage(state, source.id, target.id, frame.context.damageAmount || 1, 'slash_penetrate', false, frame.context?.card);
         return { dodged: false, penetrated: true };
+      }
+
+      // Luồng tương tác chuẩn: Đẩy ASK_WEAPON_SKILL nếu source có đủ >= 2 lá bài (tay + trang bị trừ Rìu Đá)
+      const handCount = source.hand?.length || 0;
+      const equipCards = Object.values(source.equipment || {}).filter(c => c && c.id !== sourceWeapon.id);
+      if (handCount + equipCards.length >= 2) {
+        state.priorityStack.push({
+          type: 'ASK_WEAPON_SKILL',
+          sourceId: source.id,
+          targetId: target.id,
+          currentActorId: source.id,
+          priorityQueue: [source.id],
+          context: {
+            weapon: 'Rìu Đá',
+            weaponName: 'Rìu Đá',
+            damageAmount: frame.context.damageAmount || 1,
+            slashCard: frame.context?.card || null
+          }
+        });
+        state.addLog(`🪓 [Rìu Đá] ${source.name} có thể bỏ 2 lá bài để xuyên phá cú Né của ${target.name}!`);
+        return { dodged: true, pendingWeaponSkill: true };
       }
     }
 
     // 2. Thanh Long Đao: Chém bị Né -> Được Chém tiếp nếu còn bài Chém trên tay
-    const isThanhLong = weaponName === 'Thanh Long Đao' || weaponId.includes('thanh_long') || weaponKey === 'thanh-long-dao' || weaponKey === 'thanh_long_dao';
-    if (isThanhLong && options.useDragonBlade !== false) {
-      const nextSlash = options.dragonBladeCardId
-        ? source.hand?.find(c => c.id === options.dragonBladeCardId)
-        : source.hand?.find(c => c.type === 'slash' || c.name === 'Chém' || c.idKey === 'slash');
-      if (nextSlash) {
-        state.discardFromHand(source.id, [nextSlash.id]);
-        state.addLog(`🐉 [Thanh Long Đao] ${source.name} lập tức đánh tiếp lá [Chém] thứ hai lên ${target.name}!`);
+    const isThanhLong = weaponName === 'Thanh Long Đao' || 
+      isEquip(sourceWeapon, 'thanh_long_dao') ||
+      weaponId.includes('thanh_long') || weaponId.includes('thanh-long') || weaponId.includes('thanh-long-đao') ||
+      weaponKey === 'thanh-long-dao' || weaponKey === 'thanh_long_dao';
+    if (isThanhLong) {
+      if (options.useDragonBlade === false) {
+        return { dodged: true };
+      }
+      if (options.dragonBladeCardId) {
+        const nextSlash = source.hand?.find(c => c.id === options.dragonBladeCardId);
+        if (nextSlash) {
+          state.discardFromHand(source.id, [nextSlash.id]);
+          state.addLog(`🐉 [Thanh Long Đao] ${source.name} lập tức đánh tiếp lá [Chém] thứ hai lên ${target.name}!`);
+          state.priorityStack.push({
+            type: 'ASK_DODGE',
+            sourceId: source.id,
+            targetId: target.id,
+            priorityQueue: [target.id],
+            context: {
+              card: nextSlash,
+              requiredDodges: frame.context.requiredDodges || 1,
+              dodgesProvided: 0,
+              damageAmount: 1
+            }
+          });
+          return { dodged: false, retriggeredSlash: true };
+        }
+      }
+      if (options.autoResolveWeapons) {
+        const nextSlash = source.hand?.find(c => c.type === 'slash' || c.name === 'Chém' || c.idKey === 'slash');
+        if (nextSlash) {
+          state.discardFromHand(source.id, [nextSlash.id]);
+          state.addLog(`🐉 [Thanh Long Đao] ${source.name} lập tức đánh tiếp lá [Chém] thứ hai lên ${target.name}!`);
+          state.priorityStack.push({
+            type: 'ASK_DODGE',
+            sourceId: source.id,
+            targetId: target.id,
+            priorityQueue: [target.id],
+            context: {
+              card: nextSlash,
+              requiredDodges: frame.context.requiredDodges || 1,
+              dodgesProvided: 0,
+              damageAmount: 1
+            }
+          });
+          return { dodged: false, retriggeredSlash: true };
+        }
+      }
+
+      // Luồng tương tác chuẩn: Đẩy ASK_WEAPON_SKILL nếu source có bài Chém (hoặc kỹ năng biến Chém)
+      const hasDoiNui = globalHeroRegistry.hasSkill(source, 'doi_nui', true);
+      const hasKhaiThien = globalHeroRegistry.hasSkill(source, 'khai_thien', true);
+      const isRed = c => {
+        if (!c) return false;
+        const col = globalHeroRegistry.getEffectiveColor(source, c);
+        return col ? col === 'red' : Boolean(c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+      };
+      const canSlash = source.hand?.some(c => 
+        c.type === 'slash' || c.name === 'Chém' || c.idKey === 'slash' ||
+        (hasDoiNui && (c.name === 'Né' || c.type === 'dodge')) ||
+        (hasKhaiThien && isRed(c))
+      );
+
+      if (canSlash) {
         state.priorityStack.push({
-          type: 'ASK_DODGE',
+          type: 'ASK_WEAPON_SKILL',
           sourceId: source.id,
           targetId: target.id,
-          priorityQueue: [target.id],
+          currentActorId: source.id,
+          priorityQueue: [source.id],
           context: {
-            card: nextSlash,
-            requiredDodges: frame.context.requiredDodges || 1,
-            dodgesProvided: 0,
+            weapon: 'Thanh Long Đao',
+            weaponName: 'Thanh Long Đao',
             damageAmount: 1
           }
         });
-        return { dodged: false, retriggeredSlash: true };
+        state.addLog(`🐉 [Thanh Long Đao] ${source.name} có thể đánh tiếp lá [Chém] thứ hai lên ${target.name}!`);
+        return { dodged: true, pendingWeaponSkill: true };
       }
     }
 
@@ -658,8 +839,8 @@ export class CombatRules {
     // Kiểm tra kỹ năng Hiền Hậu (Ngọc Hân Công Chúa): Chặn sát thương nếu có bài Cơ (hoặc Bích do Quốc Sắc)
     if ((globalHeroRegistry.hasSkill(target, 'hien_hau', true) || target.skills?.includes('hien_hau')) && !target.temporaryFlags?.hienHauAttempted) {
       const hasHeartOrSpade = target.hand?.some(c => {
-        const s = c.suit?.toLowerCase() || '';
-        return s === 'heart' || s === 'cơ' || s === 'spade' || s === 'bích' || c.suit === '♥' || c.suit === '♠';
+        const effSuit = globalHeroRegistry.getEffectiveSuit(target, c) || c.suit;
+        return normalizeSuit(effSuit).code === 'heart';
       });
       if (hasHeartOrSpade) {
         state.priorityStack.push({
@@ -686,11 +867,14 @@ export class CombatRules {
       const isQuatSat = sourceWeapon && (
         sourceWeapon.name === 'Quạt Sắt' ||
         sourceWeapon.name === 'Cổ Đĩnh Đao' ||
+        isEquip(sourceWeapon, 'quat_sat') ||
         sourceWeapon.idKey === 'quat_sat' ||
         sourceWeapon.idKey === 'quat-sat' ||
         sourceWeapon.idKey === 'co_dinh_dao' ||
         sourceWeapon.id?.includes('quat_sat') ||
         sourceWeapon.id?.includes('quat-sat') ||
+        sourceWeapon.id?.includes('quạt-sắt') ||
+        sourceWeapon.id?.includes('cổ-đĩnh-đao') ||
         sourceWeapon.key === 'quat-sat' ||
         sourceWeapon.key === 'quat_sat'
       );
@@ -704,7 +888,11 @@ export class CombatRules {
     const targetArmor = target.equipment?.armor;
     const isBachNgan = targetArmor && (
       targetArmor.name === 'Bạch Ngân' ||
+      targetArmor.name === 'Bạch Ngân Sư Tử' ||
+      isEquip(targetArmor, 'bach_ngan') ||
       targetArmor.id?.includes('bach_ngan') ||
+      targetArmor.id?.includes('bach-ngan') ||
+      targetArmor.id?.includes('bạch-ngân') ||
       targetArmor.key === 'bach-ngan'
     );
     if (isBachNgan && amount > 1) {
@@ -742,9 +930,12 @@ export class CombatRules {
       const sourceWeapon = source.equipment?.weapon;
       const isKirinBow = sourceWeapon && (
         sourceWeapon.name === 'Kỳ Lân Cung' ||
+        isEquip(sourceWeapon, 'ky_lan_cung') ||
         sourceWeapon.idKey === 'ky_lan_cung' ||
         sourceWeapon.idKey === 'ky-lan-cung' ||
         sourceWeapon.id?.includes('ky_lan') ||
+        sourceWeapon.id?.includes('ky-lan') ||
+        sourceWeapon.id?.includes('kỳ-lân') ||
         sourceWeapon.id?.includes('wp_bow') ||
         sourceWeapon.key === 'ky-lan-cung' ||
         sourceWeapon.key === 'ky_lan_cung'
@@ -829,7 +1020,8 @@ export class CombatRules {
       const isWine = peachCard.name === 'Rượu' || peachCard.type === 'wine' || peachCard.idKey === 'wine' || peachCard.idKey === 'ruou' || peachCard.id?.includes('wine') || peachCard.id?.includes('ruou');
       const isPeach = peachCard.name === 'Đào' || peachCard.type === 'peach' || peachCard.idKey === 'peach' || peachCard.idKey === 'dao' || peachCard.id?.includes('peach') || peachCard.id?.includes('dao');
       const hasNamDuoc = globalHeroRegistry.hasSkill(rescuer, 'nam_duoc', true) && state.currentTurnPlayerId !== rescuerId;
-      const isRed = peachCard.color === 'red' || peachCard.suit === 'heart' || peachCard.suit === 'diamond' || peachCard.suit === '♥' || peachCard.suit === '♦';
+      const effColor = peachCard && rescuer ? globalHeroRegistry.getEffectiveColor(rescuer, peachCard) : peachCard.color;
+      const isRed = effColor ? effColor === 'red' : Boolean(peachCard.color === 'red' || getSuitColor(peachCard.suit) === 'red');
       const isNamDuocPeach = hasNamDuoc && isRed;
 
       if (!isWine && !isPeach && !isNamDuocPeach) {
@@ -881,7 +1073,42 @@ export class CombatRules {
     const deadFaction = deadPlayer.faction || h1?.faction || deadPlayer.identity;
     state.addLog(`💀 [${deadPlayer.name}] (${heroNames}) ĐÃ TỬ TRẬN! Phe phái: [${(deadFaction || 'Vô danh').toUpperCase()}].`);
 
-    // 1. Thu hồi toàn bộ bài trên tay + trang bị + bài phán xét vào discardPile
+    // 1. Dọn dẹp tất cả các frame trong priorityStack liên quan đến người chơi đã tử trận
+    if (state.priorityStack && Array.isArray(state.priorityStack._stack)) {
+      const stack = state.priorityStack._stack;
+      for (let i = stack.length - 1; i >= 0; i--) {
+        const frame = stack[i];
+        if (!frame) continue;
+
+        if (Array.isArray(frame.priorityQueue)) {
+          frame.priorityQueue = frame.priorityQueue.filter(id => id !== deadPlayerId);
+        }
+
+        if (frame.type === 'ASK_SLASH_DUEL') {
+          if (frame.context?.p1 === deadPlayerId || frame.context?.p2 === deadPlayerId || frame.sourceId === deadPlayerId || frame.targetId === deadPlayerId || frame.context?.attackerId === deadPlayerId) {
+            stack.splice(i, 1);
+            continue;
+          }
+        }
+
+        // Nếu frame nhắm vào người chơi đã chết và không còn ai khác trong priorityQueue
+        if (frame.targetId === deadPlayerId && (!Array.isArray(frame.priorityQueue) || frame.priorityQueue.length === 0)) {
+          stack.splice(i, 1);
+          continue;
+        }
+
+        if (frame.currentActorId === deadPlayerId || frame.sourceId === deadPlayerId) {
+          if (Array.isArray(frame.priorityQueue) && frame.priorityQueue.length > 0) {
+            frame.currentActorId = frame.priorityQueue[0];
+          } else {
+            stack.splice(i, 1);
+            continue;
+          }
+        }
+      }
+    }
+
+    // 2. Thu hồi toàn bộ bài trên tay + trang bị + bài phán xét vào discardPile
     if (deadPlayer.hand.length > 0) {
       state.discardPile.push(...deadPlayer.hand);
       deadPlayer.hand = [];
@@ -901,7 +1128,7 @@ export class CombatRules {
       deadPlayer.trungCards = [];
     }
 
-    // 2. Thưởng / Phạt Phe Phái (Quốc Chiến & Nội Chiến)
+    // 3. Thưởng / Phạt Phe Phái (Quốc Chiến & Nội Chiến)
     if (killerId !== null && killerId !== deadPlayerId) {
       const killer = state.getPlayer(killerId);
       if (killer && killer.isAlive) {
@@ -911,10 +1138,10 @@ export class CombatRules {
         );
 
         if (isNationalWar) {
-          const isSameFaction = !killer.isDaTam && !deadPlayer.isDaTam && (killer.faction === deadPlayer.faction);
-          if (isSameFaction) {
+          const isAlly = isSameFaction(killer, deadPlayer);
+          if (isAlly) {
             // Ngộ sát đồng minh cùng phe -> Phạt vứt toàn bộ bài trên tay và trang bị
-            state.addLog(`⚠️ ÁC MỘNG! ${killer.name} đã ngộ sát đồng minh cùng phe ${deadPlayer.faction.toUpperCase()}! Bị trừng phạt vứt toàn bộ bài!`);
+            state.addLog(`⚠️ ÁC MỘNG! ${killer.name} đã ngộ sát đồng minh cùng phe ${getFactionLabel(deadPlayer.faction).toUpperCase()}! Bị trừng phạt vứt toàn bộ bài!`);
             if (killer.hand.length > 0) {
               state.discardPile.push(...killer.hand);
               killer.hand = [];
@@ -927,7 +1154,7 @@ export class CombatRules {
             }
           } else {
             // Tiêu diệt kẻ địch khác phe -> Thưởng rút bài
-            const deadAllies = state.players.filter(p => p.id !== deadPlayer.id && p.faction === deadPlayer.faction && (p.revealedHeroes?.[0] || p.revealedHeroes?.[1])).length;
+            const deadAllies = state.players.filter(p => p.id !== deadPlayer.id && isSameFaction(p, deadPlayer) && (p.revealedHeroes?.[0] || p.revealedHeroes?.[1])).length;
             const rewardCards = deadPlayer.isDaTam ? 1 : Math.max(2, deadAllies + 1);
             state.addLog(`🎁 LẬP CÔNG! ${killer.name} tiêu diệt kẻ địch [${deadPlayer.name}], được thưởng rút ${rewardCards} lá bài!`);
             state.drawCards(killerId, rewardCards);
@@ -987,12 +1214,12 @@ export class CombatRules {
 
     // Lấy phe của người chơi đầu tiên (phải là phe Quốc Chiến hợp lệ, không phải 'none')
     const firstPlayer = alivePlayers[0];
-    const firstFaction = firstPlayer.faction;
-    const isValidFaction = Boolean(firstFaction) && firstFaction !== 'none';
+    const firstFaction = getCanonicalFaction(firstPlayer.faction);
+    const isValidFaction = firstFaction !== 'none' && !firstPlayer.isDaTam;
     const maxAllowedFaction = Math.floor(state.players.length / 2);
 
     // Nếu tất cả người sống sót đều cùng phe gốc:
-    if (isValidFaction && alivePlayers.every(p => p.faction === firstFaction)) {
+    if (isValidFaction && alivePlayers.every(p => isSameFaction(p, firstPlayer))) {
       // Nếu số lượng người sống sót vượt quá giới hạn phe (ví dụ 3 người phe Lạc trong bàn 4 người):
       // Buộc các tướng chưa lật phải lộ diện để kích hoạt cơ chế Dã Tâm!
       if (state.players.length >= 4 && alivePlayers.length > maxAllowedFaction) {

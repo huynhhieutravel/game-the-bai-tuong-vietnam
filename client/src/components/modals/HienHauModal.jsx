@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { getFullPlayerName } from 'shared/utils/playerHelpers';
 import { getSuitEmoji } from 'shared/constants/cardTypes';
+import { getEffectiveSuit } from 'shared/engine_v4/heroes/HeroRegistry.js';
 
 export function HienHauModal({ req, gameState, onConfirm }) {
   const [selectedTarget, setSelectedTarget] = useState(null);
@@ -15,9 +16,8 @@ export function HienHauModal({ req, gameState, onConfirm }) {
   });
 
   const validCards = me.hand.filter(c => {
-    // Quốc Sắc converts Spade (Bích) to Heart (Cơ)
-    const s = c.suit?.toLowerCase() || '';
-    return s === 'heart' || s === 'cơ' || s === 'spade' || s === 'bích' || c.suit === '♥' || c.suit === '♠';
+    const effSuit = (getEffectiveSuit(me, c) || c.suit || '').toString().toLowerCase();
+    return effSuit === 'heart' || effSuit === 'hearts' || effSuit === '♥' || effSuit === 'cơ';
   });
 
   return (

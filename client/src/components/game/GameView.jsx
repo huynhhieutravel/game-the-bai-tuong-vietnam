@@ -1,13 +1,15 @@
 import { getSuitEmoji } from 'shared/constants/cardTypes';
 import { getCardBg, getBadgeColor } from 'shared/utils/cardStyles';
+import { normalizeSkillType, normalizePhase, getPhaseLabel, getFactionLabel, getFactionColor } from 'shared/utils/translationHelper';
 // @ts-check
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from "react-router-dom";
 import { useGameState, useGameAPI, useGameController } from '../../contexts/GameProvider';
 import { ModalContainer } from '../modals/ModalContainer';
 import { VipHeroSelectorModal } from '../modals/VipHeroSelectorModal';
+import { GameOverModal } from '../modals/GameOverModal';
 import { PHASES, CARD_SUBTYPES, getCardSubType } from 'shared/data/gameData';
-import { RangeIcon, DistanceIcon } from '../common/GameIcons';
+import { RangeIcon, DistanceIcon, WeaponIcon, ArmorIcon, MountAtkIcon, MountDefIcon } from '../common/GameIcons';
 import "../../index.css";
 
 import { useTargeting } from './hooks/useTargeting';
@@ -24,10 +26,10 @@ import { ActionBar } from './ActionBar';
 import { ChatWidget } from './ChatWidget';
 
 const getHeroNameStr = (p) => {
-   if (!p || !p.heroes) return `(Tướng Ẩn ${p ? p.id + 1 : ''})`;
+   if (!p || !p.heroes) return `Tướng Ẩn ${p ? p.id + 1 : ''}`;
    const revealed = p.heroes.filter((h, i) => p.revealedHeroes?.[i]).map(h => h.name);
-   if (revealed.length === 0) return `(Tướng Ẩn ${p.id + 1})`;
-   return `(${revealed.join(' & ')})`;
+   if (revealed.length === 0) return `Tướng Ẩn ${p.id + 1}`;
+   return revealed.join(' & ');
 };
 
 const renderLogText = (text) => {
@@ -52,14 +54,16 @@ const renderLogText = (text) => {
   });
 };
 
-export default function GameView() {
+export default function GameView(props = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   const isWiki = location.pathname.startsWith('/wiki');
   
-  const gameAPI = useGameAPI();
+  const injectedAPI = useGameAPI();
   const gameController = useGameController();
-  const gameState = useGameState();
+  const injectedState = useGameState();
+  const gameAPI = props.gameAPI || injectedAPI;
+  const gameState = props.gameState || injectedState;
   const isActionPending = useRef(false);
 
   // Auto-reset action lock whenever gameState changes
@@ -96,9 +100,27 @@ export default function GameView() {
 
   const [activeSkill, setActiveSkill] = useState(null);
   const [targetSession, setTargetSession] = useState(null);
+  const [toastQueue, setToastQueue] = useState([]);
   const [phaseBanner, setPhaseBanner] = useState(null);
   const [heroPopup, setHeroPopup] = useState(null);
+  const [popupTab, setPopupTab] = useState('heroes');
   const [cardPopup, setCardPopup] = useState(null);
+  const [isGameOverModalDismissed, setIsGameOverModalDismissed] = useState(false);
+  const toastTimerRef = useRef(null);
+  const isUserScrolledUpRef = useRef(false);
+  const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
+
+  useEffect(() => {
+    if (heroPopup) {
+      setPopupTab(heroPopup.initialTab || 'heroes');
+    }
+  }, [heroPopup]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   const mainPlayerId = typeof window !== 'undefined' && window.playerId !== undefined ? window.playerId : 0; 
   const playerAnimations = usePlayerAnimations(gameState);
@@ -138,32 +160,120 @@ export default function GameView() {
       mainPlayerId
   });
 
+  const dismissBanner = useCallback(() => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setPhaseBanner(null);
+    setToastQueue([]);
+  }, []);
+
   const handleResponseAction = useCallback((payload) => {
+    dismissBanner();
     if (!gameState?.waitingForResponse || !gameAPI) return;
     gameAPI.respond(payload);
-  }, [gameState, gameAPI]);
+  }, [gameState, gameAPI, dismissBanner]);
 
   const handleDraw = useCallback((skipDraw = false, drawExtra = false, khaiQuoc = false) => {
+    dismissBanner();
     if (!gameAPI) return;
     gameAPI.drawPhase(mainPlayerId, skipDraw, drawExtra, khaiQuoc);
-  }, [gameAPI, mainPlayerId]);
+  }, [gameAPI, mainPlayerId, dismissBanner]);
 
   const handleEndTurn = useCallback(() => {
+    dismissBanner();
     if (!gameAPI) return;
     cancelTargeting();
     isActionPending.current = false;
     gameAPI.endPhase(mainPlayerId);
-  }, [gameAPI, cancelTargeting, mainPlayerId]);
+  }, [gameAPI, cancelTargeting, mainPlayerId, dismissBanner]);
 
   const handleRevealClick = useCallback((heroIndex) => {
+    dismissBanner();
     if (!gameAPI) return;
     gameAPI.revealHero(mainPlayerId, heroIndex);
-  }, [gameAPI, mainPlayerId]);
+  }, [gameAPI, mainPlayerId, dismissBanner]);
 
-  const showPhaseBanner = (text) => {
-    setPhaseBanner(text);
-    setTimeout(() => setPhaseBanner(null), 2000);
-  };
+  const onCardClick = useCallback((card) => {
+    dismissBanner();
+    handleCardClick(card);
+  }, [dismissBanner, handleCardClick]);
+
+  const onDiscardToggle = useCallback((cardId) => {
+    dismissBanner();
+    handleDiscardToggle(cardId);
+  }, [dismissBanner, handleDiscardToggle]);
+
+  useEffect(() => {
+    if (targetSession) {
+      dismissBanner();
+    }
+  }, [targetSession, dismissBanner]);
+
+  const confirmPlayCard = useCallback(() => {
+    dismissBanner();
+    if (!targetSession || isActionPending.current || !gameAPI) return;
+    isActionPending.current = true;
+    try {
+      const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
+      const isReforge = isXiengXich && (!targetSession.selectedTargets || targetSession.selectedTargets.length === 0);
+      gameAPI.playCard(mainPlayerId, targetSession.card.id, targetSession.selectedTargets || [], { 
+        virtualCardName: targetSession.virtualCardName || (isXiengXich ? 'Xiềng Xích' : undefined),
+        isReforge,
+        reforge: isReforge,
+        asChain: isXiengXich
+      });
+    } finally {
+      setTimeout(() => {
+        isActionPending.current = false;
+      }, 500);
+    }
+    cancelTargeting();
+  }, [targetSession, activeSkill, gameAPI, mainPlayerId, cancelTargeting, isActionPending, dismissBanner]);
+
+  const showPhaseBanner = useCallback((text) => {
+    if (!text) return;
+    setToastQueue(prev => {
+      if (prev.length > 0 && prev[prev.length - 1] === text) return prev;
+      const nextQueue = [...prev, text];
+      return nextQueue.slice(-6); // Giữ tối đa 6 thông báo liên tiếp
+    });
+  }, []);
+
+  // 1. Lấy toast tiếp theo từ hàng đợi khi chưa có banner hiển thị
+  useEffect(() => {
+    if (phaseBanner || toastQueue.length === 0) return;
+    const nextToast = toastQueue[0];
+    setPhaseBanner(nextToast);
+    setToastQueue(prev => prev.slice(1));
+  }, [phaseBanner, toastQueue]);
+
+  // 2. Tự động ẩn banner toast với thời lượng thông minh (mượt mà, phản hồi tức thì, không làm delay nhịp chơi)
+  useEffect(() => {
+    if (!phaseBanner) return;
+    const isLongText = (phaseBanner || '').length > 40;
+    const duration = toastQueue.length > 0 ? 1100 : (isLongText ? 2200 : 1500);
+    toastTimerRef.current = setTimeout(() => {
+      setPhaseBanner(null);
+    }, duration);
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, [phaseBanner, toastQueue.length]);
+
+  // 3. Tự động dọn sạch thông báo lỗi thời khi có Modal tương tác mới xuất hiện
+  useEffect(() => {
+    if (gameState?.waitingForResponse) {
+      setPhaseBanner(null);
+      setToastQueue([]);
+    }
+  }, [gameState?.waitingForResponse]);
+
+  // 4. Xóa bỏ thông báo chỉ dẫn khi Phase hoặc Turn đã trôi qua
+  useEffect(() => {
+    setToastQueue(prev => prev.filter(t => !t.includes('Đến Pha Bỏ Bài')));
+    if (phaseBanner && phaseBanner.includes('Đến Pha Bỏ Bài') && gameState?.phase !== PHASES.DISCARD) {
+      setPhaseBanner(null);
+    }
+  }, [gameState?.phase, gameState?.currentPlayerIndex]);
 
   const winnerText = useMemo(() => {
     if (!gameState || !gameState.winner) return 'Ai đó';
@@ -176,13 +286,77 @@ export default function GameView() {
         return (heroStr && heroStr !== 'Chưa lật') ? heroStr : (p.name || `Người chơi ${p.id + 1}`);
       }).join(' & ');
       const faction = winnerPlayers[0]?.faction;
-      const factionStr = faction && faction !== 'none' ? `Phe ${faction.toUpperCase()} (` : '';
-      const factionEnd = faction && faction !== 'none' ? ')' : '';
-      return `${factionStr}${names}${factionEnd}`;
+      const factionStr = faction && faction !== 'none' ? `Phe ${getFactionLabel(faction).toUpperCase()} ` : '';
+      return `${factionStr}(${names})`;
     }
     const heroStr = getHeroNameStr(gameState.winner);
     return (heroStr && heroStr !== 'Chưa lật') ? heroStr : (gameState.winner.name || `Người chơi ${gameState.winner.id + 1}`);
   }, [gameState]);
+
+  const targetPlayer = useMemo(() => {
+    if (!heroPopup) return null;
+    return gameState?.players?.find(p => p.id === heroPopup.id) || heroPopup;
+  }, [heroPopup, gameState?.players]);
+
+  const getPlayerEquip = useCallback((player, subType) => {
+    if (!player || !player.equipment) return null;
+    if (Array.isArray(player.equipment)) {
+      const found = player.equipment.find(c => c && (c.subType === subType || getCardSubType(c) === subType));
+      if (found) return found;
+    }
+    if (subType === CARD_SUBTYPES.EQUIP_WEAPON) return player.equipment.weapon || null;
+    if (subType === CARD_SUBTYPES.EQUIP_ARMOR) return player.equipment.armor || null;
+    if (subType === CARD_SUBTYPES.EQUIP_MOUNT_ATK) return player.equipment.horse_attack || null;
+    if (subType === CARD_SUBTYPES.EQUIP_MOUNT_DEF) return player.equipment.horse_defense || null;
+    return null;
+  }, []);
+
+  const targetEquipSlots = useMemo(() => {
+    if (!targetPlayer) return [];
+    return [
+      {
+        key: 'weapon',
+        type: CARD_SUBTYPES.EQUIP_WEAPON,
+        label: 'Vũ Khí',
+        icon: <WeaponIcon size={18} />,
+        card: getPlayerEquip(targetPlayer, CARD_SUBTYPES.EQUIP_WEAPON),
+        defaultDesc: 'Tầm bắn cơ bản: 1. Trang bị vũ khí giúp tăng tầm bắn hoặc mở khóa đòn đánh đặc biệt.'
+      },
+      {
+        key: 'armor',
+        type: CARD_SUBTYPES.EQUIP_ARMOR,
+        label: 'Phòng Cụ',
+        icon: <ArmorIcon size={18} />,
+        card: getPlayerEquip(targetPlayer, CARD_SUBTYPES.EQUIP_ARMOR),
+        defaultDesc: 'Chưa trang bị giáp hộ thân. Phòng cụ giúp tự động phòng thủ hoặc né sát thương.'
+      },
+      {
+        key: 'horse_attack',
+        type: CARD_SUBTYPES.EQUIP_MOUNT_ATK,
+        label: 'Ngựa Công (-1 Cự ly)',
+        icon: <MountAtkIcon size={18} />,
+        card: getPlayerEquip(targetPlayer, CARD_SUBTYPES.EQUIP_MOUNT_ATK),
+        defaultDesc: 'Chưa cưỡi chiến mã. Ngựa công giúp giảm khoảng cách đến đối thủ đi 1 (-1 cự ly).'
+      },
+      {
+        key: 'horse_defense',
+        type: CARD_SUBTYPES.EQUIP_MOUNT_DEF,
+        label: 'Ngựa Thủ (+1 Cự ly)',
+        icon: <MountDefIcon size={18} />,
+        card: getPlayerEquip(targetPlayer, CARD_SUBTYPES.EQUIP_MOUNT_DEF),
+        defaultDesc: 'Chưa cưỡi tuấn mã. Ngựa thủ giúp tăng khoảng cách đối thủ tiếp cận bản thân lên 1 (+1 cự ly).'
+      }
+    ];
+  }, [targetPlayer, getPlayerEquip]);
+
+  const targetJudgements = useMemo(() => {
+    if (!targetPlayer) return [];
+    return targetPlayer.judgementArea || targetPlayer.judges || [];
+  }, [targetPlayer]);
+
+  const totalTargetEquipCount = useMemo(() => {
+    return targetEquipSlots.filter(s => Boolean(s.card)).length;
+  }, [targetEquipSlots]);
 
   const processedLogsCount = useRef(0);
   useEffect(() => {
@@ -197,11 +371,40 @@ export default function GameView() {
             const logText = log?.text || log?.message || (typeof log === 'string' ? log : '');
             if (logText) {
                 const text = logText.toLowerCase();
-                if (text.includes("mất") && text.includes("sinh lực")) {
+                if (text.includes("lập công") || text.includes("tiêu diệt kẻ địch") || text.includes("thưởng rút")) {
+                    sfx.playDrawCard();
+                    showPhaseBanner(logText.startsWith("🎁") ? logText : `🎁 ${logText}`);
+                } else if (text.includes("đã tử trận") || text.includes("tử trận!")) {
+                    showPhaseBanner(logText.startsWith("💀") ? logText : `💀 ${logText}`);
+                } else if (text.includes("ác mộng") || text.includes("ngộ sát đồng minh")) {
+                    showPhaseBanner(logText.startsWith("⚠️") ? logText : `⚠️ ${logText}`);
+                } else if (text.includes("trạng thái hấp hối") || text.includes("hấp hối (hp: 0)")) {
+                    showPhaseBanner(logText.startsWith("⚠️") ? logText : `⚠️ ${logText}`);
+                } else if (text.includes("trò chơi kết thúc") || text.includes("chiến thắng độc tôn")) {
+                    showPhaseBanner(logText.startsWith("🏆") ? logText : `🏆 ${logText}`);
+                } else if (text.includes("sát thương") || (text.includes("mất") && text.includes("sinh lực"))) {
                     sfx.playDamage();
-                    showPhaseBanner(logText);
+                    showPhaseBanner(`🩸 ${logText}`);
                 } else if (text.includes("hồi") && text.includes("sinh lực")) {
                     sfx.playHeal();
+                    showPhaseBanner(`💖 ${logText}`);
+                } else if (text.includes("[dã man]:") || text.includes("🏹")) {
+                    showPhaseBanner(logText.startsWith("🏹") ? logText : `🏹 ${logText}`);
+                } else if (text.includes("[vạn tiễn]:") || text.includes("🎯")) {
+                    showPhaseBanner(logText.startsWith("🎯") ? logText : `🎯 ${logText}`);
+                } else if (text.includes("dã tâm") || text.includes("🐺")) {
+                    showPhaseBanner(logText.startsWith("🐺") ? logText : `🐺 ${logText}`);
+                } else if (text.includes("đã tước 1 lá bài") || text.includes("tước 1 lá bài")) {
+                    showPhaseBanner(`💥 ${logText}`);
+                } else if (text.includes("đã cướp 1 lá bài") || text.includes("cướp 1 lá bài")) {
+                    showPhaseBanner(`🤏 ${logText}`);
+                } else if (text.includes("né thành công")) {
+                    sfx.playDodge();
+                    showPhaseBanner(`💨 ${logText}`);
+                } else if (text.includes("sử dụng [hóa giải]") || text.includes("đã bị [hóa giải]") || text.includes("vô hiệu hóa")) {
+                    showPhaseBanner(`🛡️ ${logText}`);
+                } else if (text.includes("cẩm nang toàn bàn") && text.includes("có hiệu lực")) {
+                    showPhaseBanner(`⚡ ${logText}`);
                 } else if (text.includes("dùng [sát]") || text.includes("dùng [chém]")) {
                     sfx.playSlash();
                 } else if (text.includes("dùng [né]")) {
@@ -211,15 +414,27 @@ export default function GameView() {
                 } else if (text.includes("bắt đầu lượt")) {
                     sfx.playTurnStart();
                 } else if (text.includes("lộ diện tướng") || text.includes("hiển lộ tướng")) {
-                    showPhaseBanner(logText);
+                    showPhaseBanner(`👁️ ${logText}`);
                 } else if (text.includes("khu phán xét")) {
-                    showPhaseBanner(logText);
+                    showPhaseBanner(`⚖️ ${logText}`);
                 }
             }
         }
     }
     processedLogsCount.current = currentLogs.length;
   }, [gameState?.logs, sfx]);
+
+  const prevNeedsDiscard = useRef(false);
+  useEffect(() => {
+    if (!gameState) return;
+    const isDiscarding = gameState.waitingForResponse?.type === 'discard_phase' && 
+      (gameState.waitingForResponse?.responderId === mainPlayerId || gameState.waitingForResponse?.responderId === gameState.players?.[0]?.id);
+    if (isDiscarding && !prevNeedsDiscard.current) {
+      const amount = gameState.waitingForResponse?.amount || 1;
+      showPhaseBanner(`⚠️ Đến Pha Bỏ Bài: Hãy chọn ${amount} lá bài trên tay rồi bấm [Bỏ Bài]!`);
+    }
+    prevNeedsDiscard.current = Boolean(isDiscarding);
+  }, [gameState, mainPlayerId, showPhaseBanner]);
 
   /** @returns {import('react').CSSProperties} */
   const getOpponentStyle = (index, totalOpponents) => {
@@ -237,9 +452,9 @@ export default function GameView() {
     let rx, ry, baseY, scale;
     if (isLandscapeMobile) {
       rx = totalOpponents > 4 ? 38 : 34; // vw
-      ry = 14; // % độ võng hình vòng cung tự nhiên
-      baseY = 27; // Trọng tâm Y ở 27%: người chơi 3 ở top 13% (27 - 14), người chơi 2 & 4 ở top 27%
-      scale = totalOpponents >= 6 ? 0.78 : (totalOpponents >= 4 ? 0.85 : 0.92);
+      ry = 3.5; // % độ võng vòng cung
+      baseY = 32.5; // Trọng tâm Y ở 32.5%: Người chơi 3 ở top 29%, Người chơi 2 & 4 ở top 32.5% (tránh đè MyHeroBar ở dưới và hoàn toàn không bị top-bar đè che tên)
+      scale = totalOpponents >= 6 ? 0.76 : (totalOpponents >= 4 ? 0.84 : 0.88);
     } else if (isMobile) {
       rx = totalOpponents > 4 ? 37 : 35; // vw
       ry = totalOpponents > 4 ? 18 : 14; // %
@@ -267,8 +482,22 @@ export default function GameView() {
     };
   };
 
+  // 1. Tự động cuộn xuống tin mới nhất lúc vừa mở modal Log
   useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+    if (showMobileLog) {
+      isUserScrolledUpRef.current = false;
+      setShowScrollBottomBtn(false);
+      setTimeout(() => {
+        if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+      }, 50);
+    }
+  }, [showMobileLog]);
+
+  // 2. Tự động cuộn khi có logs mới, NHƯNG chỉ khi người chơi KHÔNG đang chủ động cuộn lên xem tin cũ
+  useEffect(() => {
+    if (logRef.current && !isUserScrolledUpRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
   }, [gameState?.logs]);
 
 
@@ -308,16 +537,37 @@ export default function GameView() {
           {/* Text trạng thái giai đoạn dời lên trên chỗ khu vực Việt Sát */}
           <div className="top-status-indicator" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {gameState.gameOver ? (
-              <span style={{ color: 'var(--color-gold)', fontWeight: 700, fontSize: '0.82rem' }}>
-                🏆 {winnerText} Thắng!
-              </span>
+              <button 
+                type="button"
+                onClick={() => setIsGameOverModalDismissed(false)}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(217, 119, 6, 0.45) 0%, rgba(180, 83, 9, 0.45) 100%)',
+                  border: '1.5px solid var(--color-gold)',
+                  borderRadius: '12px',
+                  padding: '2px 10px',
+                  color: 'var(--color-gold)',
+                  fontWeight: 'bold',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 0 10px rgba(245, 158, 11, 0.4)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'all 0.2s'
+                }}
+                title="Nhấn để mở Bảng Kết Quả Trận Đấu"
+              >
+                🏆 {winnerText} Thắng! (Xem Kết Quả)
+              </button>
             ) : needsDiscard ? (
               <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '0.74rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', padding: '2px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
                 ⚠️ Bỏ {discardAmount} lá ({selectedDiscards.length} đã chọn)
               </span>
             ) : targetSession ? (
               <span style={{ color: '#fca5a5', fontWeight: 'bold', fontSize: '0.74rem', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239,68,68,0.5)', padding: '2px 8px', borderRadius: '12px', whiteSpace: 'nowrap' }}>
-                🎯 Hãy chọn mục tiêu!
+                🎯 {targetSession.targetingDef?.type === 'multiple' 
+                     ? `Đã chọn ${targetSession.selectedTargets?.length || 0}/${targetSession.targetingDef?.max || 2}`
+                     : (targetSession.selectedTargets?.length > 0 ? `Đã chọn ${targetSession.selectedTargets.length} mục tiêu` : 'Hãy chọn mục tiêu!')}
               </span>
             ) : (
               <span style={{ color: isMyTurn ? '#6ee7b7' : '#94a3b8', fontSize: '0.74rem', fontWeight: 600, background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.15)', padding: '2px 8px', borderRadius: '12px', whiteSpace: 'nowrap' }}>
@@ -333,7 +583,7 @@ export default function GameView() {
             </span>
             <span style={{ color: 'rgba(255,255,255,0.25)' }}>|</span>
             <span style={{ color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 'bold' }} title="Khoảng cách phòng vệ">
-              <DistanceIcon size={12} /> Cự ly: <strong style={{ color: '#f8fafc' }}>+{me.equipment?.find(c => getCardSubType(c) === CARD_SUBTYPES.EQUIP_MOUNT_DEF) ? 1 : 0}</strong>
+              <DistanceIcon size={12} /> Cự ly: <strong style={{ color: '#f8fafc' }}>+{getPlayerEquip(me, CARD_SUBTYPES.EQUIP_MOUNT_DEF) ? 1 : 0}</strong>
             </span>
           </div>
         </div>
@@ -395,8 +645,47 @@ export default function GameView() {
       )}
 
       {phaseBanner && (
-        <div className="phase-banner">
-          {phaseBanner}
+        <div 
+          className="game-toast-popup" 
+          onClick={() => {
+            dismissBanner();
+          }}
+          title="Nhấn để đóng thông báo"
+        >
+          <span className="game-toast-icon">
+            {phaseBanner.includes('🎁') || phaseBanner.includes('LẬP CÔNG') ? '🎁' :
+             phaseBanner.includes('💀') || phaseBanner.includes('TỬ TRẬN') ? '💀' :
+             phaseBanner.includes('🏆') ? '🏆' :
+             phaseBanner.includes('🏹') || phaseBanner.includes('Dã Man') ? '🏹' :
+             phaseBanner.includes('🎯') || phaseBanner.includes('Vạn Tiễn') ? '🎯' :
+             phaseBanner.includes('🐺') || phaseBanner.includes('Dã Tâm') ? '🐺' :
+             phaseBanner.includes('👁️') ? '👁️' :
+             phaseBanner.includes('🩸') || phaseBanner.includes('sát thương') ? '🩸' :
+             phaseBanner.includes('💖') ? '💖' :
+             phaseBanner.includes('⚔️') || phaseBanner.includes('chém') ? '⚔️' :
+             phaseBanner.includes('⚖️') || phaseBanner.includes('phán xét') ? '⚖️' :
+             phaseBanner.includes('📜') ? '📜' :
+             phaseBanner.includes('💥') || phaseBanner.includes('tước') ? '💥' :
+             phaseBanner.includes('🤏') || phaseBanner.includes('cướp') ? '🤏' :
+             phaseBanner.includes('🛡️') || phaseBanner.includes('hóa giải') ? '🛡️' :
+             phaseBanner.includes('💨') || phaseBanner.includes('né') ? '💨' :
+             phaseBanner.includes('⚡') ? '⚡' :
+             phaseBanner.includes('⚠️') ? '⚠️' : '📢'}
+          </span>
+          <span className="game-toast-text">
+            {phaseBanner.replace(/^[🎁💀🏆🏹🎯🐺👁️🩸💖⚔️⚖️📜💥🤏🛡️💨⚡⚠️📢\s]+/, '')}
+          </span>
+          <button 
+            type="button" 
+            className="game-toast-close"
+            onClick={(e) => {
+              e.stopPropagation();
+              dismissBanner();
+            }}
+            title="Đóng thông báo"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -421,18 +710,46 @@ export default function GameView() {
           );
         })}
         
-        <div className="board-center" style={{ zIndex: 1, position: 'absolute', top: isLandscapeMobile ? '48%' : (isMobile ? '46%' : '38%'), left: isMobile ? '50%' : 'calc(50% - 160px)', transform: isLandscapeMobile ? 'translate(-50%, -50%) scale(0.78)' : 'translate(-50%, -50%)', width: '250px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          
-          <div className="deck-info" style={{ display: 'flex', justifyContent: 'center', gap: isLandscapeMobile ? '10px' : '20px', marginBottom: isLandscapeMobile ? '4px' : '15px' }}>
-            <div style={{ textAlign: 'center', background: 'rgba(0,0,0,0.5)', padding: isLandscapeMobile ? '2px 10px' : '5px 15px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)' }}>
-               <div style={{ fontSize: isLandscapeMobile ? '1.1rem' : '1.5rem', fontWeight: 'bold', color: 'var(--color-gold)' }}>{gameState.deck?.length || 0}</div>
-               <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>Bài Cầm</div>
+        {/* Landscape Mobile: Đưa Bài Cầm & Bỏ Đi sang góc phải giữa Người chơi 3 và 4 để không đè bàn trang bị */}
+        {isLandscapeMobile && (
+          <div 
+            className="deck-info deck-info-landscape" 
+            style={{ 
+              position: 'absolute', 
+              top: '29%', 
+              left: 'calc(50% + 17.5vw)', 
+              transform: 'translate(-50%, -50%) scale(0.88)', 
+              display: 'flex', 
+              gap: '8px', 
+              zIndex: 6,
+              pointerEvents: 'none'
+            }}
+          >
+            <div style={{ textAlign: 'center', background: 'rgba(15, 23, 42, 0.75)', padding: '3px 10px', borderRadius: '8px', border: '1px solid rgba(212, 168, 67, 0.4)', backdropFilter: 'blur(6px)', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
+               <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: 'var(--color-gold)', lineHeight: 1.1 }}>{gameState.deck?.length || 0}</div>
+               <div style={{ fontSize: '0.55rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>Bài Cầm</div>
             </div>
-            <div style={{ textAlign: 'center', background: 'rgba(0,0,0,0.5)', padding: isLandscapeMobile ? '2px 10px' : '5px 15px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)' }}>
-               <div style={{ fontSize: isLandscapeMobile ? '1.1rem' : '1.5rem', fontWeight: 'bold', color: 'var(--color-text-muted)' }}>{gameState.discardPile?.length || 0}</div>
-               <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>Bỏ Đi</div>
+            <div style={{ textAlign: 'center', background: 'rgba(15, 23, 42, 0.75)', padding: '3px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.15)', backdropFilter: 'blur(6px)', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
+               <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: 'var(--color-text-muted)', lineHeight: 1.1 }}>{gameState.discardPile?.length || 0}</div>
+               <div style={{ fontSize: '0.55rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>Bỏ Đi</div>
             </div>
           </div>
+        )}
+
+        <div className="board-center" style={{ zIndex: 1, position: 'absolute', top: isLandscapeMobile ? '49%' : (isMobile ? '46%' : '38%'), left: isMobile ? '50%' : 'calc(50% - 160px)', transform: isLandscapeMobile ? 'translate(-50%, -50%) scale(0.85)' : 'translate(-50%, -50%)', width: isLandscapeMobile ? '380px' : '320px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          
+          {!isLandscapeMobile && (
+            <div className="deck-info" style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '15px' }}>
+              <div style={{ textAlign: 'center', background: 'rgba(0,0,0,0.5)', padding: '5px 15px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)' }}>
+                 <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--color-gold)' }}>{gameState.deck?.length || 0}</div>
+                 <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>Bài Cầm</div>
+              </div>
+              <div style={{ textAlign: 'center', background: 'rgba(0,0,0,0.5)', padding: '5px 15px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)' }}>
+                 <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--color-text-muted)' }}>{gameState.discardPile?.length || 0}</div>
+                 <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>Bỏ Đi</div>
+              </div>
+            </div>
+          )}
 
           <div className="played-cards" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', minHeight: isLandscapeMobile ? (gameState.playedCards?.length ? '65px' : '0px') : '120px', alignItems: 'center' }}>
             {gameState.playedCards?.map((card, i) => {
@@ -467,24 +784,141 @@ export default function GameView() {
                 </div>
               );
             })}
-            {(gameState.playedCards?.length || 0) === 0 && targetSession && (
-              <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.8)', fontStyle: 'italic', background: 'rgba(0,0,0,0.5)', padding: '5px 10px', borderRadius: '5px' }}>
-                {targetSession.targetingDef?.steps?.[targetSession.step]?.message || targetSession.message || '🎯 Hãy chọn 1 mục tiêu...'}
-              </span>
-            )}
+            {targetSession && (() => {
+              const cardName = targetSession.virtualCardName || targetSession.card?.name || activeSkill || '';
+              const isXiengXich = cardName === 'Xiềng Xích' || targetSession.card?.name === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
+              const isMultiple = targetSession.targetingDef?.type === 'multiple';
+              const selectedCount = targetSession.selectedTargets?.length || 0;
+              const maxTargets = targetSession.targetingDef?.max || (isXiengXich ? 2 : 1);
+              const minTargets = targetSession.targetingDef?.min !== undefined ? targetSession.targetingDef.min : 1;
+              const isReforge = isXiengXich && selectedCount === 0;
+
+              let message = targetSession.targetingDef?.steps?.[targetSession.step]?.message || targetSession.message;
+              if (isMultiple) {
+                if (selectedCount === 0) {
+                  message = isXiengXich
+                    ? `[Xiềng Xích]: Đã chọn 0/${maxTargets} mục tiêu (Bấm "Rèn Lại" nếu không khóa ai)`
+                    : `[${cardName}]: Đã chọn 0/${maxTargets} mục tiêu`;
+                } else {
+                  message = `[${cardName}]: Đã chọn ${selectedCount}/${maxTargets} mục tiêu${selectedCount >= maxTargets ? ' (Đã đủ)' : ''}`;
+                }
+              }
+
+              const hasEnoughTargets = isMultiple 
+                ? (selectedCount >= minTargets)
+                : (selectedCount > 0);
+
+              const canConfirm = Boolean(
+                ['none', 'aoe', 'self'].includes(targetSession.targetingDef?.type) ||
+                isReforge ||
+                hasEnoughTargets
+              );
+
+              let confirmLabel = `Dùng ${cardName}`.trim();
+              if (isXiengXich) {
+                confirmLabel = isReforge ? 'Rèn Lại (Bỏ 1)' : `Khóa Xích (${selectedCount}/${maxTargets})`;
+              } else if (isMultiple) {
+                confirmLabel = `Xác Nhận (${selectedCount}/${maxTargets})`;
+              }
+
+              return (
+                <div 
+                  className="target-notification-banner"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(30, 41, 59, 0.96) 100%)',
+                    border: '1.5px solid #f59e0b',
+                    borderRadius: '20px',
+                    padding: '5px 12px',
+                    boxShadow: '0 6px 20px rgba(0, 0, 0, 0.8), 0 0 14px rgba(245, 158, 11, 0.45)',
+                    zIndex: 50,
+                    marginTop: '6px',
+                    maxWidth: '100%',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <span style={{ 
+                    fontSize: '0.84rem', 
+                    color: '#f8fafc', 
+                    fontWeight: 'bold',
+                    textShadow: '0 1px 3px rgba(0,0,0,0.8)'
+                  }}>
+                    {message}
+                  </span>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      className="btn-notification-cancel"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        cancelTargeting();
+                      }}
+                      style={{
+                        background: 'rgba(51, 65, 85, 0.95)',
+                        color: '#f8fafc',
+                        border: '1px solid rgba(255, 255, 255, 0.25)',
+                        borderRadius: '12px',
+                        padding: '3px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        lineHeight: 1.2
+                      }}
+                      title="Hủy thao tác"
+                    >
+                      ✕ Hủy
+                    </button>
+
+                    {canConfirm && (
+                      <button
+                        type="button"
+                        className="btn-notification-confirm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          confirmPlayCard();
+                        }}
+                        style={{
+                          background: 'linear-gradient(135deg, #fcd34d 0%, #f59e0b 50%, #d97706 100%)',
+                          color: '#1e1b4b',
+                          border: '1px solid #fef08a',
+                          borderRadius: '12px',
+                          padding: '3px 10px',
+                          fontSize: '0.74rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          lineHeight: 1.2,
+                          boxShadow: '0 2px 6px rgba(245, 158, 11, 0.6)'
+                        }}
+                        title={`Xác nhận sử dụng [${cardName}]`}
+                      >
+                        ✓ {confirmLabel}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
 
       <div style={{ flex: 1 }}></div>
 
-      <div className="player-hand-area" onClick={() => cancelTargeting()}>
+      <div className="player-hand-area" onClick={() => { dismissBanner(); cancelTargeting(); }}>
         <MyHeroBar
             me={me}
             isMyTurn={isMyTurn}
             activeSkill={activeSkill}
             setActiveSkill={setActiveSkill}
-            handleExecuteSkill={handleExecuteSkill}
+            handleExecuteSkill={(skillId) => {
+              dismissBanner();
+              handleExecuteSkill(skillId);
+            }}
             animationClass={myAnimationClass}
             gameState={gameState}
             activePhase={gameState.phase}
@@ -502,10 +936,11 @@ export default function GameView() {
                   activeSkill={activeSkill}
                   targetSession={targetSession}
                   selectedDiscards={selectedDiscards}
-                  handleDiscardToggle={handleDiscardToggle}
-                  handleCardClick={handleCardClick}
+                  handleDiscardToggle={onDiscardToggle}
+                  handleCardClick={onCardClick}
                   cancelTargeting={cancelTargeting}
                   handleUnplayableClick={handleUnplayableClick}
+                  confirmPlayCard={confirmPlayCard}
               />
             }
             actionBar={
@@ -564,39 +999,98 @@ export default function GameView() {
              ✕ Thoát
            </button>
         </div>
-        <div className="game-log-tabs" style={{ display: 'flex', gap: '8px', padding: '8px 16px', background: 'rgba(0,0,0,0.3)' }}>
-           <div className={`game-log-tab ${logTab === 'all' ? 'active' : ''}`} onClick={() => setLogTab('all')} style={{ padding: '4px 14px', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: logTab === 'all' ? 'bold' : 'normal', background: logTab === 'all' ? 'var(--color-gold)' : 'rgba(255,255,255,0.06)', color: logTab === 'all' ? '#111827' : '#94a3b8' }}>Tất cả</div>
-           <div className={`game-log-tab ${logTab === 'personal' ? 'active' : ''}`} onClick={() => setLogTab('personal')} style={{ padding: '4px 14px', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: logTab === 'personal' ? 'bold' : 'normal', background: logTab === 'personal' ? 'var(--color-gold)' : 'rgba(255,255,255,0.06)', color: logTab === 'personal' ? '#111827' : '#94a3b8' }}>Cá nhân</div>
+        <div className="game-log-tabs" style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '6px 16px', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.08)', WebkitTextSizeAdjust: '100%', textSizeAdjust: '100%', touchAction: 'manipulation' }}>
+           <div className={`game-log-tab ${logTab === 'all' ? 'active' : ''}`} onClick={() => setLogTab('all')} style={{ width: '130px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: logTab === 'all' ? 'bold' : 'normal', background: logTab === 'all' ? 'var(--color-gold)' : 'rgba(255,255,255,0.06)', color: logTab === 'all' ? '#111827' : '#94a3b8', transition: 'all 0.2s', WebkitTextSizeAdjust: '100%', textSizeAdjust: '100%', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none' }}>Tất cả</div>
+           <div className={`game-log-tab ${logTab === 'personal' ? 'active' : ''}`} onClick={() => setLogTab('personal')} style={{ width: '130px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: logTab === 'personal' ? 'bold' : 'normal', background: logTab === 'personal' ? 'var(--color-gold)' : 'rgba(255,255,255,0.06)', color: logTab === 'personal' ? '#111827' : '#94a3b8', transition: 'all 0.2s', WebkitTextSizeAdjust: '100%', textSizeAdjust: '100%', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none' }}>Cá nhân</div>
         </div>
-        <div className="game-log" ref={logRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {gameState.logs?.filter(log => {
-             const text = log.text || log.message || '';
-             if (logTab === 'all') return true;
-             const playerName = `Người chơi ${mainPlayerId + 1}`;
-             return text.includes("Bạn") || text.includes(playerName);
-          }).map((log, i) => {
-            const text = log.text || log.message || '';
-            return (
-              <div key={i} className={`log-entry ${log.important ? 'important' : ''} ${text.includes("mất") ? 'damage' : ''}`} style={{ fontSize: '0.9rem', lineHeight: '1.45' }}>
-                 <span style={{ opacity: 0.5, marginRight: '6px', fontSize: '0.8rem' }}>
-                   [{new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}]
-                 </span> {renderLogText(text)}
-              </div>
-            );
-          })}
+        <div 
+          className="game-log" 
+          ref={logRef} 
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+            isUserScrolledUpRef.current = !isNearBottom;
+            setShowScrollBottomBtn(!isNearBottom);
+          }}
+          style={{ flex: 1, overflowY: 'auto', padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: '5px', WebkitTextSizeAdjust: '100%', textSizeAdjust: '100%', touchAction: 'manipulation' }}
+        >
+          {(() => {
+            const mePlayer = gameState.players.find(p => p.id === mainPlayerId);
+            const myHeroNames = mePlayer?.heroes?.map(h => h?.name).filter(Boolean) || [];
+            const myPlayerName = `Người chơi ${mainPlayerId + 1}`;
+
+            const filteredLogs = gameState.logs?.filter(log => {
+              if (logTab === 'all') return true;
+              const text = log.text || log.message || '';
+              return text.includes("Bạn") || 
+                     text.includes(myPlayerName) || 
+                     (mePlayer?.name && text.includes(mePlayer.name)) ||
+                     myHeroNames.some(hn => text.includes(hn));
+            }) || [];
+
+            if (filteredLogs.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.82rem', padding: '24px 10px', fontStyle: 'italic', WebkitTextSizeAdjust: '100%', textSizeAdjust: '100%' }}>
+                  {logTab === 'personal' ? 'Chưa có nhật ký cá nhân nào.' : 'Chưa có nhật ký trận đấu.'}
+                </div>
+              );
+            }
+
+            return filteredLogs.map((log, i) => {
+              const text = log.text || log.message || '';
+              return (
+                <div 
+                  key={i} 
+                  className={`log-entry ${log.important ? 'important' : ''} ${text.includes("mất") ? 'damage' : ''}`} 
+                  style={{ 
+                    fontSize: '0.84rem', 
+                    lineHeight: '1.4',
+                    WebkitTextSizeAdjust: '100%',
+                    textSizeAdjust: '100%',
+                    touchAction: 'manipulation'
+                  }}
+                >
+                   <span style={{ opacity: 0.5, marginRight: '6px', fontSize: '0.78rem' }}>
+                     [{new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}]
+                   </span> {renderLogText(text)}
+                </div>
+              );
+            });
+          })()}
         </div>
-        <div className="game-log-footer" style={{ padding: '10px 16px', background: 'rgba(15, 23, 42, 0.98)', borderTop: '1px solid rgba(212, 168, 67, 0.35)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        {showScrollBottomBtn && (
           <button 
-            className="btn-action primary"
-            onClick={() => setShowMobileLog(false)} 
+            type="button" 
+            className="log-scroll-bottom-btn"
+            onClick={() => {
+              if (logRef.current) {
+                logRef.current.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' });
+                isUserScrolledUpRef.current = false;
+                setShowScrollBottomBtn(false);
+              }
+            }}
+            title="Cuộn xuống xem diễn biến mới nhất"
+          >
+            ⬇ Tin mới nhất
+          </button>
+        )}
+        <div className="game-log-footer" style={{ padding: '8px 16px', background: 'rgba(15, 23, 42, 0.98)', borderTop: '1px solid rgba(212, 168, 67, 0.35)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <button 
+            onClick={() => setShowMobileLog(false)}
             style={{ 
-              padding: '8px 36px', 
-              borderRadius: '8px', 
-              fontSize: '0.92rem', 
-              fontWeight: 'bold', 
+              height: '32px',
+              minHeight: '32px',
+              padding: '0 28px',
+              borderRadius: '20px',
+              fontSize: '0.82rem',
+              fontWeight: 'bold',
               cursor: 'pointer',
-              minWidth: '200px',
-              boxShadow: '0 4px 14px rgba(212, 168, 67, 0.35)'
+              background: 'rgba(30, 41, 59, 0.95)',
+              border: '1px solid rgba(212, 168, 67, 0.6)',
+              color: 'var(--color-gold)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+              transition: 'all 0.2s ease',
+              flex: 'none'
             }}
           >
             ✕ Đóng Nhật Ký
@@ -615,153 +1109,514 @@ export default function GameView() {
              left: 0, 
              width: '100%', 
              height: '100%', 
-             background: 'rgba(0,0,0,0.88)', 
+             background: 'rgba(0,0,0,0.85)', 
              zIndex: 1200, 
              display: 'flex', 
-             flexDirection: 'column', 
              alignItems: 'center', 
              justifyContent: 'center', 
-             backdropFilter: 'blur(10px)', 
-             padding: '8px', 
+             backdropFilter: 'blur(8px)', 
+             padding: '10px', 
              boxSizing: 'border-box' 
            }} 
            onClick={() => setHeroPopup(null)}
          >
-            {/* Nút thoát nổi góc trên bên phải */}
-            <button 
-              onClick={() => setHeroPopup(null)} 
-              title="Thoát xem tướng"
-              style={{ 
-                position: 'absolute', 
-                top: '12px', 
-                right: '16px', 
-                zIndex: 1220, 
-                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
-                color: 'white', 
-                border: '1px solid rgba(255, 255, 255, 0.3)', 
-                borderRadius: '8px', 
-                padding: '6px 16px', 
-                fontSize: '0.88rem', 
-                fontWeight: 'bold', 
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)'
-              }}
-            >
-              ✕ Đóng
-            </button>
+           <div
+             style={{
+               position: 'relative',
+               background: 'linear-gradient(165deg, #1e293b 0%, #0f172a 100%)',
+               border: '1.5px solid rgba(212, 168, 67, 0.55)',
+               borderRadius: '14px',
+               boxShadow: '0 12px 40px rgba(0, 0, 0, 0.9), inset 0 1px 1px rgba(255, 255, 255, 0.15)',
+               padding: isLandscapeMobile ? '10px 16px 12px 16px' : '16px',
+               maxWidth: isLandscapeMobile ? '640px' : '92vw',
+               maxHeight: isLandscapeMobile ? '92vh' : '88vh',
+               display: 'flex',
+               flexDirection: 'column',
+               alignItems: 'center',
+               boxSizing: 'border-box'
+             }}
+             onClick={e => e.stopPropagation()}
+           >
+             {/* Nút thoát nổi góc trên bên phải của modal dialog */}
+             <button 
+               onClick={() => setHeroPopup(null)} 
+               title="Thoát xem tướng"
+               style={{ 
+                 position: 'absolute', 
+                 top: '10px', 
+                 right: '12px', 
+                 zIndex: 10, 
+                 background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
+                 color: 'white', 
+                 border: '1px solid rgba(255, 255, 255, 0.35)', 
+                 borderRadius: '6px', 
+                 padding: '3px 10px', 
+                 fontSize: '0.75rem', 
+                 fontWeight: 'bold', 
+                 cursor: 'pointer',
+                 boxShadow: '0 2px 6px rgba(239, 68, 68, 0.4)'
+               }}
+             >
+               ✕ Đóng
+             </button>
 
-            <div style={{ color: 'var(--color-gold)', fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '8px', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
-              📜 Xem Tướng: {heroPopup.name} {heroPopup.isRevealed ? `(Phe ${heroPopup.faction})` : '(Chưa lộ diện)'}
-            </div>
+             <div style={{ color: 'var(--color-gold)', fontSize: '0.92rem', fontWeight: 'bold', marginBottom: '8px', paddingRight: '50px', textShadow: '0 2px 4px rgba(0,0,0,0.8)', textAlign: 'center' }}>
+               📜 Hồ Sơ: {targetPlayer.name} {targetPlayer.isRevealed ? (targetPlayer.isDaTam ? '(Phe Dã Tâm)' : `(Phe ${targetPlayer.faction})`) : '(Chưa lộ diện)'}
+             </div>
 
-            <div 
-              style={{ 
-                display: 'flex', 
-                gap: '14px', 
-                maxWidth: '96vw', 
-                maxHeight: '82vh', 
-                overflowY: 'auto', 
-                overflowX: 'auto', 
-                padding: '4px', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                flexWrap: 'nowrap' 
-              }}
-            >
-              {(heroPopup.heroes || []).map((hero, idx) => {
-                const isSelf = heroPopup.id === mainPlayerId;
-                const isRevealed = Boolean(heroPopup.revealedHeroes?.[idx] ?? hero?.isRevealed);
-                const isGameOver = Boolean(gameState?.gameOver);
-                const isVisible = isSelf || isRevealed || isGameOver;
+             {/* Segmented Tab Controls */}
+             <div style={{
+               display: 'flex',
+               gap: '8px',
+               marginBottom: '10px',
+               background: 'rgba(15, 23, 42, 0.7)',
+               padding: '3px',
+               borderRadius: '24px',
+               border: '1px solid rgba(212, 168, 67, 0.35)',
+               boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.6)'
+             }}>
+               <button
+                 type="button"
+                 onClick={() => setPopupTab('heroes')}
+                 style={{
+                   padding: '5px 16px',
+                   borderRadius: '20px',
+                   fontSize: '0.78rem',
+                   fontWeight: 'bold',
+                   border: 'none',
+                   cursor: 'pointer',
+                   background: popupTab === 'heroes' ? 'linear-gradient(135deg, #d4a843 0%, #b45309 100%)' : 'transparent',
+                   color: popupTab === 'heroes' ? '#0f172a' : '#cbd5e1',
+                   boxShadow: popupTab === 'heroes' ? '0 2px 8px rgba(212, 168, 67, 0.5)' : 'none',
+                   transition: 'all 0.15s ease'
+                 }}
+               >
+                 🎴 Võ Tướng ({targetPlayer.heroes?.length || 2})
+               </button>
+               <button
+                 type="button"
+                 onClick={() => setPopupTab('equipment')}
+                 style={{
+                   padding: '5px 16px',
+                   borderRadius: '20px',
+                   fontSize: '0.78rem',
+                   fontWeight: 'bold',
+                   border: 'none',
+                   cursor: 'pointer',
+                   background: popupTab === 'equipment' ? 'linear-gradient(135deg, #d4a843 0%, #b45309 100%)' : 'transparent',
+                   color: popupTab === 'equipment' ? '#0f172a' : '#cbd5e1',
+                   boxShadow: popupTab === 'equipment' ? '0 2px 8px rgba(212, 168, 67, 0.5)' : 'none',
+                   transition: 'all 0.15s ease',
+                   display: 'flex',
+                   alignItems: 'center',
+                   gap: '5px'
+                 }}
+               >
+                 <span>⚔️ Trang Bị & Phán Xét</span>
+                 <span style={{
+                   background: popupTab === 'equipment' ? '#0f172a' : 'rgba(212, 168, 67, 0.25)',
+                   color: popupTab === 'equipment' ? '#fef08a' : 'var(--color-gold)',
+                   borderRadius: '10px',
+                   padding: '1px 6px',
+                   fontSize: '0.68rem',
+                   fontWeight: 'bold'
+                 }}>
+                   {totalTargetEquipCount + targetJudgements.length}
+                 </span>
+               </button>
+             </div>
 
-                if (!isVisible) {
-                  return (
-                    <div 
-                      key={idx} 
-                      style={{ 
-                        background: 'linear-gradient(180deg, #161e2e 0%, #0d121d 100%)', 
-                        borderRadius: '12px', 
-                        border: '2px dashed #4b5563', 
-                        height: isLandscapeMobile ? 'clamp(150px, 58vh, 230px)' : 'clamp(200px, 68vh, 300px)', 
-                        aspectRatio: '1086 / 1448',
-                        boxShadow: '0 8px 30px rgba(0,0,0,0.85)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '16px',
-                        boxSizing: 'border-box'
-                      }} 
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <div style={{ fontSize: '42px' }}>🕵️</div>
-                      <div style={{ color: '#9ca3af', fontWeight: 'bold', fontSize: '0.9rem', marginTop: '8px' }}>TƯỚNG ẨN</div>
-                      <div style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: '4px' }}>Chưa lộ diện</div>
-                    </div>
-                  );
-                }
+             {/* TAB 1: VÕ TƯỚNG */}
+             {popupTab === 'heroes' && (
+               <div 
+                 style={{ 
+                   display: 'flex', 
+                   gap: '12px', 
+                   maxWidth: '100%', 
+                   maxHeight: isLandscapeMobile ? '68vh' : '75vh', 
+                   overflowY: 'auto', 
+                   overflowX: 'auto', 
+                   padding: '4px', 
+                   alignItems: 'stretch', 
+                   justifyContent: 'center', 
+                   flexWrap: 'nowrap' 
+                 }}
+               >
+                 {(targetPlayer.heroes || []).map((hero, idx) => {
+                 const isSelf = heroPopup.id === mainPlayerId;
+                 const isRevealed = Boolean(heroPopup.revealedHeroes?.[idx] ?? hero?.isRevealed);
+                 const isGameOver = Boolean(gameState?.gameOver);
+                 const isVisible = isSelf || isRevealed || isGameOver;
+                 const roleLabel = idx === 0 ? 'Chính Tướng' : 'Phó Tướng';
 
-                const heroFaction = hero?.faction || heroPopup.faction || 'none';
-                const factionColor = heroPopup.isDaTam ? '#9ca3af' : (heroFaction === 'Lạc' ? '#10b981' : heroFaction === 'Sơn' ? '#b45309' : heroFaction === 'Hà' ? '#3b82f6' : '#ef4444');
+                 if (!isVisible) {
+                   return (
+                     <div 
+                       key={idx} 
+                       style={{ 
+                         background: 'linear-gradient(180deg, #161e2e 0%, #0d121d 100%)', 
+                         borderRadius: '12px', 
+                         border: '2px dashed #4b5563', 
+                         width: isLandscapeMobile ? '210px' : '230px',
+                         height: isLandscapeMobile ? 'clamp(170px, 58vh, 220px)' : 'clamp(210px, 65vh, 280px)', 
+                         boxShadow: '0 8px 24px rgba(0,0,0,0.85)',
+                         display: 'flex',
+                         flexDirection: 'column',
+                         alignItems: 'center',
+                         justifyContent: 'center',
+                         padding: '16px',
+                         boxSizing: 'border-box'
+                       }} 
+                       onClick={e => e.stopPropagation()}
+                     >
+                       <div style={{ fontSize: '40px' }}>🕵️</div>
+                       <div style={{ color: '#9ca3af', fontWeight: 'bold', fontSize: '0.88rem', marginTop: '6px' }}>TƯỚNG ẨN</div>
+                       <div style={{ color: '#f59e0b', fontSize: '0.72rem', marginTop: '2px', fontWeight: 'bold' }}>{roleLabel}</div>
+                       <div style={{ color: '#6b7280', fontSize: '0.72rem', marginTop: '4px' }}>Chưa lộ diện</div>
+                     </div>
+                   );
+                 }
 
-                return (
-                  <div 
-                    key={idx} 
-                    style={{ 
-                      background: 'linear-gradient(180deg, #161e2e 0%, #0d121d 100%)', 
-                      borderRadius: '12px', 
-                      border: `2px solid ${factionColor}`, 
-                      height: isLandscapeMobile ? 'clamp(150px, 58vh, 230px)' : 'clamp(200px, 68vh, 300px)', 
-                      aspectRatio: '1086 / 1448',
-                      boxShadow: '0 8px 30px rgba(0,0,0,0.85)', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      overflow: 'hidden', 
-                      position: 'relative'
-                    }} 
-                    onClick={e => e.stopPropagation()}
-                  >
-                    {hero?.image ? (
-                      <img 
-                        src={`/images/heroes/${hero.image}`} 
-                        alt={hero.name} 
-                        style={{ 
-                          width: '100%', 
-                          height: '100%', 
-                          objectFit: 'contain', 
-                          display: 'block' 
-                        }} 
-                      />
-                    ) : (
-                      <div style={{ padding: '16px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '50px' }}>{hero?.emoji || '🎴'}</div>
-                        <h3 style={{ color: 'var(--color-gold)', margin: '6px 0 3px 0', fontSize: '1rem' }}>{hero?.name}</h3>
-                        <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '8px', background: factionColor, color: 'white' }}>{heroFaction}</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                 const isDaTam = Boolean(heroPopup.isDaTam || targetPlayer.isDaTam);
+                 const rawHeroFaction = hero?.faction || heroPopup.rawFaction || heroPopup.canonicalFaction || heroPopup.faction || 'none';
+                 const heroFaction = getFactionLabel(rawHeroFaction);
+                 const factionColor = isDaTam ? '#9ca3af' : getFactionColor(heroFaction, false);
 
-            <button 
-              className="btn-action primary"
-              onClick={() => setHeroPopup(null)} 
-              style={{ 
-                marginTop: '12px', 
-                padding: '6px 32px', 
-                borderRadius: '8px', 
-                fontSize: '0.9rem', 
-                fontWeight: 'bold', 
-                cursor: 'pointer',
-                minWidth: '180px',
-                boxShadow: '0 4px 12px rgba(212, 168, 67, 0.35)'
-              }}
-            >
-              ✕ Đóng
-            </button>
+                 return (
+                   <div 
+                     key={idx} 
+                     style={{ 
+                       background: 'linear-gradient(180deg, #161e2e 0%, #0d121d 100%)', 
+                       borderRadius: '12px', 
+                       border: `2px solid ${factionColor}`, 
+                       width: isLandscapeMobile ? '260px' : '280px',
+                       maxWidth: '46vw',
+                       height: isLandscapeMobile ? 'clamp(170px, 58vh, 220px)' : 'clamp(210px, 65vh, 280px)', 
+                       boxShadow: `0 8px 24px rgba(0,0,0,0.85), 0 0 10px ${factionColor}30`, 
+                       display: 'flex', 
+                       flexDirection: 'column', 
+                       overflow: 'hidden', 
+                       position: 'relative',
+                       padding: '8px 10px',
+                       boxSizing: 'border-box'
+                     }} 
+                     onClick={e => e.stopPropagation()}
+                   >
+                     {/* Header Card: Avatar + Tên + Badge Phe/Vai Trò */}
+                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: '6px', marginBottom: '6px', flexShrink: 0 }}>
+                       {hero?.image ? (
+                         <img 
+                           src={`/images/heroes/${hero.image}`} 
+                           alt={hero.name} 
+                           style={{ 
+                             width: '42px', 
+                             height: '56px', 
+                             objectFit: 'cover', 
+                             objectPosition: 'top',
+                             borderRadius: '5px',
+                             border: `1.5px solid ${factionColor}`,
+                             flexShrink: 0,
+                             display: 'block' 
+                           }} 
+                         />
+                       ) : (
+                         <div style={{ width: '42px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', background: 'rgba(255,255,255,0.05)', borderRadius: '5px', border: `1.5px solid ${factionColor}`, flexShrink: 0 }}>
+                           {hero?.emoji || '🎴'}
+                         </div>
+                       )}
+                       <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                         <h3 style={{ color: 'var(--color-gold)', margin: 0, fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                           {hero?.name || 'Võ Tướng'}
+                         </h3>
+                         <div style={{ display: 'flex', gap: '4px', marginTop: '3px', flexWrap: 'wrap' }}>
+                           <span style={{ fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', background: factionColor, color: 'white', fontWeight: 'bold' }}>
+                             {isDaTam ? 'DÃ TÂM' : heroFaction}
+                           </span>
+                           <span style={{ fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.1)', color: '#cbd5e1', fontWeight: 'bold' }}>
+                             {roleLabel}
+                           </span>
+                           <span style={{ fontSize: '0.58rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(239,68,68,0.2)', color: '#fca5a5', fontWeight: 'bold' }}>
+                             ❤️ {hero?.hp || hero?.maxHp || 3}
+                           </span>
+                         </div>
+                       </div>
+                     </div>
+
+                     {/* Body Card: Chi tiết các Kỹ Năng (Skill List) */}
+                     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '5px', paddingRight: '2px' }}>
+                       {hero?.skills && hero.skills.length > 0 ? (
+                         hero.skills.filter((s, idx, arr) => arr.findIndex(o => (o.id && o.id === s.id) || (o.name && o.name === s.name)) === idx).map((skill, sIdx) => {
+                           const normType = normalizeSkillType(skill.type);
+                           return (
+                             <div key={sIdx} style={{ background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '5px', padding: '4px 6px' }}>
+                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', marginBottom: '2px' }}>
+                                 <span style={{ color: '#fef08a', fontWeight: 'bold', fontSize: '0.74rem' }}>
+                                   ⚡ {skill.name}
+                                 </span>
+                                 {skill.type && (
+                                   <span style={{ fontSize: '0.52rem', padding: '1px 4px', borderRadius: '3px', background: normType.badgeColor, color: 'white', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                                     {normType.label}
+                                   </span>
+                                 )}
+                               </div>
+                               <div style={{ fontSize: '0.68rem', color: '#cbd5e1', lineHeight: '1.35', textAlign: 'left' }}>
+                                 {skill.desc || '(Chưa có mô tả)'}
+                               </div>
+                             </div>
+                           );
+                         })
+                       ) : (
+                         <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', margin: 'auto' }}>
+                           Không có kỹ năng đặc biệt
+                         </div>
+                       )}
+                     </div>
+                   </div>
+                 );
+               })}
+             </div>
+             )}
+
+             {/* TAB 2: TRANG BỊ & PHÁN XÉT */}
+             {popupTab === 'equipment' && (
+               <div 
+                 style={{ 
+                   display: 'flex', 
+                   flexDirection: 'column',
+                   gap: '8px', 
+                   width: '100%', 
+                   maxWidth: isLandscapeMobile ? '580px' : '92vw',
+                   maxHeight: isLandscapeMobile ? '68vh' : '75vh', 
+                   overflowY: 'auto', 
+                   padding: '4px',
+                   boxSizing: 'border-box'
+                 }}
+               >
+                 {/* 4 Ô Trang Bị dạng Grid */}
+                 <div style={{
+                   display: 'grid',
+                   gridTemplateColumns: isLandscapeMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(260px, 1fr))',
+                   gap: '8px',
+                   width: '100%'
+                 }}>
+                   {targetEquipSlots.map(slot => {
+                     const { card } = slot;
+                     const bgImage = card ? getCardBg(card.name) : null;
+                     return (
+                       <div
+                         key={slot.key}
+                         style={{
+                           display: 'flex',
+                           gap: '8px',
+                           alignItems: 'center',
+                           background: card ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%)' : 'rgba(15, 23, 42, 0.5)',
+                           border: card ? '1.5px solid rgba(212, 168, 67, 0.75)' : '1px dashed rgba(255, 255, 255, 0.15)',
+                           borderRadius: '10px',
+                           padding: '6px 8px',
+                           boxShadow: card ? '0 4px 12px rgba(0,0,0,0.6), inset 0 0 10px rgba(212, 168, 67, 0.15)' : 'none',
+                           cursor: card ? 'pointer' : 'default',
+                           transition: 'all 0.15s ease'
+                         }}
+                         onClick={() => {
+                           if (card && setCardPopup) {
+                             setCardPopup(card);
+                           }
+                         }}
+                         title={card ? `${card.name} - Nhấn để xem phóng to` : `${slot.label} (Trống)`}
+                       >
+                         {/* Slot Card Thumbnail / Empty Slot */}
+                         {card ? (
+                           <div style={{
+                             width: '42px',
+                             height: '56px',
+                             borderRadius: '6px',
+                             border: '1px solid var(--color-gold)',
+                             backgroundImage: bgImage ? `url(${bgImage})` : 'none',
+                             backgroundSize: 'cover',
+                             backgroundPosition: 'center',
+                             backgroundColor: 'rgba(212, 168, 67, 0.2)',
+                             display: 'flex',
+                             flexDirection: 'column',
+                             justifyContent: 'space-between',
+                             padding: '2px 3px',
+                             flexShrink: 0,
+                             position: 'relative',
+                             boxShadow: '0 2px 6px rgba(0,0,0,0.8)'
+                           }}>
+                             <span style={{
+                               fontSize: '0.62rem',
+                               fontWeight: 'bold',
+                               color: card.color === 'red' ? '#ef4444' : '#ffffff',
+                               textShadow: '0 0 3px black, 0 1px 2px black',
+                               lineHeight: 1
+                             }}>
+                               {getSuitEmoji(card.suit)}{card.rank}
+                             </span>
+                             <span style={{ 
+                               alignSelf: 'center', 
+                               display: 'flex', 
+                               alignItems: 'center', 
+                               justifyContent: 'center', 
+                               color: 'var(--color-gold)', 
+                               filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.95))',
+                               opacity: 0.95 
+                             }}>
+                               {slot.icon}
+                             </span>
+                             <span style={{
+                               fontSize: '0.45rem',
+                               background: 'rgba(0,0,0,0.75)',
+                               color: '#fef08a',
+                               borderRadius: '2px',
+                               padding: '1px 2px',
+                               textAlign: 'center',
+                               fontWeight: 'bold',
+                               whiteSpace: 'nowrap',
+                               overflow: 'hidden'
+                             }}>
+                               {card.name}
+                             </span>
+                           </div>
+                         ) : (
+                           <div style={{
+                             width: '42px',
+                             height: '56px',
+                             borderRadius: '6px',
+                             border: '1px dashed rgba(255, 255, 255, 0.2)',
+                             backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                             display: 'flex',
+                             alignItems: 'center',
+                             justifyContent: 'center',
+                             flexShrink: 0,
+                             opacity: 0.4
+                           }}>
+                             {slot.icon}
+                           </div>
+                         )}
+
+                         {/* Slot Details */}
+                         <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', marginBottom: '2px' }}>
+                             <span style={{ fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--color-gold)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                               {slot.icon} {slot.label}
+                             </span>
+                             {card && slot.key === 'weapon' && (
+                               <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.3)', color: '#fca5a5', fontWeight: 'bold', border: '1px solid rgba(239, 68, 68, 0.5)' }}>
+                                 🎯 Tầm: {card.attackRange || 1}
+                               </span>
+                             )}
+                             {card && (
+                               <span style={{ fontSize: '0.6rem', color: '#93c5fd', fontStyle: 'italic' }}>
+                                 🔍 Phóng to
+                               </span>
+                             )}
+                           </div>
+
+                           {card ? (
+                             <>
+                               <div style={{ fontSize: '0.82rem', fontWeight: 'bold', color: card.color === 'red' ? '#f87171' : '#f8fafc', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                 {card.name} <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>({getSuitEmoji(card.suit)}{card.rank})</span>
+                               </div>
+                               <div style={{ fontSize: '0.68rem', color: '#cbd5e1', lineHeight: '1.35', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                 {card.desc || slot.defaultDesc}
+                               </div>
+                             </>
+                           ) : (
+                             <div style={{ fontSize: '0.68rem', color: '#64748b', fontStyle: 'italic', lineHeight: '1.35' }}>
+                               (Chưa trang bị) — {slot.defaultDesc}
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     );
+                   })}
+                 </div>
+
+                 {/* Judgement Area Section */}
+                 <div style={{
+                   marginTop: '4px',
+                   background: targetJudgements.length > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(15, 23, 42, 0.4)',
+                   border: targetJudgements.length > 0 ? '1px solid rgba(239, 68, 68, 0.45)' : '1px dashed rgba(255, 255, 255, 0.1)',
+                   borderRadius: '10px',
+                   padding: '8px 12px',
+                   width: '100%',
+                   boxSizing: 'border-box'
+                 }}>
+                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: targetJudgements.length > 0 ? '6px' : 0 }}>
+                     <div style={{ fontSize: '0.76rem', fontWeight: 'bold', color: targetJudgements.length > 0 ? '#fca5a5' : '#94a3b8', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                       <span>⚖️</span>
+                       <span>Khu Vực Phán Xét:</span>
+                       <span style={{ fontSize: '0.7rem', color: targetJudgements.length > 0 ? '#ef4444' : '#64748b', fontWeight: 'normal' }}>
+                         {targetJudgements.length > 0 ? `(${targetJudgements.length} lá bài hiệu ứng đang chờ phán xét)` : '(Trống - Không có hiệu ứng bất lợi)'}
+                       </span>
+                     </div>
+                   </div>
+
+                   {targetJudgements.length > 0 && (
+                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                       {targetJudgements.map((jCard, jIdx) => {
+                         const jBg = getCardBg(jCard.name);
+                         return (
+                           <div 
+                             key={jIdx}
+                             style={{
+                               display: 'flex',
+                               alignItems: 'center',
+                               gap: '8px',
+                               background: 'rgba(30, 41, 59, 0.85)',
+                               border: '1px solid rgba(239, 68, 68, 0.6)',
+                               borderRadius: '6px',
+                               padding: '4px 8px',
+                               cursor: 'pointer'
+                             }}
+                             onClick={() => setCardPopup && setCardPopup(jCard)}
+                             title="Nhấn để xem phóng to"
+                           >
+                             {jBg ? (
+                               <div style={{ width: '28px', height: '38px', backgroundImage: `url(${jBg})`, backgroundSize: 'cover', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)' }} />
+                             ) : (
+                               <span style={{ fontSize: '1.1rem' }}>📜</span>
+                             )}
+                             <div style={{ textAlign: 'left' }}>
+                               <div style={{ fontWeight: 'bold', fontSize: '0.74rem', color: '#fca5a5' }}>
+                                 {jCard.name} <span style={{ fontSize: '0.68rem', color: '#cbd5e1' }}>({getSuitEmoji(jCard.suit)}{jCard.rank})</span>
+                               </div>
+                               <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+                                 {jCard.desc}
+                               </div>
+                             </div>
+                           </div>
+                         );
+                       })}
+                     </div>
+                   )}
+                 </div>
+               </div>
+             )}
+
+             {/* Nút đóng chân dialog cố định kích thước gọn gàng, không bị dãn phình to */}
+             <button 
+               onClick={() => setHeroPopup(null)} 
+               style={{ 
+                 flex: 'none',
+                 height: '32px', 
+                 minHeight: '32px', 
+                 marginTop: '10px', 
+                 padding: '0 28px', 
+                 borderRadius: '20px', 
+                 fontSize: '0.82rem', 
+                 fontWeight: 'bold', 
+                 cursor: 'pointer',
+                 background: 'rgba(30, 41, 59, 0.95)',
+                 border: '1px solid rgba(212, 168, 67, 0.6)',
+                 color: 'var(--color-gold)',
+                 boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               ✕ Đóng
+             </button>
+           </div>
          </div>
       )}
 
@@ -828,7 +1683,7 @@ export default function GameView() {
               ⚙️ TÙY CHỌN TRẬN ĐẤU
             </h3>
             <p style={{ margin: '0 0 16px 0', color: '#94a3b8', fontSize: '0.8rem' }}>
-              Quốc Chiến • Lượt {gameState.turnCount || 1} • {gameState.phase}
+              Quốc Chiến • Lượt {gameState.turnCount || 1} • {getPhaseLabel(gameState.phase)}
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -910,6 +1765,17 @@ export default function GameView() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* GAME OVER MODAL */}
+      {gameState?.gameOver && !isGameOverModalDismissed && (
+        <GameOverModal 
+          gameState={gameState} 
+          mainPlayerId={mainPlayerId} 
+          onClose={() => setIsGameOverModalDismissed(true)} 
+          onRestart={() => window.location.reload()} 
+          onHome={() => navigate('/')} 
+        />
       )}
 
       <ChatWidget style={{ position: 'absolute', top: '100px', left: '20px', zIndex: 90, height: '300px', width: '280px' }} />

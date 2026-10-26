@@ -114,7 +114,6 @@ export function GameProvider({ children, playerCount = 4 }) {
 // Custom hooks để lấy data nhanh
 export function useGameState() {
   const ctx = useContext(GameStateContext);
-  if (ctx === undefined) throw new Error('useGameState must be used within a GameProvider');
   return ctx;
 }
 
@@ -123,7 +122,7 @@ let isSubmittingGlobal = false;
 
 export function useGameAPI() {
   const ctx = useContext(GameAPIContext);
-  if (ctx === undefined) throw new Error('useGameAPI must be used within a GameProvider');
+  if (!ctx) return null;
   
   const api = ctx.getAPI();
   

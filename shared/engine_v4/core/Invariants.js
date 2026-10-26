@@ -4,15 +4,23 @@
  * Tự động assert để phát hiện bug logic ngay lập tức trong quá trình chạy test và mô phỏng.
  */
 
+import { isEquip } from '../../utils/translationHelper.js';
+
 export class GameInvariants {
   /**
    * Bất biến 1: Giới hạn đánh Chém trong lượt
    * Tuyệt đối không được đánh > 1 Chém nếu không có Liên Nỏ hoặc cờ phá giới hạn
    */
   static assertSlashLimit(player) {
-    const hasCrossbow = player.equipment?.weapon?.id === 'crossbow' || 
-                        player.equipment?.weapon?.key === 'crossbow' || 
-                        player.equipment?.weapon?.name === 'Liên Nỏ';
+    const weapon = player.equipment?.weapon;
+    const weaponName = weapon?.name || '';
+    const weaponId = String(weapon?.id || weapon?.idKey || weapon?.key || '');
+    const hasCrossbow = isEquip(weapon, 'lien_no') ||
+                        weaponName === 'Liên Nỏ' || 
+                        weaponId === 'crossbow' || 
+                        weaponId.includes('lien-no') || 
+                        weaponId.includes('liên-nỏ') || 
+                        weaponId.includes('lien_no');
     const hasUnlimitedFlag = player.temporaryFlags?.unlimitedSlash === true;
     const hasVanDonBonus = player.temporaryFlags?.vanDonWin === true && (player.turnStats?.slashCount || 0) <= 2;
 
@@ -75,37 +83,38 @@ export class GameInvariants {
   static assertCardConservation(state, initialTotalCards) {
     if (!initialTotalCards) return;
 
-    let currentTotal = 0;
-    currentTotal += state.drawPile?.length || 0;
-    currentTotal += state.discardPile?.length || 0;
+    const allPresent = new Set();
+    state.drawPile?.forEach(c => c && allPresent.add(c.id));
+    state.discardPile?.forEach(c => c && allPresent.add(c.id));
 
     for (const p of state.players) {
-      currentTotal += p.hand?.length || 0;
+      p.hand?.forEach(c => c && allPresent.add(c.id));
       if (p.equipment) {
-        if (p.equipment.weapon) currentTotal += 1;
-        if (p.equipment.armor) currentTotal += 1;
-        if (p.equipment.horse_attack) currentTotal += 1;
-        if (p.equipment.horse_defense) currentTotal += 1;
+        if (p.equipment.weapon) allPresent.add(p.equipment.weapon.id);
+        if (p.equipment.armor) allPresent.add(p.equipment.armor.id);
+        if (p.equipment.horse_attack) allPresent.add(p.equipment.horse_attack.id);
+        if (p.equipment.horse_defense) allPresent.add(p.equipment.horse_defense.id);
       }
-      currentTotal += p.judgementArea?.length || 0;
-      currentTotal += p.trungCards?.length || 0;
+      p.judgementArea?.forEach(c => c && allPresent.add(c.id));
+      p.trungCards?.forEach(c => c && allPresent.add(c.id));
     }
 
     if (state.priorityStack?.stack) {
       for (const frame of state.priorityStack.stack) {
-        if (frame.context?.judgeCard) currentTotal += 1;
-        if (frame.context?.delayedCard) currentTotal += 1;
+        if (frame.context?.card) allPresent.add(frame.context.card.id);
+        if (frame.context?.judgeCard) allPresent.add(frame.context.judgeCard.id);
+        if (frame.context?.delayedCard) allPresent.add(frame.context.delayedCard.id);
+        if (frame.context?.revealedCard) allPresent.add(frame.context.revealedCard.id);
         if (Array.isArray(frame.context?.drawnCards)) {
           for (const card of frame.context.drawnCards) {
-            const alreadyInHand = state.players.some(p => p.hand?.some(c => c.id === card?.id));
-            if (!alreadyInHand) currentTotal += 1;
+            if (card) allPresent.add(card.id);
           }
         }
       }
     }
 
-    if (currentTotal !== initialTotalCards) {
-      throw new Error(`[INVARIANT_VIOLATION] Lệch tổng số bài trong bàn! Ban đầu: ${initialTotalCards}, Hiện tại: ${currentTotal}. Có lá bài bị mất hoặc bị nhân đôi!`);
+    if (allPresent.size !== initialTotalCards) {
+      throw new Error(`[INVARIANT_VIOLATION] Lệch tổng số bài trong bàn! Ban đầu: ${initialTotalCards}, Hiện tại: ${allPresent.size}. Có lá bài bị mất hoặc bị trùng lặp!`);
     }
   }
 
@@ -154,4 +163,45 @@ export class GameInvariants {
       }
     }
   }
+
+  /**
+   * Bất biến 6: Không được tự Hóa Giải lá bài Hóa Giải của chính mình (No Self-Negate Loop)
+   * Trong chuỗi phản hồi Hóa Giải, người vừa đánh Hóa Giải (lastNegaterId)
+   * tuyệt đối không được là actorId trong hàng đợi hỏi tiếp theo.
+   */
+  static assertNoSelfNegate(frame, actorId) {
+    if (!frame || frame.type !== 'ASK_NEGATE') return;
+    const lastNegaterId = frame.context?.lastNegaterId;
+    if (lastNegaterId !== undefined && lastNegaterId !== null && actorId === lastNegaterId) {
+      throw new Error(`[INVARIANT_VIOLATION] Người chơi ${actorId} vừa sử dụng Hóa Giải không được tự Hóa Giải lại chính lá bài của mình!`);
+    }
+  }
+
+  /**
+   * Bất biến 7: Tính toàn vẹn của Thao tác Thẻ Ảo (Virtual Card Action Integrity)
+   * Khi đánh một lá bài dưới dạng chuyển đổi (virtualCardName / asSlash / asDuel / asDismantle...):
+   * Thẻ vật lý tuyệt đối KHÔNG ĐƯỢC nằm trong ô player.equipment[slot]
+   */
+  static assertVirtualActionIntegrity(player, isVirtualAction, card, virtualCardName) {
+    if (!isVirtualAction || !card || !player) return;
+    if (player.equipment) {
+      for (const slot in player.equipment) {
+        if (player.equipment[slot]?.id === card.id && virtualCardName) {
+          throw new Error(`[INVARIANT_VIOLATION] Lá bài [${card.name}] (id: ${card.id}) được dùng làm bài ảo [${virtualCardName}] nhưng lại bị mặc vào slot trang bị [${slot}] của người chơi ${player.id} (${player.name})!`);
+        }
+      }
+    }
+  }
+
+  /**
+   * Bất biến 8: Ngăn chặn Deadlock trong Hàng đợi Ưu tiên (Priority Queue Deadlock)
+   * PriorityQueue không được chứa phần tử trùng lặp vô tận và không được vượt quá số người chơi * 2
+   */
+  static assertNoPriorityQueueDeadlock(frame) {
+    if (!frame || !frame.priorityQueue) return;
+    if (frame.priorityQueue.length > 20) {
+      throw new Error(`[INVARIANT_VIOLATION] Hàng đợi ưu tiên frame [${frame.type}] vượt quá 20 người chơi, dấu hiệu vòng lặp vô hạn!`);
+    }
+  }
 }
+

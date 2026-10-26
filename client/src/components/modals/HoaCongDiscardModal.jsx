@@ -3,19 +3,22 @@ import React from 'react';
 import { getFullPlayerName } from 'shared/utils/playerHelpers';
 import { getSuitEmoji } from 'shared/constants/cardTypes';
 import { CardSelector } from './CardSelector';
+import { getEffectiveSuit, getEffectiveColor } from 'shared/engine_v4/heroes/HeroRegistry.js';
 
 export function HoaCongDiscardModal({ req, gameState, onConfirm }) {
   const me = gameState.players.find(p => p.id === (req.responderId ?? req.sourceId ?? (typeof window !== 'undefined' ? window.playerId : 0))) || gameState.players[0];
   const target = gameState.players.find(p => p.id === req.targetId);
 
   const revealedCard = req.revealedCard;
-  const suitEmoji = revealedCard ? getSuitEmoji(revealedCard.suit) : '';
+  const revSuit = revealedCard ? (getEffectiveSuit(target, revealedCard) || revealedCard.suit) : null;
+  const suitEmoji = revSuit ? getSuitEmoji(revSuit) : (revealedCard ? getSuitEmoji(revealedCard.suit) : '');
   const suitText = revealedCard ? `${revealedCard.name || ''} ${suitEmoji}${revealedCard.rank || ''}` : '';
 
-  // Chỉ những lá bài cùng chất (suit) mới hợp lệ để bỏ
+  // Chỉ những lá bài cùng chất hiệu dụng (effective suit) mới hợp lệ để bỏ
   const validCards = (me.hand || []).map((c, idx) => ({ ...c, idx })).filter(c => {
-    if (!revealedCard) return true;
-    return c.suit === revealedCard.suit;
+    if (!revealedCard || !revSuit) return true;
+    const mySuit = getEffectiveSuit(me, c) || c.suit;
+    return mySuit && mySuit.toString().toLowerCase() === revSuit.toString().toLowerCase();
   });
 
   return (

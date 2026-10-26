@@ -6,8 +6,11 @@ import { CombatRules } from '../rules/CombatRules.js';
 import { TrickRules } from '../rules/TrickRules.js';
 import { BotBrain } from '../ai/BotBrain.js';
 import { GameInvariants } from '../core/Invariants.js';
+import { getCardSubType } from '../../data/gameData.js';
+import { isEquip } from '../../utils/translationHelper.js';
 
-console.log('🚀 Bắt đầu Đại Giả Lập 1.000 Trận Đấu Song Tướng (Dual Heroes) Engine v4...');
+const MATCH_COUNT = parseInt(process.argv[2] || process.env.MATCHES || '1000', 10);
+console.log(`🚀 Bắt đầu Đại Giả Lập ${MATCH_COUNT.toLocaleString()} Trận Đấu Song Tướng (Dual Heroes) Engine v4...`);
 
 const allHeroes = globalHeroRegistry.getAllHeroes();
 const heroesByFaction = {
@@ -20,7 +23,7 @@ const heroesByFaction = {
 const factions = ['lac', 'viet', 'ha', 'son'];
 
 const stats = {
-  totalMatches: 1000,
+  totalMatches: MATCH_COUNT,
   completedMatches: 0,
   timeouts: 0,
   errors: [],
@@ -36,7 +39,7 @@ const stats = {
 
 const startTime = Date.now();
 
-for (let g = 0; g < 1000; g++) {
+for (let g = 0; g < MATCH_COUNT; g++) {
   try {
     const deck = CardDeck.shuffle(CardDeck.getStandardDeck());
     const initialTotalCards = deck.length;
@@ -126,8 +129,10 @@ for (let g = 0; g < 1000; g++) {
         }
         if (state.priorityStack?.stack) {
           for (const frame of state.priorityStack.stack) {
+            if (frame.context?.card) present.add(frame.context.card.id);
             if (frame.context?.judgeCard) present.add(frame.context.judgeCard.id);
             if (frame.context?.delayedCard) present.add(frame.context.delayedCard.id);
+            if (frame.context?.revealedCard) present.add(frame.context.revealedCard.id);
             if (Array.isArray(frame.context?.drawnCards)) {
               frame.context.drawnCards.forEach(c => c && present.add(c.id));
             }
@@ -419,8 +424,8 @@ for (let g = 0; g < 1000; g++) {
           if (p && target && p.hand?.length > 0 && target.hand?.length > 0) {
             const myCard = p.hand[0];
             const oppCard = target.hand[0];
-            state.discardFromHand(actorId, [myCard.id]);
-            state.discardFromHand(target.id, [oppCard.id]);
+            state.moveCard(myCard.id, { type: 'hand', playerId: actorId }, { type: 'discardPile' });
+            state.moveCard(oppCard.id, { type: 'hand', playerId: target.id }, { type: 'discardPile' });
 
             const rankToNum = (r) => {
               if (typeof r === 'number') return r;
@@ -458,6 +463,54 @@ for (let g = 0; g < 1000; g++) {
             p.skillUsage = p.skillUsage || {};
             p.skillUsage.duyen_tho = p.skillUsage.duyen_tho || {};
             p.skillUsage.duyen_tho.usedThisTurn = true;
+          }
+        } else if (frame.type === 'ASK_WEAPON_SKILL') {
+          const p = state.getPlayer(actorId);
+          const weapon = frame.context?.weapon || frame.context?.weaponName;
+          if (weapon === 'Rìu Đá' || weapon === 'Quán Thạch Phủ') {
+            const target = state.getPlayer(frame.targetId);
+            if (p && p.hand && p.hand.length >= 2 && target && Math.random() < 0.5) {
+              const discards = [p.hand[0].id, p.hand[1].id];
+              state.discardFromHand(actorId, discards);
+              state.priorityStack.pop();
+              CombatRules.applyDamage(state, actorId, target.id, frame.context?.damageAmount || 1, 'slash_penetrate', false, frame.context?.slashCard);
+            } else {
+              state.priorityStack.pop();
+            }
+          } else if (weapon === 'Thanh Long Đao') {
+            const extraSlash = p?.hand?.find(c => c.type === 'slash' || c.name === 'Chém');
+            const target = state.getPlayer(frame.targetId);
+            if (p && extraSlash && target && Math.random() < 0.5) {
+              state.discardFromHand(actorId, [extraSlash.id]);
+              state.priorityStack.pop();
+              state.priorityStack.push({
+                type: 'ASK_DODGE',
+                sourceId: actorId,
+                targetId: target.id,
+                priorityQueue: [target.id],
+                context: {
+                  card: extraSlash,
+                  requiredDodges: 1,
+                  dodgesProvided: 0,
+                  damageAmount: 1
+                }
+              });
+            } else {
+              state.priorityStack.pop();
+            }
+          } else if (weapon === 'Song Kiếm') {
+            const source = state.getPlayer(frame.sourceId);
+            if (p && p.hand && p.hand.length > 0) {
+              state.discardFromHand(actorId, [p.hand[0].id]);
+              state.priorityStack.pop();
+            } else {
+              state.priorityStack.pop();
+              if (source && source.isAlive) {
+                state.drawCards(source.id, 1);
+              }
+            }
+          } else {
+            state.priorityStack.pop();
           }
         } else {
           if (frame.context?.judgeCard) state.discardPile.push(frame.context.judgeCard);
@@ -498,17 +551,18 @@ for (let g = 0; g < 1000; g++) {
           } else if (card) {
             const p = state.getPlayer(currentBotId);
             p.hand = p.hand.filter(c => c.id !== card.id);
+            const rawSubtype = getCardSubType(card);
             let slot = null;
-            if (card.type === 'weapon' || card.name?.includes('Đao') || card.name?.includes('Nỏ') || card.name?.includes('Rìu')) slot = 'weapon';
-            else if (card.type === 'armor' || card.name?.includes('Thuẫn') || card.name?.includes('Quái')) slot = 'armor';
-            else if (card.type === 'horse_attack' || card.name?.includes('(-1)')) slot = 'horse_attack';
-            else if (card.type === 'horse_defense' || card.name?.includes('(+1)')) slot = 'horse_defense';
+            if (rawSubtype === 'equip_weapon' || card.type === 'weapon') slot = 'weapon';
+            else if (rawSubtype === 'equip_armor' || card.type === 'armor') slot = 'armor';
+            else if (rawSubtype === 'equip_mount_atk' || card.type === 'horse_attack') slot = 'horse_attack';
+            else if (rawSubtype === 'equip_mount_def' || card.type === 'horse_defense') slot = 'horse_defense';
 
             if (slot) {
               const old = p.equipment[slot];
               if (old) {
                 state.discardPile.push(old);
-                if (old.name === 'Bạch Ngân' || old.id?.includes('bach_ngan')) {
+                if (isEquip(old, 'bach_ngan') || old.name === 'Bạch Ngân' || old.name === 'Bạch Ngân Sư Tử') {
                   p.hp = Math.min(p.maxHp, p.hp + 1);
                 }
                 globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: p.id, card: old }, state);
@@ -533,23 +587,7 @@ for (let g = 0; g < 1000; g++) {
 
       assertAllCards('AFTER_DISCARD');
 
-      const allPresentCardIds = new Set();
-      state.drawPile?.forEach(c => c && allPresentCardIds.add(c.id));
-      state.discardPile?.forEach(c => c && allPresentCardIds.add(c.id));
-      for (const p of state.players) {
-        p.hand?.forEach(c => c && allPresentCardIds.add(c.id));
-        if (p.equipment) {
-          Object.values(p.equipment).forEach(c => c && allPresentCardIds.add(c.id));
-        }
-        p.judgementArea?.forEach(c => c && allPresentCardIds.add(c.id));
-        p.trungCards?.forEach(c => c && allPresentCardIds.add(c.id));
-      }
-      const missingCards = deck.filter(c => !allPresentCardIds.has(c.id));
-      if (missingCards.length > 0) {
-        console.error(`💥 [STEP ${step}] Missing cards:`, missingCards.map(c => `${c.id} (${c.name})`));
-        console.error(`💥 Last 3 logs:`, state.logs.slice(-3).map(l => l.message));
-        throw new Error(`[INVARIANT_VIOLATION] Lệch tổng số bài trong bàn! Ban đầu: ${initialTotalCards}, Hiện tại: ${allPresentCardIds.size}.`);
-      }
+      assertAllCards('END_OF_STEP');
     }
 
     // Assert Invariant Bảo toàn Thẻ bài
@@ -564,8 +602,9 @@ for (let g = 0; g < 1000; g++) {
       stats.factionWins.draw++;
     }
 
-    if ((g + 1) % 200 === 0) {
-      console.log(`✅ Đã hoàn thành ${g + 1}/1000 trận mô phỏng... (Đang chạy mượt mà)`);
+    const progressInterval = Math.max(1, Math.floor(MATCH_COUNT / 5));
+    if ((g + 1) % progressInterval === 0 || g + 1 === MATCH_COUNT) {
+      console.log(`✅ Đã hoàn thành ${g + 1}/${MATCH_COUNT} trận mô phỏng... (Đang chạy mượt mà)`);
     }
   } catch (err) {
     stats.errors.push({ gameIndex: g, error: err.message, stack: err.stack });
@@ -574,8 +613,8 @@ for (let g = 0; g < 1000; g++) {
 }
 
 const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(2);
-console.log(`\n🎉 KẾT QUẢ MÔ PHỎNG 1.000 TRẬN ĐẤU (Thời gian: ${elapsedSec}s):`);
-console.log(`- Trận hoàn thành hợp lệ: ${stats.completedMatches}/1000`);
+console.log(`\n🎉 KẾT QUẢ MÔ PHỎNG ${MATCH_COUNT.toLocaleString()} TRẬN ĐẤU (Thời gian: ${elapsedSec}s):`);
+console.log(`- Trận hoàn thành hợp lệ: ${stats.completedMatches}/${MATCH_COUNT}`);
 console.log(`- Số lỗi Invariant / Exception: ${stats.errors.length}`);
 console.log(`- Số trận Timeout (>1200 steps): ${stats.timeouts}`);
 console.log(`- Tỉ lệ thắng theo Phe:`, stats.factionWins);

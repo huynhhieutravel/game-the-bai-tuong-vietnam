@@ -3,12 +3,13 @@ import { GameState } from '../../core/GameState.js';
 import { StateMachine, PHASES } from '../../core/StateMachine.js';
 import { CombatRules } from '../../rules/CombatRules.js';
 import { RangeSystem, WEAPON_RANGE_MAP } from '../../rules/RangeSystem.js';
-import { TargetResolverV4, getTargetingDefinition } from '../../rules/TargetResolverV4.js';
+import { canPlayCard, getTargetingDefinition } from '../../rules/TargetResolverV4.js';
 import { DispatcherV4 } from '../../application/DispatcherV4.js';
 import { CardDeck } from '../../cards/CardDeck.js';
 import { CARDS, EQUIP_CARDS_INFO, CARD_TYPES, CARD_SUBTYPES } from '../../../data/gameData.js';
 import { globalHeroRegistry } from '../../heroes/HeroRegistry.js';
 import { GameInvariants } from '../../core/Invariants.js';
+import { GameViewMapperV4 } from '../../application/GameViewMapperV4.js';
 
 describe('QA Toàn Diện Thẻ Bài Trang Bị: Vũ Khí (Weapons QA Suite v4)', () => {
   const createMockGameState = (customPlayers = null) => {
@@ -194,6 +195,35 @@ describe('QA Toàn Diện Thẻ Bài Trang Bị: Vũ Khí (Weapons QA Suite v4)'
       expect(p0.turnStats.slashCount).toBe(3);
       expect(state.getPlayer(1).hp).toBe(0); // 3 - 3 = 0 (hấp hối)
     });
+
+    it('khi trang bị lá Liên Nỏ từ CardDeck (id dạng liên-nỏ-...): toViewModel và TargetResolver đều cho phép Chém tiếp khi slashCount >= 1', () => {
+      const state = createMockGameState();
+      const p0 = state.getPlayer(0);
+      const realLienNo = CardDeck.getStandardDeck().find(c => c.name === 'Liên Nỏ');
+      expect(realLienNo).toBeDefined();
+      expect(realLienNo.id).toMatch(/^liên-nỏ/);
+
+      p0.equipment.weapon = realLienNo;
+      p0.turnStats.slashCount = 1;
+
+      const slashCard = { id: 's2', name: 'Chém', type: 'slash' };
+      p0.hand.push(slashCard);
+      state.currentPhase = PHASES.ACTION;
+      state.activePlayerId = 0;
+
+      // 1. Invariants không ném lỗi
+      expect(() => GameInvariants.assertSlashLimit(p0)).not.toThrow();
+
+      // 2. TargetResolver báo hợp lệ
+      const canPlay = canPlayCard(state, 0, slashCard.name, slashCard.id);
+      expect(canPlay.valid).toBe(true);
+
+      // 3. toViewModel hiển thị isPlayable: true (không bị làm mờ thẻ bài trên tay)
+      const vm = GameViewMapperV4.toViewModel(state, 0);
+      const vmSlash = vm.players[0].hand.find(c => c.id === 's2');
+      expect(vmSlash.isPlayable).toBe(true);
+      expect(vmSlash.unplayableReason || '').toBe('');
+    });
   });
 
   // ==========================================
@@ -217,8 +247,8 @@ describe('QA Toàn Diện Thẻ Bài Trang Bị: Vũ Khí (Weapons QA Suite v4)'
       CombatRules.playSlash(state, 0, 1, slash1);
       expect(state.priorityStack.peek().type).toBe('ASK_DODGE');
 
-      // p1 dùng Né -> Thanh Long Đao tự động kích hoạt đòn Chém 2!
-      const resDodge = CombatRules.respondDodge(state, 1, dodge1);
+      // p1 dùng Né -> chọn lá Chém s2 kích hoạt đòn Chém 2 qua dragonBladeCardId
+      const resDodge = CombatRules.respondDodge(state, 1, dodge1, { dragonBladeCardId: slash2.id });
       expect(resDodge.retriggeredSlash).toBe(true);
 
       // Frame mới được đẩy lên stack để yêu cầu p1 Né đòn Chém thứ 2
@@ -272,8 +302,8 @@ describe('QA Toàn Diện Thẻ Bài Trang Bị: Vũ Khí (Weapons QA Suite v4)'
       p1.hand.push(dodge1);
 
       CombatRules.playSlash(state, 0, 1, slash1);
-      // p1 dùng Né -> Rìu Đá tự động kích hoạt bỏ 2 lá bài dump1, dump2
-      const resDodge = CombatRules.respondDodge(state, 1, dodge1);
+      // p1 dùng Né -> chọn 2 lá bài dump1, dump2 để kích hoạt Rìu Đá
+      const resDodge = CombatRules.respondDodge(state, 1, dodge1, { rockAxeCardIds: ['dump_1', 'dump_2'] });
 
       expect(resDodge.penetrated).toBe(true);
       expect(resDodge.dodged).toBe(false);

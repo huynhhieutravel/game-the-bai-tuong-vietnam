@@ -59,7 +59,12 @@ export function createGameState(safeCount = 4) {
         const skillId = skill.id;
         const realName = skill.name || SkillIdToName[skillId] || skillId;
         const baseName = SkillIdToName[skillId] || realName;
-        const desc = skill.description || SkillDescriptions[skillId] || SkillDescriptions[realName] || SkillDescriptions[baseName] || '(Chưa có mô tả)';
+        const canonicalDesc = SkillDescriptions[skillId] 
+          || SkillDescriptions[skillId?.replace(/_/g, '-')]
+          || SkillDescriptions[skillId?.replace(/-/g, '_')]
+          || SkillDescriptions[realName] 
+          || SkillDescriptions[baseName];
+        const desc = canonicalDesc || skill.description || '(Chưa có mô tả)';
         return {
           id: skillId,
           name: realName,

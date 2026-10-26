@@ -12,6 +12,7 @@ import { RangeSystem } from '../rules/RangeSystem.js';
 import { globalHeroRegistry, getPlayerGender } from '../heroes/HeroRegistry.js';
 import { GameInvariants } from '../core/Invariants.js';
 import { getCardSubType, HEROES } from '../../data/gameData.js';
+import { normalizeSkillId, getCanonicalFaction, isSameFaction, normalizeSuit, getSuitColor, isSameSuit, isEquip, isTrick, isBasicCard } from '../../utils/translationHelper.js';
 
 function rankToNumber(rank) {
   if (typeof rank === 'number') return rank;
@@ -101,6 +102,7 @@ export class DispatcherV4 {
 
         case 'ACTION_REACT':
         case 'ACTION_RESPONSE':
+        case 'RESPOND_ACTION':
         case 'REACT':
           this._handleReact(payload);
           break;
@@ -121,6 +123,8 @@ export class DispatcherV4 {
           break;
 
         case 'ACTION_DISCARD':
+        case 'DISCARD_CARDS':
+        case 'DISCARD':
           this._handleDiscard(payload);
           break;
 
@@ -144,7 +148,7 @@ export class DispatcherV4 {
 
   _handlePlayCard(payload) {
     const sourceId = payload.sourceId !== undefined ? payload.sourceId : payload.playerId;
-    const cardId = payload.cardId;
+    const cardId = payload.cardId || payload.card?.id;
     const targetIds = payload.targetIds || payload.targets || (payload.targetId !== undefined ? [payload.targetId] : []);
     const virtualCardName = payload.virtualCardName || null;
     const player = this.state.getPlayer(sourceId);
@@ -158,7 +162,9 @@ export class DispatcherV4 {
 
     const cardType = card.type || '';
     const cardName = virtualCardName || card.name;
-    const isRedCard = card.color === 'red' || card.suit === 'heart' || card.suit === 'diamond' || card.suit === '♥' || card.suit === '♦';
+    const effColor = globalHeroRegistry.getEffectiveColor(player, card);
+    const effSuit = globalHeroRegistry.getEffectiveSuit(player, card);
+    const isRedCard = effColor ? effColor === 'red' : Boolean(card.color === 'red' || getSuitColor(card.suit) === 'red');
     const isNonTargetedRedCard = ['dodge', 'peach', 'wine', 'equip'].includes(cardType) || ['Né', 'Đào', 'Rượu'].includes(card.name);
     const isTargetingOther = targetIds.length > 0 && targetIds[0] !== sourceId;
     const hasDoiNuiSlash = globalHeroRegistry.hasSkill(player, 'doi_nui', true) && (virtualCardName === 'Chém' || payload.asSlash || (isTargetingOther && (cardType === 'dodge' || card.name === 'Né')));
@@ -173,19 +179,20 @@ export class DispatcherV4 {
         const targets = targetIds.slice(0, 2);
         this.state.discardFromHand(sourceId, [card.id]);
         this.state.addLog(`🌊 [Vân Đồn] ${player.name} dùng [Chém] quét 2 mục tiêu: ${targets.map(id => this.state.getPlayer(id)?.name).join(', ')}!`);
-        CombatRules.playSlash(this.state, sourceId, targets[0], card, { alreadyDiscardedCard: true, asSlash: cardName === 'Chém' || hasDoiNuiSlash || hasKhaiThien });
-        CombatRules.playSlash(this.state, sourceId, targets[1], card, { alreadyDiscardedCard: true, isRedirected: true, asSlash: cardName === 'Chém' || hasDoiNuiSlash || hasKhaiThien });
+        CombatRules.playSlash(this.state, sourceId, targets[0], card, { alreadyDiscardedCard: true, asSlash: cardName === 'Chém' || hasDoiNuiSlash || hasKhaiThien, interactiveSongKiem: true });
+        CombatRules.playSlash(this.state, sourceId, targets[1], card, { alreadyDiscardedCard: true, isRedirected: true, asSlash: cardName === 'Chém' || hasDoiNuiSlash || hasKhaiThien, interactiveSongKiem: true });
         return;
       }
 
       const targetId = targetIds[0];
       if (targetId === undefined) throw new Error('Vui lòng chọn mục tiêu để Chém!');
-      CombatRules.playSlash(this.state, sourceId, targetId, card, { asSlash: cardName === 'Chém' || hasDoiNuiSlash || hasKhaiThien });
+      CombatRules.playSlash(this.state, sourceId, targetId, card, { asSlash: cardName === 'Chém' || hasDoiNuiSlash || hasKhaiThien, interactiveSongKiem: true });
       return;
     }
 
     // 2. Đào (Peach)
-    if (cardType === 'peach' || cardName === 'Đào') {
+    const isPeachAction = virtualCardName ? virtualCardName === 'Đào' : (cardType === 'peach' || card.name === 'Đào');
+    if (isPeachAction) {
       if (player.hp >= player.maxHp) {
         throw new Error('Máu đã đầy, không thể sử dụng Đào!');
       }
@@ -193,9 +200,9 @@ export class DispatcherV4 {
       this.state.discardFromHand(sourceId, [card.id]);
 
       // Kiểm tra Kỹ Năng Hậu Viện (Ngô Quyền - Phe Hà)
-      const isHaFaction = (player.faction || '').toLowerCase() === 'ha' || player.faction === 'Hà' || player.rawFaction === 'ha';
+      const isHaFaction = getCanonicalFaction(player.faction) === 'ha';
       const hauVienTargets = isHaFaction
-        ? this.state.getAlivePlayers().filter(p => p.id !== player.id && ((p.faction || '').toLowerCase() === 'ha' || p.faction === 'Hà' || p.rawFaction === 'ha') && p.hp < p.maxHp && (globalHeroRegistry.hasSkill(p, 'hau_vien') || globalHeroRegistry.hasSkill(p, 'hau-vien') || p.skills?.includes('hau_vien') || p.skills?.includes('hau-vien')))
+        ? this.state.getAlivePlayers().filter(p => p.id !== player.id && getCanonicalFaction(p.faction) === 'ha' && p.hp < p.maxHp && (globalHeroRegistry.hasSkill(p, 'hau_vien') || globalHeroRegistry.hasSkill(p, 'hau-vien') || p.skills?.includes('hau_vien') || p.skills?.includes('hau-vien')))
         : [];
 
       if (hauVienTargets.length > 0) {
@@ -220,7 +227,8 @@ export class DispatcherV4 {
     }
 
     // 3. Rượu (Wine)
-    if (cardType === 'wine' || cardName === 'Rượu') {
+    const isWineAction = virtualCardName ? virtualCardName === 'Rượu' : (cardType === 'wine' || card.name === 'Rượu');
+    if (isWineAction) {
       if ((player.turnStats?.wineCount || 0) >= 1) {
         throw new Error('Mỗi lượt chỉ được uống Rượu 1 lần trong giai đoạn Hành động!');
       }
@@ -242,7 +250,9 @@ export class DispatcherV4 {
     else if (rawSubtype === 'equip_mount_atk' || rawSubtype === 'horse_attack') equipSlot = 'horse_attack';
     else if (rawSubtype === 'equip_mount_def' || rawSubtype === 'horse_defense') equipSlot = 'horse_defense';
 
-    if (equipSlot) {
+    const isVirtualAction = Boolean(virtualCardName || payload.asSlash || payload.asDuel || payload.asDismantle || payload.asChaos || payload.asChain || payload.asFireAttack);
+
+    if (!isVirtualAction && equipSlot) {
       // Chuyển bài từ tay lên trang bị (KHÔNG đẩy vào discardPile)
       player.hand = player.hand.filter(c => c.id !== card.id);
       player.equipment = player.equipment || {};
@@ -254,7 +264,7 @@ export class DispatcherV4 {
         // Kích hoạt phản ứng mất trang bị (Hồ Xuân Hương - Xuân Hương...)
         globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: player.id, card: oldEquip }, this.state);
         // Bạch Ngân: Khi tháo giáp hoặc bị thay thế -> Hồi 1 HP
-        if (oldEquip.name === 'Bạch Ngân' || oldEquip.id?.includes('bach_ngan') || oldEquip.key === 'bach-ngan') {
+        if (oldEquip.name === 'Bạch Ngân' || oldEquip.name === 'Bạch Ngân Sư Tử' || isEquip(oldEquip, 'bach_ngan') || oldEquip.id?.includes('bach_ngan') || oldEquip.key === 'bach-ngan') {
           player.hp = Math.min(player.maxHp, player.hp + 1);
           this.state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${player.name}, hồi 1 HP (${player.hp}/${player.maxHp})!`);
         }
@@ -263,6 +273,10 @@ export class DispatcherV4 {
       player.equipment[equipSlot] = card;
       this.state.addLog(`${player.name} trang bị [${card.name}].`);
       return;
+    }
+
+    if (isVirtualAction) {
+      GameInvariants.assertVirtualActionIntegrity(player, isVirtualAction, card, virtualCardName);
     }
 
     // 5. Cẩm nang (Tricks)
@@ -284,21 +298,22 @@ export class DispatcherV4 {
       TrickRules.playDuel(this.state, sourceId, targetId, card);
       return;
     }
+    const isInteractive = payload.interactive === true;
     const hasKyTap = (globalHeroRegistry.hasSkill(player, 'ky_tap', true) || player.skills?.includes('ky_tap')) && !isRedCard && (virtualCardName === 'Tước Bài' || payload.asDismantle || card.asDismantle);
     if (cardName === 'Tước Bài' || hasKyTap) {
       const targetId = targetIds[0];
       if (hasKyTap) {
         this.state.discardFromHand(sourceId, [card.id]);
         this.state.addLog(`⚡ [Kỳ Tập] ${player.name} sử dụng lá bài Đen [${card.name}] như [Tước Bài]!`);
-        TrickRules.playDismantle(this.state, sourceId, targetId, { ...card, name: 'Tước Bài', idKey: 'tuoc_bai', virtual: true });
+        TrickRules.playDismantle(this.state, sourceId, targetId, { ...card, name: 'Tước Bài', idKey: 'tuoc_bai', virtual: true }, { interactive: isInteractive });
         return;
       }
-      TrickRules.playDismantle(this.state, sourceId, targetId, card);
+      TrickRules.playDismantle(this.state, sourceId, targetId, card, { interactive: isInteractive });
       return;
     }
     if (cardName === 'Cướp Bài') {
       const targetId = targetIds[0];
-      TrickRules.playSteal(this.state, sourceId, targetId, card);
+      TrickRules.playSteal(this.state, sourceId, targetId, card, { interactive: isInteractive });
       return;
     }
     if (cardName === 'Vạn Tiễn Quy Tâm' || cardName === 'Loạn Tiễn') {
@@ -321,7 +336,7 @@ export class DispatcherV4 {
       TrickRules.playTrick(this.state, sourceId, [sourceId], card);
       return;
     }
-    const isDiamond = card && (card.suit === 'diamond' || card.suit === 'diamonds' || card.suit === '♦');
+    const isDiamond = card && normalizeSuit(card.suit).code === 'diamond';
     const hasHoaThanAnTu = (globalHeroRegistry.hasSkill(player, 'hoa_than_an_tu', true) || globalHeroRegistry.hasSkill(player, 'hoa-than-an-tu', true)) && isDiamond && (virtualCardName === 'Hỗn Loạn' || payload.asChaos || card.asChaos);
     if (cardName === 'Hỗn Loạn' || hasHoaThanAnTu) {
       const targetId = targetIds[0];
@@ -334,10 +349,18 @@ export class DispatcherV4 {
       TrickRules.playChaos(this.state, sourceId, targetId, card);
       return;
     }
-    const hasTienDuyenChain = globalHeroRegistry.hasSkill(player, 'tien_duyen_chu_dong_tu', true) && (card.suit === 'club' || card.suit === '♣') && (virtualCardName === 'Xiềng Xích' || payload.asChain);
+    if (cardName === 'Binh Lương Thốn Đoạn' || cardName === 'Binh Lương' || card.idKey === 'binh_luong' || card.idKey === 'binh-luong') {
+      const targetId = targetIds[0];
+      if (targetId === undefined) throw new Error('Vui lòng chọn mục tiêu để Binh Lương Thốn Đoạn!');
+      TrickRules.playStarvation(this.state, sourceId, targetId, card);
+      return;
+    }
+    const isClub = card && normalizeSuit(card.suit).code === 'club';
+    const hasTienDuyenChain = globalHeroRegistry.hasSkill(player, 'tien_duyen_chu_dong_tu', true) && isClub && (virtualCardName === 'Xiềng Xích' || payload.asChain);
     if (cardName === 'Xiềng Xích' || card.idKey === 'xieng_xich' || hasTienDuyenChain) {
       const chainCard = hasTienDuyenChain ? { ...card, name: 'Xiềng Xích', idKey: 'xieng_xich', virtual: true } : card;
-      TrickRules.playIronChain(this.state, sourceId, targetIds, chainCard, { isIronChain: true, reforge: payload.reforge });
+      const isReforgeMode = Boolean(payload.reforge || payload.isReforge);
+      TrickRules.playIronChain(this.state, sourceId, targetIds, chainCard, { isIronChain: true, reforge: isReforgeMode });
       return;
     }
     if (cardName === 'Mượn Đao') {
@@ -358,9 +381,16 @@ export class DispatcherV4 {
       return;
     }
 
-    // Mặc định: Bỏ bài và ghi log nếu là lá bài khác
-    this.state.discardFromHand(sourceId, [card.id]);
-    this.state.addLog(`${player.name} sử dụng [${card.name}].`);
+    if (cardName === 'Hóa Giải' || card.idKey === 'hoa_giai') {
+      throw new Error('Lá [Hóa Giải] chỉ có thể sử dụng khi phản ứng cẩm nang, không thể chủ động đánh ra trong lượt!');
+    }
+    const hasDoiNui = globalHeroRegistry.hasSkill(player, 'doi_nui', true);
+    if ((cardName === 'Né' || card.idKey === 'ne') && !hasDoiNui && !hasKhaiThien) {
+      throw new Error('Lá [Né] chỉ có thể sử dụng khi phản ứng Né đòn, không thể chủ động đánh ra trong lượt!');
+    }
+
+    // Tuyệt đối không tự ý discardFromHand các lá bài không hợp lệ hoặc chưa phân loại
+    throw new Error(`Lá bài [${card.name}] không thể sử dụng trực tiếp trong Pha Hành Động!`);
   }
 
   _resolveCard(player, data) {
@@ -417,9 +447,218 @@ export class DispatcherV4 {
       data.doNegate === false || 
       data.doProvide === false;
 
+    const expectedActorId = frame.context?.currentResponderId ?? 
+                            frame.currentActorId ?? 
+                            frame.priorityQueue?.[0] ?? 
+                            frame.targetId ?? 
+                            frame.sourceId;
+
+    const isQueueFrame = frame.type === 'ASK_NEGATE' || frame.type === 'ASK_PEACH';
+    if (isQueueFrame) {
+      if (isCancelOrSkip) {
+        if (playerId !== undefined && playerId !== null && expectedActorId !== undefined && expectedActorId !== null && playerId !== expectedActorId) {
+          console.warn(`[DispatcherV4] Bỏ qua lượt bỏ qua từ player ${playerId} cho frame ${frame.type} vì frame đang chờ player ${expectedActorId}`);
+          return;
+        }
+      } else {
+        if (Array.isArray(frame.priorityQueue) && frame.priorityQueue.length > 0 && !frame.priorityQueue.includes(playerId)) {
+          console.warn(`[DispatcherV4] Player ${playerId} không có trong danh sách ưu tiên của frame ${frame.type}`);
+          return;
+        }
+      }
+    } else {
+      if (playerId !== undefined && playerId !== null && expectedActorId !== undefined && expectedActorId !== null && playerId !== expectedActorId) {
+        console.warn(`[DispatcherV4] Bỏ qua phản hồi từ player ${playerId} cho frame ${frame.type} vì frame đang chờ player ${expectedActorId}`);
+        return;
+      }
+    }
+
+    const expectedPlayer = this.state.getPlayer(expectedActorId);
+    if (expectedPlayer && !expectedPlayer.isAlive) {
+      console.warn(`[DispatcherV4] Người chơi ${expectedActorId} đang chờ phản hồi đã tử trận. Đang tự động giải phóng frame ${frame.type}.`);
+      if (typeof frame.nextActor === 'function') {
+        const next = frame.nextActor();
+        if (!next) {
+          this.state.priorityStack.pop();
+        }
+      } else {
+        this.state.priorityStack.pop();
+      }
+      return;
+    }
+
     const player = this.state.getPlayer(playerId);
 
     switch (frame.type) {
+      case 'ASK_WEAPON_SKILL': {
+        const weapon = frame.context?.weapon || frame.context?.weaponName;
+        const source = this.state.getPlayer(frame.sourceId);
+        const target = this.state.getPlayer(frame.targetId);
+
+        if (weapon === 'Rìu Đá' || weapon === 'Quán Thạch Phủ' || isEquip(weapon, 'riu_da')) {
+          if (!isCancelOrSkip && data.doUse) {
+            let cardIdsToDiscard = [];
+            if (Array.isArray(data.cardIds) && data.cardIds.length > 0) {
+              cardIdsToDiscard.push(...data.cardIds);
+            }
+            if (Array.isArray(data.equipIds) && data.equipIds.length > 0) {
+              cardIdsToDiscard.push(...data.equipIds);
+            }
+            if (cardIdsToDiscard.length < 2 && Array.isArray(data.cardIndexes)) {
+              for (const idx of data.cardIndexes) {
+                if (source?.hand?.[idx] && !cardIdsToDiscard.includes(source.hand[idx].id)) {
+                  cardIdsToDiscard.push(source.hand[idx].id);
+                }
+              }
+            }
+            if (cardIdsToDiscard.length < 2 && Array.isArray(data.equipIndexes)) {
+              const rawEquips = Array.isArray(source?.equipment)
+                ? source.equipment
+                : Object.values(source?.equipment || {}).filter(Boolean);
+              for (const idx of data.equipIndexes) {
+                if (rawEquips[idx] && !cardIdsToDiscard.includes(rawEquips[idx].id)) {
+                  cardIdsToDiscard.push(rawEquips[idx].id);
+                }
+              }
+            }
+            if (cardIdsToDiscard.length < 2) {
+              const availableHand = (source?.hand || []).map(c => c.id);
+              const availableEquip = Object.values(source?.equipment || {})
+                .filter(e => e && e.name !== 'Rìu Đá' && e.id !== source.equipment?.weapon?.id)
+                .map(e => e.id);
+              const allAvailable = [...availableHand, ...availableEquip];
+              cardIdsToDiscard = allAvailable.slice(0, 2);
+            }
+
+            if (cardIdsToDiscard.length >= 2) {
+              const chosen = cardIdsToDiscard.slice(0, 2);
+              for (const cid of chosen) {
+                const inHand = source.hand?.some(c => c.id === cid);
+                if (inHand) {
+                  this.state.discardFromHand(source.id, [cid]);
+                } else if (source.equipment) {
+                  for (const slot in source.equipment) {
+                    if (source.equipment[slot]?.id === cid) {
+                      const removed = source.equipment[slot];
+                      source.equipment[slot] = null;
+                      this.state.discardPile.push(removed);
+                      globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: source.id, card: removed }, this.state);
+                    }
+                  }
+                }
+              }
+              this.state.priorityStack.pop();
+              this.state.addLog(`🪓 [Rìu Đá] ${source.name} bỏ 2 lá bài để xuyên phá cú Né của ${target.name}!`);
+              CombatRules.applyDamage(this.state, source.id, target.id, frame.context.damageAmount || 1, 'slash_penetrate', false, frame.context.slashCard || frame.context.card);
+              break;
+            }
+          }
+          this.state.priorityStack.pop();
+          this.state.addLog(`🪓 [Rìu Đá] ${source.name} không kích hoạt Rìu Đá, ${target.name} né thành công!`);
+          break;
+        }
+
+        if (weapon === 'Thanh Long Đao' || isEquip(weapon, 'thanh_long_dao')) {
+          if (!isCancelOrSkip && data.doUse) {
+            const hasDoiNui = globalHeroRegistry.hasSkill(source, 'doi_nui', true);
+            const hasKhaiThien = globalHeroRegistry.hasSkill(source, 'khai_thien', true);
+            const isRed = c => {
+              if (!c) return false;
+              const col = globalHeroRegistry.getEffectiveColor(source, c);
+              return col ? col === 'red' : Boolean(c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+            };
+            const resolved = this._resolveCard(source, data) || 
+              (data.cardId ? source.hand?.find(c => c.id === data.cardId) : null) ||
+              source.hand?.find(c => c.type === 'slash' || c.name === 'Chém' || c.idKey === 'slash') ||
+              (hasDoiNui ? source.hand?.find(c => c.type === 'dodge' || c.name === 'Né') : null) ||
+              (hasKhaiThien ? source.hand?.find(isRed) : null);
+
+            if (resolved) {
+              this.state.discardFromHand(source.id, [resolved.id]);
+              this.state.priorityStack.pop();
+              this.state.addLog(`🐉 [Thanh Long Đao] ${source.name} vung tiếp lá [Chém] thứ hai lên ${target.name}!`);
+              this.state.priorityStack.push({
+                type: 'ASK_DODGE',
+                sourceId: source.id,
+                targetId: target.id,
+                priorityQueue: [target.id],
+                context: {
+                  card: resolved,
+                  requiredDodges: 1,
+                  dodgesProvided: 0,
+                  damageAmount: 1
+                }
+              });
+              break;
+            }
+          }
+          this.state.priorityStack.pop();
+          this.state.addLog(`🐉 [Thanh Long Đao] ${source.name} không đánh tiếp, ${target.name} né thành công!`);
+          break;
+        }
+
+        if (weapon === 'Song Kiếm' || isEquip(weapon, 'song_kiem')) {
+          const actor = this.state.getPlayer(playerId);
+          if (!isCancelOrSkip && data.doUse) {
+            let cardIdToDiscard = data.cardId || (Array.isArray(data.cardIds) ? data.cardIds[0] : null);
+            let equipIdToDiscard = data.equipId || (Array.isArray(data.equipIds) ? data.equipIds[0] : null);
+
+            if (!cardIdToDiscard && !equipIdToDiscard) {
+              if (Array.isArray(data.cardIndexes) && data.cardIndexes.length > 0) {
+                cardIdToDiscard = actor?.hand?.[data.cardIndexes[0]]?.id;
+              } else if (Array.isArray(data.equipIndexes) && data.equipIndexes.length > 0) {
+                const rawEquips = Array.isArray(actor?.equipment)
+                  ? actor.equipment
+                  : Object.values(actor?.equipment || {}).filter(Boolean);
+                equipIdToDiscard = rawEquips[data.equipIndexes[0]]?.id;
+              }
+            }
+
+            if (cardIdToDiscard) {
+              this.state.discardFromHand(actor.id, [cardIdToDiscard]);
+              this.state.priorityStack.pop();
+              this.state.addLog(`⚔️ [Song Kiếm] ${actor.name} tự bỏ 1 lá bài từ trên tay.`);
+              break;
+            } else if (equipIdToDiscard && actor.equipment) {
+              for (const slot in actor.equipment) {
+                if (actor.equipment[slot]?.id === equipIdToDiscard) {
+                  const removed = actor.equipment[slot];
+                  actor.equipment[slot] = null;
+                  this.state.discardPile.push(removed);
+                  globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: actor.id, card: removed }, this.state);
+                }
+              }
+              this.state.priorityStack.pop();
+              this.state.addLog(`⚔️ [Song Kiếm] ${actor.name} tháo bỏ 1 trang bị.`);
+              break;
+            }
+          }
+          this.state.priorityStack.pop();
+          this.state.drawCards(source.id, 1);
+          this.state.addLog(`⚔️ [Song Kiếm] ${actor.name} không bỏ bài, ${source.name} được rút 1 lá bài!`);
+          break;
+        }
+
+        this.state.priorityStack.pop();
+        break;
+      }
+
+      case 'ASK_DISMANTLE': {
+        const targetId = frame.targetId ?? frame.context?.targetId;
+        const targetCardId = isCancelOrSkip ? null : (data.cardId || data.targetCardId || null);
+        TrickRules.resolveDismantle(this.state, playerId, targetId, targetCardId);
+        this.state.priorityStack.pop();
+        break;
+      }
+
+      case 'ASK_SNATCH': {
+        const targetId = frame.targetId ?? frame.context?.targetId;
+        const targetCardId = isCancelOrSkip ? null : (data.cardId || data.targetCardId || null);
+        TrickRules.resolveSteal(this.state, playerId, targetId, targetCardId);
+        this.state.priorityStack.pop();
+        break;
+      }
+
       case 'ASK_XA_THAN': {
         if (isCancelOrSkip) {
           CombatRules.respondXaThan(this.state, playerId, null, null);
@@ -440,8 +679,31 @@ export class DispatcherV4 {
         if (!isCancelOrSkip && !data.useBagua && !data.doBagua && !data.callBocTramTrung && !data.doTienPhat && !data.doHoGia) {
           const hasDoiNui = globalHeroRegistry.hasSkill(player, 'doi_nui', true);
           const hasThinhChinh = globalHeroRegistry.hasSkill(player, 'thinh_chinh', true);
-          const isBlack = c => c && (c.color === 'black' || c.suit === 'spade' || c.suit === 'club' || c.suit === '♠' || c.suit === '♣');
-          dodgeCard = this._resolveCard(player, data) || (data.doReact ? (player.hand.find(c => c.type === 'dodge' || c.name === 'Né') || (hasDoiNui ? player.hand.find(c => c.type === 'slash' || c.name === 'Chém') : null) || (hasThinhChinh ? player.hand.find(isBlack) : null)) : null);
+          const hasLinhGiam = globalHeroRegistry.hasSkill(player, 'linh_giam', true);
+          const isBlack = c => {
+            if (!c) return false;
+            const col = globalHeroRegistry.getEffectiveColor(player, c);
+            return col ? col === 'black' : Boolean(c.color === 'black' || c.suit === 'spade' || c.suit === 'club' || c.suit === '♠' || c.suit === '♣');
+          };
+          const resolved = this._resolveCard(player, data) || (data.doReact ? (
+            player.hand.find(c => c.type === 'dodge' || c.name === 'Né') || 
+            (hasDoiNui ? player.hand.find(c => c.type === 'slash' || c.name === 'Chém') : null) || 
+            (hasThinhChinh ? player.hand.find(isBlack) : null) ||
+            (frame.context?.reason === 'van-tien' ? player.hand.find(c => c.name === 'Hóa Giải' || c.idKey === 'hoa_giai') : null) ||
+            (frame.context?.reason === 'van-tien' && hasLinhGiam ? player.hand.find(isBlack) : null)
+          ) : null);
+          if (resolved) {
+            const isNegate = (isTrick(resolved, 'hoa_giai') ||
+              data.virtualCardName === 'Hóa Giải' || data.activeSkill === 'Linh Giám' ||
+              (hasLinhGiam && isBlack(resolved) && (data.virtualCardName === 'Hóa Giải' || data.asNegate))) && frame.context?.reason === 'van-tien';
+            const isDodge = resolved.name === 'Né' || resolved.type === 'dodge' || resolved.idKey === 'ne' || resolved.idKey === 'dodge' || resolved.id?.includes('dodge') || resolved.id?.includes('ne') ||
+              (hasDoiNui && (resolved.name === 'Chém' || resolved.type === 'slash')) ||
+              (hasThinhChinh && isBlack(resolved)) ||
+              isNegate;
+            if (isDodge) {
+              dodgeCard = resolved;
+            }
+          }
         }
         CombatRules.respondDodge(this.state, playerId, dodgeCard, data);
         break;
@@ -451,7 +713,11 @@ export class DispatcherV4 {
         let peachCard = null;
         if (!isCancelOrSkip) {
           const hasNamDuoc = globalHeroRegistry.hasSkill(player, 'nam_duoc', true) && this.state.currentTurnPlayerId !== playerId;
-          const isRed = c => c && (c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+          const isRed = c => {
+            if (!c) return false;
+            const col = globalHeroRegistry.getEffectiveColor(player, c);
+            return col ? col === 'red' : Boolean(c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+          };
           peachCard = this._resolveCard(player, data) || 
             (data.doSave ? player.hand.find(c => c.type === 'peach' || c.name === 'Đào' || (playerId === frame.targetId && (c.type === 'wine' || c.name === 'Rượu')) || (hasNamDuoc && isRed(c))) : null);
         }
@@ -463,17 +729,30 @@ export class DispatcherV4 {
         let negateCard = null;
         if (!isCancelOrSkip) {
           const hasLinhGiam = globalHeroRegistry.hasSkill(player, 'linh_giam', true);
-          const isBlack = c => c && (c.color === 'black' || c.suit === 'spade' || c.suit === 'club' || c.suit === '♠' || c.suit === '♣');
+          const isBlack = c => {
+            if (!c) return false;
+            const col = globalHeroRegistry.getEffectiveColor(player, c);
+            return col ? col === 'black' : Boolean(c.color === 'black' || c.suit === 'spade' || c.suit === 'club' || c.suit === '♠' || c.suit === '♣');
+          };
           negateCard = this._resolveCard(player, data) || 
             player.hand.find(c => c.name === 'Hóa Giải' || c.idKey === 'hoa_giai') ||
             (hasLinhGiam ? player.hand.find(isBlack) : null);
         }
         TrickRules.respondNegate(this.state, playerId, negateCard);
+        if (this.state.currentPhase === PHASES.JUDGE && this.state.priorityStack.isEmpty()) {
+          this.stateMachine._completeJudgePhase();
+        }
         break;
       }
 
       case 'ASK_DISCARD': {
-        const cardIds = data.cardIds || (data.cardId ? [data.cardId] : (data.selectedDiscards || []));
+        const rawCardIds = data.cardIds || (data.cardId ? [data.cardId] : (data.selectedDiscards || []));
+        const required = Math.min(player?.hand?.length || 0, frame.context?.cardsToDiscard || 1);
+        let cardIds = Array.isArray(rawCardIds) ? rawCardIds.filter(cid => player.hand.some(c => c.id === cid)) : [];
+        if (cardIds.length !== required) {
+          console.warn(`[DispatcherV4] CardIds bỏ bài không khớp yêu cầu (${required} lá). Tự động chọn.`);
+          cardIds = (player?.hand || []).slice(0, required).map(c => c.id);
+        }
         this.stateMachine.handleDiscard(playerId, cardIds);
         break;
       }
@@ -488,30 +767,76 @@ export class DispatcherV4 {
       }
 
       case 'ASK_SLASH_DUEL': {
+        const duelFrame = this.state.priorityStack.peek();
+        if (duelFrame && duelFrame.context && duelFrame.context.currentResponderId !== undefined && duelFrame.context.currentResponderId !== playerId) {
+          console.warn(`[DispatcherV4] Bỏ qua respondDuel từ player ${playerId} vì frame đang chờ player ${duelFrame.context.currentResponderId}`);
+          break;
+        }
         let slashCard = null;
         if (!isCancelOrSkip) {
           const hasDoiNui = globalHeroRegistry.hasSkill(player, 'doi_nui', true);
           const hasKhaiThien = globalHeroRegistry.hasSkill(player, 'khai_thien', true);
-          const isRed = c => c && (c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
-          slashCard = this._resolveCard(player, data) || 
+          const isRed = c => {
+            if (!c) return false;
+            const col = globalHeroRegistry.getEffectiveColor(player, c);
+            return col ? col === 'red' : Boolean(c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+          };
+          const resolved = this._resolveCard(player, data) || 
             player.hand.find(c => c.type === 'slash' || c.name === 'Chém') || 
             (hasDoiNui ? player.hand.find(c => c.type === 'dodge' || c.name === 'Né') : null) ||
             (hasKhaiThien ? player.hand.find(isRed) : null);
+          if (resolved) {
+            const isSlash = resolved.name === 'Chém' || resolved.type === 'slash' || resolved.idKey === 'chem' || resolved.idKey === 'slash' || resolved.id?.includes('slash') || resolved.id?.includes('chem') ||
+              (hasDoiNui && (resolved.name === 'Né' || resolved.type === 'dodge')) ||
+              (hasKhaiThien && isRed(resolved));
+            if (isSlash) {
+              slashCard = resolved;
+            }
+          }
         }
         TrickRules.respondDuel(this.state, playerId, slashCard, data);
         break;
       }
 
       case 'ASK_SLASH_RESPONSE': {
+        const barbFrame = this.state.priorityStack.peek();
+        if (barbFrame && barbFrame.currentActorId !== undefined && barbFrame.currentActorId !== playerId) {
+          console.warn(`[DispatcherV4] Bỏ qua respondBarbarian từ player ${playerId} vì frame đang chờ player ${barbFrame.currentActorId}`);
+          break;
+        }
         let slashCard = null;
         if (!isCancelOrSkip) {
           const hasDoiNui = globalHeroRegistry.hasSkill(player, 'doi_nui', true);
           const hasKhaiThien = globalHeroRegistry.hasSkill(player, 'khai_thien', true);
-          const isRed = c => c && (c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
-          slashCard = this._resolveCard(player, data) || 
+          const hasLinhGiam = globalHeroRegistry.hasSkill(player, 'linh_giam', true);
+          const isRed = c => {
+            if (!c) return false;
+            const col = globalHeroRegistry.getEffectiveColor(player, c);
+            return col ? col === 'red' : Boolean(c.color === 'red' || c.suit === 'heart' || c.suit === 'diamond' || c.suit === '♥' || c.suit === '♦');
+          };
+          const isBlack = c => {
+            if (!c) return false;
+            const col = globalHeroRegistry.getEffectiveColor(player, c);
+            return col ? col === 'black' : Boolean(c.color === 'black' || c.suit === 'spade' || c.suit === 'club' || c.suit === '♠' || c.suit === '♣');
+          };
+          const resolved = this._resolveCard(player, data) || 
             player.hand.find(c => c.type === 'slash' || c.name === 'Chém') || 
             (hasDoiNui ? player.hand.find(c => c.type === 'dodge' || c.name === 'Né') : null) ||
-            (hasKhaiThien ? player.hand.find(isRed) : null);
+            (hasKhaiThien ? player.hand.find(isRed) : null) ||
+            player.hand.find(c => c.name === 'Hóa Giải' || c.idKey === 'hoa_giai') ||
+            (hasLinhGiam ? player.hand.find(isBlack) : null);
+          if (resolved) {
+            const isNegate = isTrick(resolved, 'hoa_giai') ||
+              data.virtualCardName === 'Hóa Giải' || data.activeSkill === 'Linh Giám' ||
+              (hasLinhGiam && isBlack(resolved) && (data.virtualCardName === 'Hóa Giải' || data.asNegate));
+            const isSlash = resolved.name === 'Chém' || resolved.type === 'slash' || resolved.idKey === 'chem' || resolved.idKey === 'slash' || resolved.id?.includes('slash') || resolved.id?.includes('chem') ||
+              (hasDoiNui && (resolved.name === 'Né' || resolved.type === 'dodge')) ||
+              (hasKhaiThien && isRed(resolved)) ||
+              isNegate;
+            if (isSlash) {
+              slashCard = resolved;
+            }
+          }
         }
         TrickRules.respondBarbarian(this.state, playerId, slashCard, data);
         break;
@@ -722,10 +1047,14 @@ export class DispatcherV4 {
             c1 = player.hand.find(c => c.id === data.cardIds[0]);
             c2 = player.hand.find(c => c.id === data.cardIds[1]);
           }
-          if (c1 && c2 && c1.suit === c2.suit) {
-            this.state.discardFromHand(playerId, [c1.id, c2.id]);
-            this.state.addLog(`🏹 [Bình Loạn] ${player.name} bỏ 2 lá bài cùng chất ${c1.suit}, phát động Loạn Tiễn!`);
-            TrickRules.playArrowRain(this.state, playerId, { name: 'Loạn Tiễn', virtual: true });
+          if (c1 && c2) {
+            const s1 = globalHeroRegistry.getEffectiveSuit(player, c1);
+            const s2 = globalHeroRegistry.getEffectiveSuit(player, c2);
+            if (s1 === s2) {
+              this.state.discardFromHand(playerId, [c1.id, c2.id]);
+              this.state.addLog(`🏹 [Bình Loạn] ${player.name} bỏ 2 lá bài cùng chất ${s1}, phát động Loạn Tiễn!`);
+              TrickRules.playArrowRain(this.state, playerId, { name: 'Loạn Tiễn', virtual: true });
+            }
           }
         }
         break;
@@ -839,24 +1168,28 @@ export class DispatcherV4 {
           const myCard = this._resolveCard(player, data) || (player.hand && player.hand.length > 0 ? player.hand[0] : null);
           const target = this.state.getPlayer(data.targetId);
           if (myCard && target && target.hand && target.hand.length > 0) {
-            const oppCard = target.hand.pop();
-            this.state.discardPile.push(oppCard);
-            this.state.discardFromHand(playerId, [myCard.id]);
+            const oppCard = (data.targetCardId ? target.hand.find(c => c.id === data.targetCardId) : null) || target.hand[0];
+            // Các lá bài sau khi đấu điểm tiến vào chồng bài bỏ (không tính là bỏ bài)
+            this.state.moveCard(oppCard.id, { type: 'hand', playerId: target.id }, { type: 'discardPile' });
+            this.state.moveCard(myCard.id, { type: 'hand', playerId: playerId }, { type: 'discardPile' });
 
             const myRank = rankToNumber(myCard.rank);
             const oppRank = rankToNumber(oppCard.rank);
 
             if (myRank > oppRank) {
-              this.state.addLog(`⚔️ [Tự Chủ] ${player.name} (${myCard.name} [${myRank}]) THẮNG ${target.name} (${oppCard.name} [${oppRank}])!`);
+              this.state.addLog(`⚔️ [Tự Chủ] Lộ bài Đấu Điểm: ${player.name} (${myCard.name} [${myRank}]) THẮNG ${target.name} (${oppCard.name} [${oppRank}])!`);
               const aliveOthers = this.state.getAlivePlayers().filter(p => p.id !== target.id && p.id !== playerId && !(globalHeroRegistry.hasSkill(p, 'dam_bac') && (!p.hand || p.hand.length === 0)));
               if (aliveOthers.length > 0 && !target.temporaryFlags?.vanDonLose) {
                 CombatRules.playSlash(this.state, target.id, aliveOthers[0].id, { name: 'Chém', virtual: true, infiniteRange: true }, { infiniteRange: true });
               }
-            } else {
-              this.state.addLog(`⚔️ [Tự Chủ] ${player.name} (${myCard.name} [${myRank}]) THUA ${target.name} (${oppCard.name} [${oppRank}])! ${target.name} lập tức Chém ${player.name}!`);
+            } else if (myRank < oppRank) {
+              this.state.addLog(`⚔️ [Tự Chủ] Lộ bài Đấu Điểm: ${player.name} (${myCard.name} [${myRank}]) THUA ${target.name} (${oppCard.name} [${oppRank}])! ${target.name} lập tức Chém ${player.name}!`);
               if (!target.temporaryFlags?.vanDonLose && !(globalHeroRegistry.hasSkill(player, 'dam_bac') && (!player.hand || player.hand.length === 0))) {
                 CombatRules.playSlash(this.state, target.id, playerId, { name: 'Chém', virtual: true, infiniteRange: true }, { infiniteRange: true });
               }
+            } else {
+              // Điểm bằng nhau: Cả hai đều không thắng và không thua
+              this.state.addLog(`⚔️ [Tự Chủ] Lộ bài Đấu Điểm HÒA: ${player.name} (${myCard.name} [${myRank}]) HÒA ${target.name} (${oppCard.name} [${oppRank}])! Cả hai đều không thắng và không thua.`);
             }
           }
         }
@@ -864,27 +1197,88 @@ export class DispatcherV4 {
       }
 
       case 'ASK_VAN_DON': {
-        this.state.priorityStack.pop();
-        if (!isCancelOrSkip) {
+        if (isCancelOrSkip) {
+          if (playerId === frame.sourceId && (!frame.context?.chosenCards || Object.keys(frame.context.chosenCards).length === 0)) {
+            this.state.priorityStack.pop();
+            this.state.addLog(`🌊 [Vân Đồn] ${player.name} đã hủy bỏ Đấu Điểm.`);
+            break;
+          }
+        }
+
+        const target = this.state.getPlayer(frame.targetId);
+        const initiator = this.state.getPlayer(frame.sourceId);
+
+        // Trường hợp 1: Backward-compatibility khi unit test gửi kèm targetCardId ngay lập tức
+        if (data.targetCardId && target && target.hand && target.hand.length > 0) {
+          this.state.priorityStack.pop();
           const myCard = this._resolveCard(player, data) || (player.hand && player.hand.length > 0 ? player.hand[0] : null);
-          const target = this.state.getPlayer(frame.targetId);
-          if (myCard && target && target.hand && target.hand.length > 0) {
-            const oppCard = (data.targetCardId ? target.hand.find(c => c.id === data.targetCardId) : null) || target.hand[0];
-            
-            this.state.discardFromHand(playerId, [myCard.id]);
-            this.state.discardFromHand(target.id, [oppCard.id]);
+          const oppCard = target.hand.find(c => c.id === data.targetCardId) || target.hand[0];
+          if (myCard && oppCard) {
+            this.state.moveCard(myCard.id, { type: 'hand', playerId: initiator.id }, { type: 'discardPile' });
+            this.state.moveCard(oppCard.id, { type: 'hand', playerId: target.id }, { type: 'discardPile' });
 
             const myRank = rankToNumber(myCard.rank);
             const oppRank = rankToNumber(oppCard.rank);
 
-            player.temporaryFlags = player.temporaryFlags || {};
+            initiator.temporaryFlags = initiator.temporaryFlags || {};
             if (myRank > oppRank) {
-              player.temporaryFlags.vanDonWin = true;
-              this.state.addLog(`🌊 [Vân Đồn] ${player.name} (${myCard.name} [${myCard.rank || myRank}]) THẮNG ${target.name} (${oppCard.name} [${oppCard.rank || oppRank}])! Được đánh thêm 1 Chém vô hạn cự ly và chọn 2 mục tiêu!`);
+              initiator.temporaryFlags.vanDonWin = true;
+              this.state.addLog(`🌊 [Vân Đồn] Lộ bài Đấu Điểm: ${initiator.name} (${myCard.name} [${myCard.rank || myRank}]) THẮNG ${target.name} (${oppCard.name} [${oppCard.rank || oppRank}])! Được đánh thêm 1 Chém vô hạn cự ly và chọn 2 mục tiêu!`);
+            } else if (myRank < oppRank) {
+              initiator.temporaryFlags.vanDonLose = true;
+              this.state.addLog(`🌊 [Vân Đồn] Lộ bài Đấu Điểm: ${target.name} (${oppCard.name} [${oppCard.rank || oppRank}]) THẮNG ${initiator.name} (${myCard.name} [${myCard.rank || myRank}])! ${initiator.name} bị cấm Chém trong lượt này!`);
             } else {
-              player.temporaryFlags.vanDonLose = true;
-              this.state.addLog(`🌊 [Vân Đồn] ${player.name} (${myCard.name} [${myCard.rank || myRank}]) THUA hoặc HÒA ${target.name} (${oppCard.name} [${oppCard.rank || oppRank}])! Bị cấm Chém trong lượt này!`);
+              initiator.temporaryFlags.vanDonLose = true;
+              this.state.addLog(`🌊 [Vân Đồn] Lộ bài Đấu Điểm HÒA: ${initiator.name} (${myCard.name} [${myCard.rank || myRank}]) HÒA ${target.name} (${oppCard.name} [${oppCard.rank || oppRank}])! Cả hai đều không thắng và không thua. ${initiator.name} không thắng nên bị cấm Chém trong lượt này!`);
             }
+          }
+          break;
+        }
+
+        // Trường hợp 2: Quy trình Đấu Điểm chuẩn (Two-Phase Point Duel)
+        const chosenCard = this._resolveCard(player, data) || (player.hand && player.hand.length > 0 ? player.hand[0] : null);
+        if (!chosenCard) {
+          this.state.priorityStack.pop();
+          break;
+        }
+
+        frame.context = frame.context || {};
+        frame.context.chosenCards = frame.context.chosenCards || {};
+        frame.context.chosenCards[playerId] = chosenCard;
+
+        const nextActor = frame.nextActor();
+        if (nextActor !== null) {
+          // Còn người chơi tiếp theo cần chọn bài bí mật
+          const nextPlayer = this.state.getPlayer(nextActor);
+          this.state.addLog(`🌊 [Vân Đồn] ${player.name} đã chọn bài đấu điểm. Đang chờ ${nextPlayer?.name} chọn bài đọ điểm...`);
+          break;
+        }
+
+        // Tất cả người tham gia đã chọn bài xong -> Pop frame và LỘ BÀI CÙNG LÚC!
+        this.state.priorityStack.pop();
+        const myCard = frame.context.chosenCards[frame.sourceId];
+        const oppCard = frame.context.chosenCards[frame.targetId];
+
+        if (initiator && target && myCard && oppCard) {
+          // Các lá bài sau khi đấu điểm sẽ tiến vào chồng bài bỏ (không tính là bỏ bài)
+          this.state.moveCard(myCard.id, { type: 'hand', playerId: initiator.id }, { type: 'discardPile' });
+          this.state.moveCard(oppCard.id, { type: 'hand', playerId: target.id }, { type: 'discardPile' });
+
+          const myRank = rankToNumber(myCard.rank);
+          const oppRank = rankToNumber(oppCard.rank);
+
+          initiator.temporaryFlags = initiator.temporaryFlags || {};
+          if (myRank > oppRank) {
+            initiator.temporaryFlags.vanDonWin = true;
+            this.state.addLog(`🌊 [Vân Đồn] Lộ bài Đấu Điểm: ${initiator.name} (${myCard.name} [${myCard.rank || myRank}]) THẮNG ${target.name} (${oppCard.name} [${oppCard.rank || oppRank}])! Được đánh thêm 1 Chém vô hạn cự ly và chọn 2 mục tiêu!`);
+          } else if (myRank < oppRank) {
+            initiator.temporaryFlags.vanDonLose = true;
+            this.state.addLog(`🌊 [Vân Đồn] Lộ bài Đấu Điểm: ${target.name} (${oppCard.name} [${oppCard.rank || oppRank}]) THẮNG ${initiator.name} (${myCard.name} [${myCard.rank || myRank}])! ${initiator.name} bị cấm Chém trong lượt này!`);
+          } else {
+            // "Nếu 2 lá bài có điểm số bằng nhau sẽ được tính là cả không thắng và không thua."
+            // Với kỹ năng Vân Đồn: "Nếu không thắng, bạn không thể sử dụng [Chém] trong lượt này."
+            initiator.temporaryFlags.vanDonLose = true;
+            this.state.addLog(`🌊 [Vân Đồn] Lộ bài Đấu Điểm HÒA: ${initiator.name} (${myCard.name} [${myCard.rank || myRank}]) HÒA ${target.name} (${oppCard.name} [${oppCard.rank || oppRank}])! Cả hai đều không thắng và không thua. ${initiator.name} không thắng nên bị cấm Chém trong lượt này!`);
           }
         }
         break;
@@ -894,7 +1288,9 @@ export class DispatcherV4 {
         this.state.priorityStack.pop();
         if (!isCancelOrSkip && data.targetId !== undefined) {
           const target = this.state.getPlayer(data.targetId);
-          const cardIds = data.cardIds || (data.cardId ? [data.cardId] : []);
+          const cardIds = (Array.isArray(data.cardIds) && data.cardIds.length > 0)
+            ? data.cardIds
+            : (data.cardIndexes ? data.cardIndexes.map(i => player.hand[i]?.id).filter(Boolean) : (data.cardId ? [data.cardId] : []));
           let cardsToDiscard = [];
           if (cardIds.length >= 2) {
             cardsToDiscard = cardIds.slice(0, 2);
@@ -961,7 +1357,7 @@ export class DispatcherV4 {
             if (oldEquip) {
               this.state.discardPile.push(oldEquip);
               globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: player.id, card: oldEquip }, this.state);
-              if (oldEquip.name === 'Bạch Ngân' || oldEquip.id?.includes('bach_ngan') || oldEquip.key === 'bach-ngan') {
+              if (oldEquip.name === 'Bạch Ngân' || oldEquip.name === 'Bạch Ngân Sư Tử' || isEquip(oldEquip, 'bach_ngan') || oldEquip.id?.includes('bach_ngan') || oldEquip.key === 'bach-ngan') {
                 player.hp = Math.min(player.maxHp, player.hp + 1);
                 this.state.addLog(`🦁 [Bạch Ngân] Rời khỏi người ${player.name}, hồi 1 HP (${player.hp}/${player.maxHp})!`);
               }
@@ -1041,13 +1437,8 @@ export class DispatcherV4 {
         const requiredSuit = frame.context?.judgeSuit;
         if (!isCancelOrSkip && data.doDiscard) {
           const card = this._resolveCard(player, data);
-          const isSuitMatch = card && (
-            card.suit === requiredSuit ||
-            (requiredSuit === 'heart' && (card.suit === '♥' || card.suit === 'heart')) ||
-            (requiredSuit === 'diamond' && (card.suit === '♦' || card.suit === 'diamond')) ||
-            (requiredSuit === 'spade' && (card.suit === '♠' || card.suit === 'spade')) ||
-            (requiredSuit === 'club' && (card.suit === '♣' || card.suit === 'club'))
-          );
+          const effSuit = globalHeroRegistry.getEffectiveSuit(player, card) || card.suit;
+          const isSuitMatch = card && isSameSuit(effSuit, requiredSuit);
 
           if (isSuitMatch) {
             this.state.discardFromHand(playerId, [card.id]);
@@ -1196,12 +1587,45 @@ export class DispatcherV4 {
             if (!RangeSystem.inSlashRange(player, target, alivePlayers)) {
               throw new Error('[Tiên Phong] Mục tiêu nằm ngoài tầm đánh!');
             }
-            if (data.costType === 'weapon' && player.equipment?.weapon) {
-              const w = player.equipment.weapon;
-              player.equipment.weapon = null;
-              this.state.discardPile.push(w);
-              globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: player.id, card: w }, this.state);
-              this.state.addLog(`⚡ [Tiên Phong] ${player.name} bỏ vũ khí [${w.name}], gây 1 sát thương lên ${target?.name}!`);
+            if (data.costType === 'weapon') {
+              let weaponCard = null;
+              if (data.cardId) {
+                if (player.equipment?.weapon && player.equipment.weapon.id === data.cardId) {
+                  weaponCard = player.equipment.weapon;
+                  player.equipment.weapon = null;
+                  this.state.discardPile.push(weaponCard);
+                  globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: player.id, card: weaponCard }, this.state);
+                } else {
+                  const handCard = player.hand?.find(c => c.id === data.cardId);
+                  if (handCard) {
+                    weaponCard = handCard;
+                    this.state.discardFromHand(player.id, [weaponCard.id]);
+                  }
+                }
+              }
+              if (!weaponCard) {
+                if (player.equipment?.weapon) {
+                  weaponCard = player.equipment.weapon;
+                  player.equipment.weapon = null;
+                  this.state.discardPile.push(weaponCard);
+                  globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: player.id, card: weaponCard }, this.state);
+                } else {
+                  const handWeapon = (player.hand || []).find(c => {
+                    if (!c) return false;
+                    const st = getCardSubType(c);
+                    return st === 'equip_weapon' || c.type === 'weapon' || c.subtype === 'equip_weapon' || c.subType === 'equip_weapon';
+                  });
+                  if (handWeapon) {
+                    weaponCard = handWeapon;
+                    this.state.discardFromHand(player.id, [weaponCard.id]);
+                  }
+                }
+              }
+              if (weaponCard) {
+                this.state.addLog(`⚡ [Tiên Phong] ${player.name} bỏ vũ khí [${weaponCard.name}], gây 1 sát thương lên ${target?.name}!`);
+              } else {
+                throw new Error('[Tiên Phong] Không tìm thấy vũ khí để bỏ!');
+              }
             } else {
               player.hp -= 1;
               this.state.addLog(`⚡ [Tiên Phong] ${player.name} mất 1 HP, gây 1 sát thương lên ${target?.name}!`);
@@ -1216,12 +1640,32 @@ export class DispatcherV4 {
         this.state.priorityStack.pop();
         const asker = this.state.getPlayer(frame.context?.sourceId);
         if (asker && asker.hand && asker.hand.length > 0) {
-          const stolen = asker.hand.pop();
+          const randomIndex = Math.floor(Math.random() * asker.hand.length);
+          const [stolen] = asker.hand.splice(randomIndex, 1);
           player.hand.push(stolen);
-          const chosenSuit = data.suit || '♥';
-          const cardSuitEmoji = stolen.suit === 'heart' ? '♥' : stolen.suit === 'diamond' ? '♦' : stolen.suit === 'spade' ? '♠' : stolen.suit === 'club' ? '♣' : stolen.suit;
-          const isMatch = chosenSuit === cardSuitEmoji || chosenSuit === stolen.suit;
-          this.state.addLog(`🔮 [Tâm Công] ${player.name} đoán chất [${chosenSuit}]. Lá bài nhận được là [${stolen.name} ${cardSuitEmoji}]!`);
+
+          const suitMap = {
+            '♥': 'heart', 'heart': 'heart', 'hearts': 'heart', 'cơ': 'heart',
+            '♦': 'diamond', 'diamond': 'diamond', 'diamonds': 'diamond', 'rô': 'diamond',
+            '♠': 'spade', 'spade': 'spade', 'spades': 'spade', 'bích': 'spade',
+            '♣': 'club', 'club': 'club', 'clubs': 'club', 'chuồn': 'club', 'tép': 'club'
+          };
+          const suitLabels = {
+            'heart': '♥ Cơ',
+            'diamond': '♦ Rô',
+            'spade': '♠ Bích',
+            'club': '♣ Chuồn'
+          };
+
+          const rawChosen = data.suit || '♥';
+          const normalizedChosen = suitMap[rawChosen] || 'heart';
+          const normalizedCardSuit = suitMap[stolen.suit] || stolen.suit;
+          const isMatch = normalizedChosen === normalizedCardSuit;
+
+          const chosenLabel = suitLabels[normalizedChosen] || rawChosen;
+          const cardLabel = suitLabels[normalizedCardSuit] || stolen.suit;
+
+          this.state.addLog(`🔮 [Tâm Công] ${player.name} đoán chất [${chosenLabel}]. Lá bài nhận được là [${stolen.name} ${cardLabel}]!`);
           if (!isMatch) {
             this.state.addLog(`💥 Đoán sai chất! ${player.name} nhận 1 sát thương từ [Tâm Công]!`);
             CombatRules.applyDamage(this.state, asker.id, player.id, 1, 'tam_cong');
@@ -1255,6 +1699,86 @@ export class DispatcherV4 {
         break;
       }
 
+      case 'ASK_HOA_THAN_AN_TU': {
+        this.state.priorityStack.pop();
+        if (!isCancelOrSkip && data.targetId !== undefined) {
+          let card = null;
+          if (data.cardFrom === 'equip' && data.cardIndex !== undefined) {
+            const equipCards = Object.values(player.equipment || {}).filter(Boolean);
+            card = equipCards[data.cardIndex];
+            if (card) {
+              for (const slot in player.equipment) {
+                if (player.equipment[slot]?.id === card.id) {
+                  delete player.equipment[slot];
+                  break;
+                }
+              }
+            }
+          } else {
+            card = this._resolveCard(player, data);
+            if (card) {
+              this.state.discardFromHand(playerId, [card.id]);
+            }
+          }
+
+          if (card) {
+            this.state.addLog(`🌺 [Hòa Thân] ${player.name} sử dụng lá bài Rô [${card.name}] như [Hỗn Loạn]!`);
+            TrickRules.playChaos(this.state, playerId, data.targetId, { ...card, name: 'Hỗn Loạn', idKey: 'hon_loan', virtual: true });
+          }
+        }
+        break;
+      }
+
+      case 'ASK_CAN_GIAN': {
+        this.state.priorityStack.pop();
+        if (!isCancelOrSkip && (data.doUse || data.doReact) && player.hp > 1) {
+          const targetId = data.targetId !== undefined ? data.targetId : (frame.targetId !== undefined ? frame.targetId : null);
+          const target = targetId !== null ? this.state.getPlayer(targetId) : null;
+          if (target && target.isAlive) {
+            player.hp -= 1;
+            this.state.drawCards(target.id, 2);
+            this.state.addLog(`🕊️ [Can Gián] ${player.name} mất 1 HP giúp ${target.name} rút 2 lá bài!`);
+          }
+        }
+        break;
+      }
+
+      case 'ASK_THONG_NGON': {
+        this.state.priorityStack.pop();
+        if (!isCancelOrSkip && data.doUse && frame.context?.judgeCard) {
+          const judgeCard = frame.context.judgeCard;
+          player.hand.push(judgeCard);
+          this.state.discardPile = this.state.discardPile.filter(c => c.id !== judgeCard.id);
+          this.state.addLog(`📜 [Thông Ngôn] ${player.name} thu hồi lá phán xét [${judgeCard.name}] về tay!`);
+        }
+        break;
+      }
+
+      case 'ASK_PHAT_TAM': {
+        this.state.priorityStack.pop();
+        if (!isCancelOrSkip && data.doUse) {
+          const blackCards = [];
+          while (true) {
+            const judge = this.state.drawCardFromDeck();
+            if (!judge) break;
+            const isBlack = judge.color === 'black' || judge.suit === 'spade' || judge.suit === 'club' || judge.suit === '♠' || judge.suit === '♣';
+            if (isBlack) {
+              blackCards.push(judge);
+              this.state.addLog(`🧘 [Phật Tâm] ${player.name} phán xét ra lá [${judge.name} ${judge.suit}] (ĐEN), tiếp tục phán xét!`);
+            } else {
+              this.state.discardPile.push(judge);
+              this.state.addLog(`🧘 [Phật Tâm] ${player.name} phán xét ra lá [${judge.name} ${judge.suit}] (ĐỎ), kết thúc phán xét.`);
+              break;
+            }
+          }
+          if (blackCards.length > 0) {
+            player.hand.push(...blackCards);
+            this.state.addLog(`🧘 [Phật Tâm] ${player.name} thu được ${blackCards.length} lá bài Đen về tay!`);
+          }
+        }
+        break;
+      }
+
       default:
         // Universal AI Fallback & Frame Auto-pop
         this.state.priorityStack.pop();
@@ -1265,7 +1789,9 @@ export class DispatcherV4 {
     if (this.state.priorityStack.isEmpty()) {
       const turnPlayer = this.state.getCurrentPlayer();
       if (turnPlayer) {
-        if (this.state.currentPhase === PHASES.BEGIN && turnPlayer.temporaryFlags?.skipJudgePhase) {
+        if (!turnPlayer.isAlive) {
+          this.stateMachine.nextTurn();
+        } else if (this.state.currentPhase === PHASES.BEGIN && turnPlayer.temporaryFlags?.skipJudgePhase) {
           turnPlayer.temporaryFlags.skipJudgePhase = false;
           turnPlayer.temporaryFlags.skipDrawPhase = false;
           this.stateMachine._runPhaseAction();
@@ -1275,6 +1801,8 @@ export class DispatcherV4 {
         } else if (this.state.currentPhase === PHASES.DISCARD && turnPlayer.temporaryFlags?.skipDiscardPhase) {
           turnPlayer.temporaryFlags.skipDiscardPhase = false;
           this.stateMachine._runPhaseEnd();
+        } else if (this.state.currentPhase === PHASES.DISCARD) {
+          this.stateMachine._checkDiscardLimit(turnPlayer);
         } else if (this.state.currentPhase === PHASES.END) {
           this.stateMachine.nextTurn();
         }
@@ -1288,7 +1816,17 @@ export class DispatcherV4 {
     if (!player) return;
     playerId = effectivePlayerId;
 
-    const normSkillId = (skillId || '').replace(/-/g, '_').toLowerCase();
+    const normSkillId = normalizeSkillId(skillId);
+
+    if (normSkillId === 'lan_sau') {
+      if (player.hp <= 1) {
+        throw new Error('[Lặn Sâu] Không thể mất máu khi chỉ còn 1 HP!');
+      }
+      player.hp -= 1;
+      this.state.drawCards(playerId, 2);
+      this.state.addLog(`🌊 [Lặn Sâu] kích hoạt: ${player.name} mất 1 HP để rút 2 lá bài!`);
+      return;
+    }
 
     if (normSkillId === 'bach_dang') {
       player.skillUsage = player.skillUsage || {};
@@ -1315,19 +1853,32 @@ export class DispatcherV4 {
       const usedCardId = cardIds.length > 0 ? cardIds[0] : options.cardId;
       const card = player.hand.find(c => c.id === usedCardId);
       if (!card) throw new Error('[Kỳ Tập] Không tìm thấy lá bài trên tay!');
-      const isRed = card.color === 'red' || card.suit === 'heart' || card.suit === 'diamond' || card.suit === '♥' || card.suit === '♦';
+      const effColor = globalHeroRegistry.getEffectiveColor(player, card);
+      const isRed = effColor ? effColor === 'red' : Boolean(card.color === 'red' || getSuitColor(card.suit) === 'red');
       if (isRed) throw new Error('[Kỳ Tập] Chỉ có thể dùng lá bài màu Đen như [Tước Bài]!');
       const targetId = targets[0] !== undefined ? targets[0] : options.targetId;
       if (targetId === undefined) throw new Error('[Kỳ Tập] Vui lòng chọn mục tiêu để Tước Bài!');
       this.state.discardFromHand(playerId, [card.id]);
       this.state.addLog(`⚡ [Kỳ Tập] ${player.name} dùng lá bài Đen [${card.name}] như [Tước Bài]!`);
-      TrickRules.playDismantle(this.state, playerId, targetId, { ...card, name: 'Tước Bài', idKey: 'tuoc_bai', virtual: true });
+      const isInteractive = options.interactive === true;
+      TrickRules.playDismantle(this.state, playerId, targetId, { ...card, name: 'Tước Bài', idKey: 'tuoc_bai', virtual: true }, { interactive: isInteractive });
       return;
     }
 
     if (normSkillId === 'can_gian') {
       if (player.hp <= 1) throw new Error('[Can Gián] Sinh lực phải lớn hơn 1 để Can Gián!');
       const targetId = targets[0] !== undefined ? targets[0] : options.targetId;
+      if (targetId === undefined) {
+        this.state.priorityStack.push({
+          type: 'ASK_CAN_GIAN',
+          sourceId: playerId,
+          targetId: playerId,
+          currentActorId: playerId,
+          priorityQueue: [playerId],
+          context: { reason: 'can_gian' }
+        });
+        return;
+      }
       const target = this.state.getPlayer(targetId);
       if (!target || !target.isAlive) throw new Error('[Can Gián] Mục tiêu không hợp lệ!');
       player.hp -= 1;
@@ -1368,12 +1919,24 @@ export class DispatcherV4 {
 
     if (normSkillId === 'hoa_than_an_tu') {
       const usedCardId = cardIds.length > 0 ? cardIds[0] : options.cardId;
+      const targetId = targets[0] !== undefined ? targets[0] : options.targetId;
+
+      if (!usedCardId || targetId === undefined) {
+        this.state.priorityStack.push({
+          type: 'ASK_HOA_THAN_AN_TU',
+          sourceId: playerId,
+          targetId: playerId,
+          currentActorId: playerId,
+          priorityQueue: [playerId],
+          context: { reason: 'hoa_than_an_tu' }
+        });
+        return;
+      }
+
       const card = player.hand.find(c => c.id === usedCardId);
       if (!card) throw new Error('[Hòa Thân] Không tìm thấy lá bài trên tay!');
-      const isDiamond = card.suit === 'diamond' || card.suit === 'diamonds' || card.suit === '♦';
+      const isDiamond = normalizeSuit(card.suit).code === 'diamond';
       if (!isDiamond) throw new Error('[Hòa Thân] Chỉ có thể dùng lá bài chất Rô ♦ như [Hỗn Loạn]!');
-      const targetId = targets[0] !== undefined ? targets[0] : options.targetId;
-      if (targetId === undefined) throw new Error('[Hòa Thân] Vui lòng chọn mục tiêu để đặt Hỗn Loạn!');
       this.state.addLog(`🌺 [Hòa Thân] ${player.name} sử dụng lá bài Rô [${card.name}] như [Hỗn Loạn]!`);
       TrickRules.playChaos(this.state, playerId, targetId, { ...card, name: 'Hỗn Loạn', idKey: 'hon_loan', virtual: true });
       return;
@@ -1426,11 +1989,13 @@ export class DispatcherV4 {
         if (!c1 || !c2) {
           throw new Error(`[Bình Loạn] Không tìm thấy 2 lá bài chỉ định trên tay!`);
         }
-        if (c1.suit !== c2.suit) {
+        const s1 = globalHeroRegistry.getEffectiveSuit(player, c1);
+        const s2 = globalHeroRegistry.getEffectiveSuit(player, c2);
+        if (s1 !== s2) {
           throw new Error(`[Bình Loạn] 2 lá bài phải cùng chất để phát động Loạn Tiễn!`);
         }
         this.state.discardFromHand(playerId, [c1.id, c2.id]);
-        this.state.addLog(`🏹 [Bình Loạn] ${player.name} bỏ 2 lá bài cùng chất ${c1.suit}, phát động Loạn Tiễn!`);
+        this.state.addLog(`🏹 [Bình Loạn] ${player.name} bỏ 2 lá bài cùng chất ${s1}, phát động Loạn Tiễn!`);
         TrickRules.playArrowRain(this.state, playerId, { name: 'Loạn Tiễn', virtual: true });
       } else {
         this.state.priorityStack.push({
@@ -1453,7 +2018,7 @@ export class DispatcherV4 {
 
       // Trường hợp 1: Đồng minh Sơn tự đưa bài cho Đinh Điền
       if (player.id !== dinhDien.id) {
-        const isSonFaction = player.faction === 'son' || player.faction === 'Sơn' || player.rawFaction === 'son';
+        const isSonFaction = getCanonicalFaction(player.faction) === 'son';
         if (!isSonFaction) {
           throw new Error('[Định Quốc] Chỉ có tướng phe Sơn mới có thể hiến bài cho Đinh Điền!');
         }
@@ -1474,7 +2039,7 @@ export class DispatcherV4 {
 
       // Trường hợp 2: Đinh Điền chủ động phát động Định Quốc kêu gọi đồng minh Sơn dâng bài
       const allySonIds = this.state.players
-        .filter(p => p.id !== dinhDien.id && p.isAlive && (p.faction === 'son' || p.faction === 'Sơn' || p.rawFaction === 'son'))
+        .filter(p => p.id !== dinhDien.id && p.isAlive && getCanonicalFaction(p.faction) === 'son')
         .map(p => p.id);
 
       if (allySonIds.length === 0) {
@@ -1538,8 +2103,8 @@ export class DispatcherV4 {
         if (!card) {
           throw new Error('[Phá Thành] Không tìm thấy lá bài trên tay!');
         }
-        const isRed = card.color === 'red' || card.suit === 'heart' || card.suit === 'diamond' || card.suit === 'hearts' || card.suit === 'diamonds' || card.suit === '♥' || card.suit === '♦';
-        const cardColor = isRed ? 'red' : 'black';
+        const effColor = globalHeroRegistry.getEffectiveColor(player, card);
+        const cardColor = effColor || (card.color === 'red' || getSuitColor(card.suit) === 'red' ? 'red' : 'black');
         if (player.temporaryFlags?.phaThanhOppositeColor && player.temporaryFlags.phaThanhOppositeColor !== cardColor) {
           throw new Error(`[Phá Thành] Chỉ có thể dùng bài màu ${player.temporaryFlags.phaThanhOppositeColor === 'red' ? 'Đỏ' : 'Đen'} như [Quyết Đấu]!`);
         }
@@ -1561,6 +2126,9 @@ export class DispatcherV4 {
     }
 
     if (normSkillId === 'thuy_to') {
+      if (!player.hand || player.hand.length === 0) {
+        throw new Error('[Thủy Tổ] Bạn không có bài trên tay để chia cho đồng minh!');
+      }
       this.state.priorityStack.push({
         type: 'ASK_THUY_TO',
         sourceId: playerId,
@@ -1616,16 +2184,48 @@ export class DispatcherV4 {
         if (!RangeSystem.inSlashRange(player, target, alivePlayers)) {
           throw new Error('[Tiên Phong] Mục tiêu nằm ngoài tầm đánh!');
         }
-        if (options.costType) {
-          if (options.costType === 'weapon') {
-            if (!player.equipment?.weapon) {
+        const opt = (options && options.options) ? { ...options, ...options.options } : (options || {});
+        const costType = opt.costType;
+        const targetCardId = opt.cardId || (cardIds.length > 0 ? cardIds[0] : undefined);
+        if (costType) {
+          if (costType === 'weapon') {
+            let weaponCard = null;
+            if (targetCardId) {
+              if (player.equipment?.weapon && player.equipment.weapon.id === targetCardId) {
+                weaponCard = player.equipment.weapon;
+                player.equipment.weapon = null;
+                this.state.discardPile.push(weaponCard);
+                globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: player.id, card: weaponCard }, this.state);
+              } else {
+                const handCard = player.hand?.find(c => c.id === targetCardId);
+                if (handCard) {
+                  weaponCard = handCard;
+                  this.state.discardFromHand(player.id, [weaponCard.id]);
+                }
+              }
+            }
+            if (!weaponCard) {
+              if (player.equipment?.weapon) {
+                weaponCard = player.equipment.weapon;
+                player.equipment.weapon = null;
+                this.state.discardPile.push(weaponCard);
+                globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: player.id, card: weaponCard }, this.state);
+              } else {
+                const handWeapon = (player.hand || []).find(c => {
+                  if (!c) return false;
+                  const st = getCardSubType(c);
+                  return st === 'equip_weapon' || c.type === 'weapon' || c.subtype === 'equip_weapon' || c.subType === 'equip_weapon';
+                });
+                if (handWeapon) {
+                  weaponCard = handWeapon;
+                  this.state.discardFromHand(player.id, [weaponCard.id]);
+                }
+              }
+            }
+            if (!weaponCard) {
               throw new Error('[Tiên Phong] Không có vũ khí để hy sinh!');
             }
-            const w = player.equipment.weapon;
-            player.equipment.weapon = null;
-            this.state.discardPile.push(w);
-            globalHeroRegistry.dispatchTrigger('ON_EQUIP_LOST', { targetId: player.id, card: w }, this.state);
-            this.state.addLog(`⚡ [Tiên Phong] ${player.name} bỏ vũ khí [${w.name}], gây 1 sát thương lên ${target.name}!`);
+            this.state.addLog(`⚡ [Tiên Phong] ${player.name} bỏ vũ khí [${weaponCard.name}], gây 1 sát thương lên ${target.name}!`);
           } else {
             player.hp -= 1;
             this.state.addLog(`⚡ [Tiên Phong] ${player.name} mất 1 HP, gây 1 sát thương lên ${target.name}!`);
@@ -1651,17 +2251,22 @@ export class DispatcherV4 {
       if (player.skillUsage.tam_cong.usedThisTurn) {
         throw new Error('[Tâm Công] Mỗi lượt chỉ được sử dụng 1 lần!');
       }
-      if (targets.length > 0) {
-        player.skillUsage.tam_cong.usedThisTurn = true;
-        this.state.priorityStack.push({
-          type: 'ASK_SUIT',
-          sourceId: playerId,
-          targetId: targets[0],
-          currentActorId: targets[0],
-          priorityQueue: [targets[0]],
-          context: { sourceId: playerId }
-        });
+      if (!player.hand || player.hand.length === 0) {
+        throw new Error('[Tâm Công] Bạn không có bài trên tay để đối thủ rút!');
       }
+      const targetId = targets[0] !== undefined ? targets[0] : options.targetId;
+      if (targetId === undefined) {
+        throw new Error('[Tâm Công] Vui lòng chọn mục tiêu đối thủ!');
+      }
+      player.skillUsage.tam_cong.usedThisTurn = true;
+      this.state.priorityStack.push({
+        type: 'ASK_SUIT',
+        sourceId: playerId,
+        targetId: targetId,
+        currentActorId: targetId,
+        priorityQueue: [targetId],
+        context: { sourceId: playerId }
+      });
       return;
     }
 
@@ -1681,11 +2286,12 @@ export class DispatcherV4 {
         sourceId: playerId,
         targetId: validTarget,
         currentActorId: playerId,
-        priorityQueue: [playerId],
+        priorityQueue: [playerId, validTarget],
         context: {
           reason: 'van_don',
           sourceId: playerId,
-          targetId: validTarget
+          targetId: validTarget,
+          chosenCards: {}
         }
       });
       this.state.addLog(`🌊 [Vân Đồn] ${player.name} phát động Đấu Điểm với ${this.state.getPlayer(validTarget)?.name}!`);
@@ -1726,6 +2332,58 @@ export class DispatcherV4 {
       return;
     }
 
+    const normSkill = normalizeSkillId(skillId);
+    if (['tien_duyen', 'tien_duyen_chu_dong_tu', 'tien_duyen_active'].includes(normSkill) || skillId === 'tien-duyen-active' || skillId === 'Tiên Duyên') {
+      const selectedCards = cardIds || options?.cardIds || [];
+      const cardId = selectedCards[0];
+      if (!cardId) {
+        throw new Error('[Tiên Duyên] Vui lòng chọn 1 lá bài ♣ trên tay để chuyển hóa thành Xiềng Xích!');
+      }
+      const card = player.hand.find(c => c.id === cardId);
+      if (!card) throw new Error('[Tiên Duyên] Không tìm thấy lá bài trên tay!');
+      const isClub = normalizeSuit(card.suit).code === 'club';
+      if (!isClub) throw new Error('[Tiên Duyên] Kỹ năng Tiên Duyên chỉ dùng được với lá bài ♣ (Chuồn)!');
+
+      const isReforge = !targets || targets.length === 0;
+      return this.dispatchAction({
+        type: 'ACTION_PLAY_CARD',
+        payload: {
+          playerId,
+          cardId,
+          targetIds: targets || [],
+          virtualCardName: 'Xiềng Xích',
+          isReforge,
+          reforge: isReforge,
+          asChain: true
+        }
+      });
+    }
+
+    if (['than_hoa', 'than_hoa_active'].includes(normSkill) || skillId === 'than-hoa' || skillId === 'Thần Hỏa') {
+      const selectedCards = cardIds || options?.cardIds || [];
+      const cardId = selectedCards[0];
+      if (!cardId) {
+        throw new Error('[Thần Hỏa] Vui lòng chọn 1 lá bài Đỏ trên tay để chuyển hóa thành Hỏa Công!');
+      }
+      const card = player.hand.find(c => c.id === cardId);
+      if (!card) throw new Error('[Thần Hỏa] Không tìm thấy lá bài trên tay!');
+      const effColor = globalHeroRegistry.getEffectiveColor(player, card);
+      if (effColor !== 'red') throw new Error('[Thần Hỏa] Kỹ năng Thần Hỏa chỉ dùng được với lá bài Đỏ!');
+      const targetId = targets && targets[0];
+      if (targetId === undefined) throw new Error('[Thần Hỏa] Vui lòng chọn mục tiêu để Hỏa Công!');
+
+      return this.dispatchAction({
+        type: 'ACTION_PLAY_CARD',
+        payload: {
+          playerId,
+          cardId,
+          targetIds: [targetId],
+          virtualCardName: 'Hỏa Công',
+          asFireAttack: true
+        }
+      });
+    }
+
     const skill = this.heroRegistry.getSkill(skillId);
     if (skill) {
       const context = {
@@ -1736,6 +2394,9 @@ export class DispatcherV4 {
         options,
         state: this.state
       };
+      if (typeof skill.canUse === 'function' && !skill.canUse(this.state, context)) {
+        throw new Error(`[${skill.name || skillId}] Không đủ điều kiện để kích hoạt!`);
+      }
       skill.execute(this.state, context, this.state.priorityStack);
       this.state.addLog(`${player.name} kích hoạt kỹ năng [${skill.name || skillId}].`);
     } else {
@@ -1758,12 +2419,36 @@ export class DispatcherV4 {
       console.warn(`[DispatcherV4] Cannot end phase: Not player ${targetId}'s turn.`);
       return;
     }
-    this.stateMachine.endActionPhase();
+    if (this.state.currentPhase === PHASES.ACTION) {
+      this.stateMachine.endActionPhase();
+    } else if (this.state.currentPhase === PHASES.DISCARD) {
+      const player = this.state.getPlayer(targetId);
+      this.stateMachine._checkDiscardLimit(player);
+    } else if (this.state.currentPhase === PHASES.END) {
+      this.stateMachine.nextTurn();
+    }
   }
 
   _handleDiscard(payload = {}) {
     const targetId = payload.targetId !== undefined ? payload.targetId : payload.playerId;
-    this.stateMachine.handleDiscard(targetId, payload.cardIds || []);
+    if (this.state.currentPhase !== PHASES.DISCARD) {
+      console.warn(`[DispatcherV4] Bỏ qua lệnh bỏ bài từ player ${targetId} vì không ở pha DISCARD (hiện tại: ${this.state.currentPhase})`);
+      return;
+    }
+    const currentFrame = this.state.priorityStack.peek();
+    if (!currentFrame || currentFrame.type !== 'ASK_DISCARD') {
+      console.warn(`[DispatcherV4] Bỏ qua lệnh bỏ bài từ player ${targetId} vì không có frame ASK_DISCARD`);
+      return;
+    }
+    const player = this.state.getPlayer(targetId);
+    if (!player) return;
+    const required = Math.min(player.hand?.length || 0, currentFrame.context?.cardsToDiscard || 1);
+    let cardIds = Array.isArray(payload.cardIds) ? payload.cardIds.filter(cid => player.hand.some(c => c.id === cid)) : [];
+    if (cardIds.length !== required) {
+      console.warn(`[DispatcherV4] CardIds bỏ bài không khớp yêu cầu (${required} lá). Tự động chọn.`);
+      cardIds = (player.hand || []).slice(0, required).map(c => c.id);
+    }
+    this.stateMachine.handleDiscard(targetId, cardIds);
   }
 
   _handleRevealHero({ playerId, heroIndex }) {

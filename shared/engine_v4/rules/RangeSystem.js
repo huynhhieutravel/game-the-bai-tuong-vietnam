@@ -5,22 +5,23 @@
  */
 
 import { globalHeroRegistry, getPlayerGender } from '../heroes/HeroRegistry.js';
+import { normalizeEquipKey } from '../../utils/translationHelper.js';
 
 export const WEAPON_RANGE_MAP = {
   // Liên Nỏ (1)
-  'lien_no': 1, 'lien-no': 1, 'Liên Nỏ': 1,
+  'lien_no': 1, 'lien-no': 1, 'liên-nỏ': 1, 'Liên Nỏ': 1, 'crossbow': 1,
   // Song Kiếm (2)
-  'song_kiem': 2, 'song-kiem': 2, 'Song Kiếm': 2,
+  'song_kiem': 2, 'song-kiem': 2, 'song-kiếm': 2, 'Song Kiếm': 2, 'twin_swords': 2,
   // Quạt Sắt / Cổ Đĩnh Đao (2)
-  'quat_sat': 2, 'quat-sat': 2, 'Quạt Sắt': 2, 'co_dinh_dao': 2, 'Cổ Đĩnh Đao': 2,
+  'quat_sat': 2, 'quat-sat': 2, 'quạt-sắt': 2, 'Quạt Sắt': 2, 'co_dinh_dao': 2, 'co-dinh-dao': 2, 'cổ-đĩnh-đao': 2, 'Cổ Đĩnh Đao': 2, 'iron_fan': 2,
   // Thanh Long Đao (3)
-  'thanh_long_dao': 3, 'thanh-long-dao': 3, 'Thanh Long Đao': 3,
+  'thanh_long_dao': 3, 'thanh-long-dao': 3, 'thanh-long-đao': 3, 'Thanh Long Đao': 3, 'thanh_long': 3, 'dragon_blade': 3,
   // Rìu Đá / Quán Thạch Phủ (3)
-  'riu_da': 3, 'riu-da': 3, 'Rìu Đá': 3, 'quan_thach_phu': 3, 'Quán Thạch Phủ': 3,
+  'riu_da': 3, 'riu-da': 3, 'rìu-đá': 3, 'Rìu Đá': 3, 'quan_thach_phu': 3, 'quan-thach-phu': 3, 'quán-thạch-phủ': 3, 'Quán Thạch Phủ': 3, 'rock_axe': 3,
   // Phương Thiên Kích (4)
-  'phuong_thien_kich': 4, 'phuong-thien-kich': 4, 'Phương Thiên Kích': 4,
+  'phuong_thien_kich': 4, 'phuong-thien-kich': 4, 'phương-thiên-kích': 4, 'Phương Thiên Kích': 4, 'phuong_thien': 4, 'sky_halberd': 4,
   // Kỳ Lân Cung (5)
-  'ky_lan_cung': 5, 'ky-lan-cung': 5, 'Kỳ Lân Cung': 5
+  'ky_lan_cung': 5, 'ky-lan-cung': 5, 'kỳ-lân-cung': 5, 'Kỳ Lân Cung': 5, 'ky_lan': 5, 'kirin_bow': 5
 };
 
 export class RangeSystem {
@@ -34,11 +35,14 @@ export class RangeSystem {
   static calculateDistance(source, target, alivePlayers) {
     if (!source || !target || source.id === target.id) return 0;
 
+    if (!Array.isArray(alivePlayers) || alivePlayers.length === 0) return 999;
+
     const sourceIdx = alivePlayers.findIndex(p => p.id === source.id);
     const targetIdx = alivePlayers.findIndex(p => p.id === target.id);
 
     if (sourceIdx === -1 || targetIdx === -1) {
-      throw new Error(`[RangeSystem] Người chơi không tồn tại trong danh sách sống: ${source.id} -> ${target.id}`);
+      // Người chơi đã chết / không còn trong danh sách còn sống -> cự ly vô hạn (không thể với tới)
+      return 999;
     }
 
     const total = alivePlayers.length;
@@ -119,6 +123,10 @@ export class RangeSystem {
     if (weapon) {
       if (typeof weapon.range === 'number') {
         return weapon.range;
+      }
+      const canonicalKey = normalizeEquipKey(weapon);
+      if (WEAPON_RANGE_MAP[canonicalKey]) {
+        return WEAPON_RANGE_MAP[canonicalKey];
       }
       const rawName = weapon.idKey || weapon.name || weapon.key || weapon.id || '';
       if (WEAPON_RANGE_MAP[rawName]) {

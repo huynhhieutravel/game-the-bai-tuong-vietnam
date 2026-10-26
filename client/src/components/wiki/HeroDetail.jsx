@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { HEROES } from 'shared/data/gameData';
+import { normalizeSkillType } from 'shared/utils/translationHelper';
 import '../WikiPage.css'; // Reuse CSS
 
 export default function HeroDetail() {
@@ -52,15 +53,18 @@ export default function HeroDetail() {
           <h3 style={{ color: 'var(--color-text)', marginBottom: '20px', borderBottom: '1px dashed var(--color-border)', paddingBottom: '10px' }}>Kỹ năng</h3>
           
           <div className="hero-skills-detail" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {hero.skills.map((skill, idx) => (
+            {hero.skills.filter((s, idx, arr) => arr.findIndex(o => (o.id && o.id === s.id) || (o.name && o.name === s.name)) === idx).map((skill, idx) => (
               <div key={idx} className="skill-block" style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '8px', borderLeft: '3px solid var(--color-blue)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
                   <h4 style={{ color: 'var(--color-gold-light)', margin: 0, fontSize: '1.2rem' }}>{skill.name}</h4>
-                  {skill.type && (
-                    <span style={{ fontSize: '0.8rem', background: 'rgba(255,255,255,0.1)', padding: '3px 8px', borderRadius: '4px', fontStyle: 'italic', color: '#94a3b8' }}>
-                      {skill.type}
-                    </span>
-                  )}
+                  {skill.type && (() => {
+                    const norm = normalizeSkillType(skill.type);
+                    return (
+                      <span style={{ fontSize: '0.78rem', background: norm.badgeColor, color: '#ffffff', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
+                        {norm.label}
+                      </span>
+                    );
+                  })()}
                 </div>
                 
                 <p style={{ lineHeight: '1.6', margin: 0, color: 'var(--color-text-secondary)' }}>
@@ -73,11 +77,14 @@ export default function HeroDetail() {
                       <div key={sIdx} style={{ background: 'rgba(0,0,0,0.15)', padding: '15px', borderRadius: '6px', borderLeft: '2px dashed var(--color-gold-dark)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
                           <span style={{ color: 'var(--color-text)', fontWeight: 'bold' }}>☆ {sub.name}</span>
-                          {sub.type && (
-                            <span style={{ color: '#fbbf24', fontSize: '0.8rem', fontStyle: 'italic' }}>
-                              [{sub.type}]
-                            </span>
-                          )}
+                          {sub.type && (() => {
+                            const subNorm = normalizeSkillType(sub.type);
+                            return (
+                              <span style={{ fontSize: '0.72rem', background: subNorm.badgeColor, color: '#ffffff', padding: '1px 6px', borderRadius: '3px', fontWeight: 'bold' }}>
+                                {subNorm.label}
+                              </span>
+                            );
+                          })()}
                         </div>
                         <p style={{ fontSize: '0.9rem', color: '#cbd5e1', margin: 0, lineHeight: '1.5' }}>
                           {sub.desc}

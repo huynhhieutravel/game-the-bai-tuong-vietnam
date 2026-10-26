@@ -4,7 +4,7 @@ import { getFullPlayerName } from 'shared/utils/playerHelpers';
 import { CardSelector } from './CardSelector';
 
 import { getSuitEmoji } from 'shared/constants/cardTypes';
-import { hasSkillEvenIfHidden } from 'shared/engine_v4/application/index.js';
+import { hasSkillEvenIfHidden, getEffectiveColor } from 'shared/engine_v4/application/index.js';
 
 export function AskChangeJudgeModal({ req, gameState, onConfirm }) {
   const me = gameState.players.find(p => p.id === (req.responderId ?? req.currentActorId ?? (typeof window !== 'undefined' ? window.playerId : 0))) || gameState.players[0];
@@ -19,7 +19,7 @@ export function AskChangeJudgeModal({ req, gameState, onConfirm }) {
 
   const validCards = (me.hand || []).map((c, idx) => ({ ...c, idx })).filter(c => {
      if (skillId === 'ung-bien' || skillId === 'ung_bien') return true;
-     return c.color === 'black'; // Quân Cơ requires black card
+     return getEffectiveColor(me, c) === 'black'; // Quân Cơ requires effective black card
   });
 
   return (

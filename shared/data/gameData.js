@@ -208,7 +208,7 @@ export const HEROES = [
   {
     id: 'cong-chua-an-tu', name: 'Công chúa An Tư', maxHp: 3, faction: 'Hà', gender: 'Nữ', image: 'ha_cong-chua-an-tu.png',
     skills: [
-      { id: 'hoa-than-an-tu', name: 'Hòa Thân', desc: 'Trong giai đoạn Hành động, bạn có thể sử dụng một lá bài chất ♦ như [Lạc Bất Tư Thục].' },
+      { id: 'hoa-than-an-tu', name: 'Hòa Thân', type: 'active', desc: 'Trong giai đoạn Hành động, bạn có thể sử dụng một lá bài chất ♦ như [Lạc Bất Tư Thục].' },
       { id: 'xa-than', name: 'Xả Thân', desc: 'Khi bạn trở thành mục tiêu của [Chém], bạn có thể bỏ đi một lá bài và đem lá [Chém] này di chuyển sang một người chơi khác nằm trong phạm vi công kích của bạn.' },
     ], bio: '',
   },
@@ -289,15 +289,17 @@ export const getCardSubType = (card) => {
   if (!card || typeof card !== 'object' || card.name === undefined) {
     throw new Error(`[Type Error] getCardSubType expects a card object, got: ${typeof card} (value: ${card})`);
   }
-  if (card.type === CARD_TYPES.TRICK) {
-    if (['Sấm Sét', 'Hỗn Loạn'].includes(card.name)) return CARD_SUBTYPES.TRICK_DELAYED;
+  if (card.subtype || card.subType) return card.subtype || card.subType;
+  if (card.type === CARD_TYPES.TRICK || card.type === 'trick') {
+    if (['Sấm Sét', 'Hỗn Loạn'].some(n => card.name?.includes(n))) return CARD_SUBTYPES.TRICK_DELAYED;
     return CARD_SUBTYPES.TRICK_NORMAL;
   }
-  if (card.type === CARD_TYPES.EQUIP) {
-    if (card.subtype) return card.subtype;
-    if (card.name.includes('-1')) return CARD_SUBTYPES.EQUIP_MOUNT_ATK;
-    if (card.name.includes('+1')) return CARD_SUBTYPES.EQUIP_MOUNT_DEF;
-    if (['Bát Quái', 'Hắc Thuẫn', 'Bạch Ngân', 'Bạch Ngân Sư Tử'].some(n => card.name.includes(n))) return CARD_SUBTYPES.EQUIP_ARMOR;
+  const typeStr = String(card.type || '').toLowerCase();
+  if (typeStr.startsWith('equip') || typeStr === 'weapon' || typeStr === 'armor' || typeStr === 'horse' || typeStr === 'mount') {
+    if (card.name?.includes('-1') || card.id?.includes('ngua_chien') || card.id?.includes('ngua-chien')) return CARD_SUBTYPES.EQUIP_MOUNT_ATK;
+    if (card.name?.includes('+1') || card.id?.includes('ngua_than') || card.id?.includes('ngua-than')) return CARD_SUBTYPES.EQUIP_MOUNT_DEF;
+    if (['Bát Quái', 'Hắc Thuẫn', 'Bạch Ngân', 'Bạch Ngân Sư Tử'].some(n => card.name?.includes(n)) || typeStr === 'armor') return CARD_SUBTYPES.EQUIP_ARMOR;
+    if (typeStr === 'weapon') return CARD_SUBTYPES.EQUIP_WEAPON;
     return CARD_SUBTYPES.EQUIP_WEAPON;
   }
   return null;

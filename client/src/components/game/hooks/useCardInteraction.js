@@ -2,7 +2,7 @@
 import { useCallback, useState } from 'react';
 import { CARD_TYPES, CARD_SUITS } from 'shared/constants/cardTypes';
 import { getTargetingDefinition, getAvailableTargets, canPlayCard } from 'shared/engine_v4/rules/TargetResolverV4.js';
-import { hasSkill } from 'shared/engine_v4/application/index.js';
+import { hasSkill, getEffectiveSuit, getEffectiveColor } from 'shared/engine_v4/application/index.js';
 import { PHASES } from 'shared/data/gameData';
 
 /**
@@ -28,12 +28,26 @@ export function useCardInteraction(props) {
         const player = gameState.players.find(p => p.id === mainPlayerId);
         const card = player?.hand[cardIndex];
         if (!card) return;
+
+        const NON_CONVERTING_TARGETED_SKILLS = ['Tâm Công', 'Vân Đồn', 'Duyên Thơ', 'Tiên Phong', 'Bọc Trăm Trứng', 'Bọc Trăm Trứng (Chủ Công Kỹ)'];
+        if (activeSkill && NON_CONVERTING_TARGETED_SKILLS.includes(activeSkill)) {
+            if (activeSkill === 'Tâm Công') {
+                gameAPI.addLog('🔮 [Tâm Công] Đối thủ sẽ tự động rút ngẫu nhiên 1 lá bài từ tay bạn! Hãy nhấp chọn TƯỚNG MỤC TIÊU trên bàn cờ.', 'warning');
+            } else {
+                gameAPI.addLog(`🎯 Bạn đang dùng [${activeSkill}]. Hãy nhấp chọn TƯỚNG MỤC TIÊU trên bàn cờ!`, 'warning');
+            }
+            return;
+        }
         
         // If an active skill is selected, handle card conversion
         let virtualName = null;
         if (activeSkill) {
+          const effColor = getEffectiveColor(player, card);
+          const effSuit = getEffectiveSuit(player, card);
+
           if (activeSkill === 'Tiên Duyên') {
-              if (card.suit !== CARD_SUITS.CLUB) {
+              const isClub = effSuit === CARD_SUITS.CLUB || effSuit === 'club' || effSuit === '♣' || effSuit === 'clubs' || effSuit === 'chuồn';
+              if (!isClub) {
                   gameAPI.addLog('Tiên Duyên chỉ dùng được với bài ♣ (Chuồn)!', 'danger');
                   return;
               }
@@ -50,7 +64,7 @@ export function useCardInteraction(props) {
               return;
           }
           if (activeSkill === 'Khai Thiên') {
-              if (card.color !== 'red') {
+              if (effColor !== 'red') {
                   gameAPI.addLog('Khai Thiên chỉ dùng được với bài màu Đỏ!', 'danger');
                   return;
               }
@@ -74,7 +88,7 @@ export function useCardInteraction(props) {
               return;
           }
           if (activeSkill === 'Thần Hỏa') {
-              if (card.color !== 'red') {
+              if (effColor !== 'red') {
                   gameAPI.addLog('Thần Hỏa chỉ dùng được với bài ĐỎ!', 'danger');
                   return;
               }
@@ -82,17 +96,36 @@ export function useCardInteraction(props) {
               // Không return, để logic bên dưới (dòng 93) tự set targetingDef dựa trên 'Hỏa Công'
           }
     
-          if (activeSkill === 'Kỳ Tập' && card.color === 'black') virtualName = 'Tước Bài';
+          if (activeSkill === 'Kỳ Tập') {
+            if (effColor !== 'black') {
+              gameAPI.addLog('Kỳ Tập chỉ dùng được với bài màu ĐEN!', 'danger');
+              return;
+            }
+            virtualName = 'Tước Bài';
+          }
           if (activeSkill === 'Dời Núi') {
             if (card.name === 'Né') virtualName = 'Chém';
-            if (card.name === 'Chém') virtualName = 'Né';
+            else if (card.name === 'Chém') virtualName = 'Né';
+            else {
+              gameAPI.addLog('Dời Núi chỉ áp dụng chuyển đổi cho lá [Chém] hoặc [Né]!', 'danger');
+              return;
+            }
           }
           if (activeSkill === 'Phá Thành') {
-            // Kiểm tra khác màu với phaThanhColor
             const p = gameState.players.find(p => p.id === mainPlayerId);
-            if (p && p.phaThanhColor && card.color !== p.phaThanhColor) {
-               virtualName = 'Quyết Đấu';
+            if (!p || !p.phaThanhColor || effColor === p.phaThanhColor) {
+              gameAPI.addLog('Phá Thành chỉ dùng được với bài KHÁC MÀU lá phán xét!', 'danger');
+              return;
             }
+            virtualName = 'Quyết Đấu';
+          }
+          if ((activeSkill === 'Hòa Thân' || activeSkill === 'hoa_than_an_tu') && player && hasSkill(player, 'hoa_than_an_tu')) {
+            const isDiamond = effSuit === 'diamond' || effSuit === 'diamonds' || effSuit === '♦' || effSuit === 'rô';
+            if (!isDiamond) {
+              gameAPI.addLog('Hòa Thân (An Tư) chỉ dùng được với bài chất Rô ♦!', 'danger');
+              return;
+            }
+            virtualName = 'Hỗn Loạn';
           }
         }
     
@@ -101,6 +134,13 @@ export function useCardInteraction(props) {
         // If clicking the same card again, cancel targeting
         if (targetSession && targetSession.cardIndex === cardIndex && targetSession.virtualCardName === virtualName) {
             cancelTargeting();
+            return;
+        }
+
+        // Lá Hóa Giải và Né chỉ dùng để phản ứng, không thể mở session tự dùng trong lượt
+        const isReactionOnlyCard = (card.name === 'Hóa Giải' || card.idKey === 'hoa_giai' || (!virtualName && (card.name === 'Né' || card.idKey === 'ne')));
+        if (isReactionOnlyCard && !activeSkill) {
+            gameAPI.addLog(`🛡️ Lá [${card.name}] chỉ có thể sử dụng khi phản ứng yêu cầu, không thể chủ động đánh ra trong lượt!`, 'warning');
             return;
         }
 
@@ -120,7 +160,10 @@ export function useCardInteraction(props) {
            // Needs target selection
            let defaultMsg = '🎯 HÃY CHỌN 1 MỤC TIÊU! 🎯';
            if (targetingDef.type === 'multiple') {
-               defaultMsg = `🎯 CHỌN ${targetingDef.min} - ${targetingDef.max} MỤC TIÊU! 🎯`;
+               const isXiengXich = virtualName === 'Xiềng Xích' || card.name === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
+               defaultMsg = isXiengXich
+                   ? `Đã chọn 0/${targetingDef.max || 2} mục tiêu (Bấm "Rèn Lại" nếu không khóa ai)`
+                   : `Đã chọn 0/${targetingDef.max || 2} mục tiêu (Chọn từ ${targetingDef.min} - ${targetingDef.max})`;
            }
            setTargetSession({
                cardIndex,
@@ -156,7 +199,7 @@ export function useCardInteraction(props) {
         const discardCount = gameState?.waitingForResponse?.type === 'discard_phase' ? gameState.waitingForResponse.amount : 0;
         if (selectedDiscards.length !== discardCount) return;
     
-        const cardIds = selectedDiscards.map(idx => player.hand[idx].id);
+        const cardIds = selectedDiscards.map(idx => player.hand[idx]?.id).filter(Boolean);
         if (!gameAPI) return;
         gameAPI.discardCards(mainPlayerId, cardIds);
         

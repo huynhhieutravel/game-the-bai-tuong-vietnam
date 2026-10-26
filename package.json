@@ -2,18 +2,22 @@
   "name": "game-vietnam-the-bai",
   "private": true,
   "scripts": {
-    "test": "vitest run",
-    "test:all": "vitest run && npm run sim:app",
+    "test": "node shared/engine_v4/__tests__/audit_39_heroes.mjs && node shared/engine_v4/__tests__/audit_canonical_equip_usage.mjs && vitest run",
+    "qa:full": "node shared/engine_v4/__tests__/audit_39_heroes.mjs && node shared/engine_v4/__tests__/audit_canonical_equip_usage.mjs && vitest run shared/engine_v4/__tests__/application/ViewModelContractGuard.test.js client/src/components/__tests__/ModalContainerIntegrationQA.test.jsx shared/engine_v4/__tests__/simulation/HybridHumanBotSimulation.test.js && npm test",
+    "test:all": "node shared/engine_v4/__tests__/audit_39_heroes.mjs && node shared/engine_v4/__tests__/audit_canonical_equip_usage.mjs && vitest run && npm run sim:dual && npm run sim:app",
     "test:v4": "vitest run shared/engine_v4/",
     "test:client": "vitest run client/",
     "build": "npm run build --workspace=client",
     "dev": "npm run dev --workspace=client",
-    "cap:build": "npm run sim:app && npm run cap:build --workspace=client",
+    "cap:build": "node shared/engine_v4/__tests__/audit_39_heroes.mjs && npm run sim:app && npm run cap:build --workspace=client",
     "cap:sync": "npm run cap:sync --workspace=client",
     "cap:android": "npm run cap:android --workspace=client",
     "cap:ios": "npm run cap:ios --workspace=client",
     "sim:core": "node shared/engine_v4/simulation/run_1000_matches.mjs",
-    "sim:app": "node shared/engine_v4/simulation/run_application_layer_stress_test.mjs"
+    "sim:hybrid": "node shared/engine_v4/simulation/run_1000_hybrid_matches.mjs",
+    "qa:1000": "node shared/engine_v4/simulation/run_1000_matches.mjs && node shared/engine_v4/simulation/run_1000_hybrid_matches.mjs",
+    "sim:app": "node shared/engine_v4/simulation/run_application_layer_stress_test.mjs",
+    "sim:dual": "node shared/engine_v4/simulation/fuzz_dual_heroes.mjs"
   },
   "workspaces": [
     "client",

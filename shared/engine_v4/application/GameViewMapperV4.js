@@ -10,22 +10,22 @@ import { RangeSystem } from '../rules/RangeSystem.js';
 import { PHASES } from '../../constants/phases.js';
 import { SkillDescriptions, SkillIdToName } from '../../data/SkillDescriptions.js';
 import { getFullPlayerName } from '../../utils/playerHelpers.js';
+import { 
+  normalizeSkillType, 
+  getCanonicalFaction, 
+  getFactionLabel, 
+  getPlayerGender, 
+  normalizePhase,
+  isEquip,
+  isTrick,
+  isBasicCard
+} from '../../utils/translationHelper.js';
 
 /**
- * Chuyển đổi Phase từ v4 (IN HOA) sang constant của UI (thường)
+ * Chuyển đổi Phase từ v4 (IN HOA) hoặc tiếng Việt sang constant của UI (thường)
  */
 function mapPhaseToUI(v4Phase) {
-  if (!v4Phase) return PHASES.ACTION;
-  switch (v4Phase) {
-    case 'BEGIN': return PHASES.START;
-    case 'JUDGE': return PHASES.JUDGEMENT;
-    case 'DRAW': return PHASES.DRAW;
-    case 'ACTION': return PHASES.ACTION;
-    case 'DISCARD': return PHASES.DISCARD;
-    case 'END': return PHASES.END;
-    case 'draft': return PHASES.DRAFT;
-    default: return v4Phase.toLowerCase();
-  }
+  return normalizePhase(v4Phase);
 }
 
 /**
@@ -112,29 +112,33 @@ export function toViewModel(state, mainPlayerId = 0) {
           ...frame.context
         };
       } else if (frame.type === 'ASK_SLASH_DUEL') {
+        const currentResponder = frame.currentActorId ?? frame.context?.currentResponderId ?? frame.priorityQueue?.[0] ?? frame.targetId;
+        const opponentId = currentResponder === frame.context?.attackerId ? frame.targetId : (frame.context?.attackerId ?? frame.sourceId);
         vm.waitingForResponse = {
           id: frame.id,
           type: 'ask_slash',
           reason: 'quyet-dau',
           trickType: 'duel',
-          responderId: frame.currentActorId || frame.context?.currentResponderId || frame.targetId,
           sourceId: frame.sourceId,
           targetId: frame.targetId,
-          duelTargetId: frame.context?.attackerId === frame.currentActorId ? frame.targetId : frame.sourceId,
+          duelTargetId: opponentId,
+          opponentId,
           askQueue: [...(frame.priorityQueue || [])],
-          ...frame.context
+          ...frame.context,
+          responderId: currentResponder
         };
       } else if (frame.type === 'ASK_SLASH_RESPONSE') {
+        const currentResponder = frame.currentActorId ?? frame.priorityQueue?.[0] ?? frame.targetId;
         vm.waitingForResponse = {
           id: frame.id,
           type: 'ask_slash',
           reason: frame.context?.reason || 'nam-man',
           trickType: frame.context?.trickType || 'barbarian',
-          responderId: frame.currentActorId || frame.targetId,
           sourceId: frame.sourceId,
           targetId: frame.targetId,
           askQueue: [...(frame.priorityQueue || [])],
-          ...frame.context
+          ...frame.context,
+          responderId: currentResponder
         };
       } else if (frame.type === 'ASK_CHANGE_JUDGE') {
         const actor = state.getPlayer ? state.getPlayer(frame.currentActorId) : (state.players || []).find(p => p.id === frame.currentActorId);
@@ -143,24 +147,25 @@ export function toViewModel(state, mainPlayerId = 0) {
         vm.waitingForResponse = {
           id: frame.id,
           type: 'ask_change_judge',
-          responderId: frame.currentActorId,
           sourceId: frame.sourceId,
           targetId: frame.targetId,
           reason: frame.context?.reason,
           judgeCard: frame.context?.judgeCard,
           skills: resolvedSkills,
           askQueue: [...(frame.priorityQueue || [])],
-          ...frame.context
+          ...frame.context,
+          responderId: frame.currentActorId
         };
       } else if (frame.type === 'ASK_HAU_VIEN') {
+        const currentResponder = frame.currentActorId ?? frame.sourceId;
         vm.waitingForResponse = {
           id: frame.id,
           type: 'ask_hau_vien',
           sourceId: frame.sourceId,
-          responderId: frame.currentActorId || frame.sourceId,
           targets: frame.context?.targets || [],
           askQueue: [...(frame.priorityQueue || [])],
-          ...frame.context
+          ...frame.context,
+          responderId: currentResponder
         };
       } else if (frame.type === 'ASK_BOC_TRAM_TRUNG_DODGE') {
         vm.waitingForResponse = {
@@ -388,10 +393,96 @@ export function toViewModel(state, mainPlayerId = 0) {
           responderId: frame.currentActorId,
           ...frame.context
         };
+      } else if (frame.type === 'ASK_HOA_THAN_AN_TU') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_hoa_than_an_tu',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_CAN_GIAN') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_can_gian',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_THONG_NGON') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_thong_ngon',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_PHAT_TAM') {
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_phat_tam',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          responderId: frame.currentActorId,
+          ...frame.context
+        };
+      } else if (frame.type === 'ASK_WEAPON_SKILL') {
+        const isSongKiem = frame.context?.weapon === 'Song Kiếm' || isEquip(frame.context?.weapon, 'song_kiem');
+        const currentResponder = frame.currentActorId ?? (isSongKiem ? frame.targetId : frame.sourceId);
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_weapon_skill',
+          weapon: frame.context?.weapon || frame.context?.weaponName,
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          askQueue: [...(frame.priorityQueue || [])],
+          ...frame.context,
+          responderId: currentResponder
+        };
+      } else if (frame.type === 'ASK_DISMANTLE') {
+        const currentResponder = frame.currentActorId ?? frame.sourceId;
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_dismantle',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          ...frame.context,
+          responderId: currentResponder
+        };
+      } else if (frame.type === 'ASK_SNATCH') {
+        const currentResponder = frame.currentActorId ?? frame.sourceId;
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_snatch',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          ...frame.context,
+          responderId: currentResponder
+        };
+      } else if (frame.type === 'ASK_NEGATE') {
+        const actorId = frame.currentActorId ?? frame.priorityQueue?.[0] ?? frame.targetId ?? frame.sourceId;
+        vm.waitingForResponse = {
+          id: frame.id,
+          type: 'ask_negate',
+          sourceId: frame.sourceId,
+          targetId: frame.targetId,
+          card: frame.context?.card,
+          delayedCard: frame.context?.delayedCard,
+          isJudgementNegate: Boolean(frame.context?.isJudgementNegate),
+          isNegated: (frame.context?.negateCount || 0) % 2 === 1,
+          lastNegaterId: frame.context?.lastNegaterId,
+          askQueue: [...(frame.priorityQueue || [])],
+          ...frame.context,
+          responderId: actorId
+        };
       } else {
         const isDiscard = frame.type === 'ASK_DISCARD';
         const frameType = isDiscard ? 'discard_phase' : frame.type.toLowerCase();
         const amount = frame.context?.cardsToDiscard || 1;
+        const currentResponder = frame.currentActorId ?? frame.priorityQueue?.[0] ?? frame.targetId ?? frame.sourceId;
 
         vm.waitingForResponse = {
           id: frame.id,
@@ -399,13 +490,26 @@ export function toViewModel(state, mainPlayerId = 0) {
           reason: frame.context?.reason || (frame.type === 'ASK_DODGE' ? 'chem' : frameType),
           amount,
           cardsToDiscard: amount,
-          responderId: frame.currentActorId ?? frame.priorityQueue?.[0] ?? frame.targetId ?? frame.sourceId,
           sourceId: frame.sourceId,
           targetId: frame.targetId,
           askQueue: [...(frame.priorityQueue || [])],
           baguaAvailable: !frame.context?.baguaAttempted,
-          ...frame.context
+          ...frame.context,
+          responderId: currentResponder
         };
+      }
+
+      // BẢO VỆ TUYỆT ĐỐI HỢP ĐỒNG (ADR 0080): responderId KHÔNG BAO GIỜ bị context rác ghi đè
+      if (vm.waitingForResponse) {
+        const canonicalResponder = frame.currentActorId ?? 
+          frame.context?.currentResponderId ?? 
+          ((frame.context?.weapon === 'Song Kiếm' || isEquip(frame.context?.weapon, 'song_kiem')) ? frame.targetId : undefined) ??
+          frame.priorityQueue?.[0] ?? 
+          frame.targetId ?? 
+          frame.sourceId;
+        if (canonicalResponder !== undefined && canonicalResponder !== null) {
+          vm.waitingForResponse.responderId = canonicalResponder;
+        }
       }
     }
   } else if (state.waitingForResponse) {
@@ -430,18 +534,54 @@ export function toViewModel(state, mainPlayerId = 0) {
       const hero = globalHeroRegistry.getHero(heroId);
       if (!hero) return { name: heroId, skills: [] };
 
-      const resolvedSkills = (hero.skills || []).map(skill => {
+      const seenSkillKeys = new Set();
+      const uniqueSkills = (hero.skills || []).filter(skill => {
+        const key = skill.name || SkillIdToName[skill.id] || skill.id;
+        if (seenSkillKeys.has(key)) return false;
+        seenSkillKeys.add(key);
+        return true;
+      });
+
+      const resolvedSkills = uniqueSkills.map(skill => {
         const skillId = skill.id;
         const realName = skill.name || SkillIdToName[skillId] || skillId;
-        const baseName = SkillIdToName[skillId] || realName;
-        const desc = skill.description || SkillDescriptions[skillId] || SkillDescriptions[realName] || SkillDescriptions[baseName] || '(Chưa có mô tả)';
+        const canonicalDesc = SkillDescriptions[skillId] 
+          || SkillDescriptions[skillId?.replace(/_/g, '-')]
+          || SkillDescriptions[skillId?.replace(/-/g, '_')]
+          || SkillDescriptions[realName] 
+          || SkillDescriptions[baseName];
+        const desc = canonicalDesc || skill.description || '(Chưa có mô tả)';
+        let isUsable = true;
+        let disableReason = null;
+        if (typeof skill.canUse === 'function') {
+          try {
+            const can = skill.canUse(state, { owner: p, ownerId: p.id, actorId: p.id });
+            if (!can) {
+              isUsable = false;
+              disableReason = p.skillUsage?.[skillId]?.usedThisTurn ? 'Đã sử dụng trong lượt này' : 'Không đủ điều kiện kích hoạt';
+            }
+          } catch (_) {
+            isUsable = true;
+          }
+        }
+
+        const normType = normalizeSkillType(skill.type || (skill.trigger ? 'reactive' : (skill.frequency === 'limited' ? 'limited' : 'active')));
+
         return {
           id: skillId,
           name: realName,
           desc,
-          type: (skill.type || '').toUpperCase(),
-          isUsable: true,
-          disableReason: null
+          type: normType.label,
+          typeLabel: normType.label,
+          typeCode: normType.code,
+          rawType: normType.code,
+          typeBadgeColor: normType.badgeColor,
+          isActive: normType.isActive,
+          isPassive: normType.isPassive,
+          isLock: normType.isLock,
+          isLimited: normType.isLimited,
+          isUsable,
+          disableReason
         };
       });
 
@@ -528,14 +668,26 @@ export function toViewModel(state, mainPlayerId = 0) {
 
     // Tính toán tầm đánh & cự ly
     pVM.distances = {};
-    alivePlayers.forEach(other => {
-      if (other.id !== p.id) {
-        pVM.distances[other.id] = RangeSystem.calculateDistance(p, other, alivePlayers);
-      }
-    });
+    if (p.isAlive) {
+      alivePlayers.forEach(other => {
+        if (other.id !== p.id) {
+          try {
+            pVM.distances[other.id] = RangeSystem.calculateDistance(p, other, alivePlayers);
+          } catch (_) {
+            pVM.distances[other.id] = 999;
+          }
+        }
+      });
+    }
 
     pVM.attackRange = RangeSystem.getAttackRange(p);
-    pVM.distanceFromMe = me ? RangeSystem.calculateDistance(me, p, alivePlayers) : 1;
+    try {
+      pVM.distanceFromMe = (me && p.isAlive && me.isAlive)
+        ? RangeSystem.calculateDistance(me, p, alivePlayers)
+        : (p.isAlive ? 1 : '-');
+    } catch (_) {
+      pVM.distanceFromMe = p.isAlive ? 1 : '-';
+    }
 
     // Tính toán isPlayable cho từng lá bài trên tay
     pVM.hand = (p.hand || []).map(card => {
@@ -545,12 +697,23 @@ export function toViewModel(state, mainPlayerId = 0) {
       if (vmPhase !== PHASES.ACTION || state.currentTurnPlayerId !== p.id) {
         isPlayable = false;
         unplayableReason = 'Chưa tới pha Hành Động của bạn';
-      } else if (card.type === 'dodge' || card.name === 'Né') {
+      } else if (isBasicCard(card, 'ne')) {
         isPlayable = false;
         unplayableReason = 'Không thể chủ động sử dụng lá Né trong lượt';
-      } else if (card.type === 'slash' || card.name === 'Chém') {
-        const weaponId = p.equipment?.weapon?.id || p.equipment?.weapon?.key || p.equipment?.weapon?.name || '';
-        const hasCrossbow = weaponId === 'crossbow' || weaponId === 'lien-no' || weaponId === 'Liên Nỏ' || weaponId.includes('lien_no');
+      } else if (isTrick(card, 'hoa_giai') || card.type === 'negate') {
+        isPlayable = false;
+        unplayableReason = 'Lá [Hóa Giải] chỉ có thể sử dụng khi phản ứng cẩm nang';
+      } else if (isBasicCard(card, 'chem')) {
+        const weapon = p.equipment?.weapon;
+        const weaponName = weapon?.name || '';
+        const weaponId = String(weapon?.id || weapon?.idKey || weapon?.key || '');
+        const hasCrossbow = isEquip(weapon, 'lien_no') ||
+          weaponName === 'Liên Nỏ' || 
+          weaponId === 'crossbow' || 
+          weaponId.includes('lien-no') || 
+          weaponId.includes('liên-nỏ') || 
+          weaponId.includes('lien_no') ||
+          Boolean(p.temporaryFlags?.unlimitedSlash);
         const maxSlashes = p.temporaryFlags?.vanDonWin ? 2 : 1;
 
         if (p.temporaryFlags?.vanDonLose) {
@@ -566,6 +729,9 @@ export function toViewModel(state, mainPlayerId = 0) {
       } else if ((card.type === 'wine' || card.name === 'Rượu') && (p.turnStats?.wineCount || 0) >= 1) {
         isPlayable = false;
         unplayableReason = 'Mỗi lượt chỉ được uống Rượu 1 lần trong pha Hành động';
+      } else if ((card.name === 'Sấm Sét' || card.idKey === 'sam_set') && p.judgementArea?.some(c => c.name === 'Sấm Sét' || c.idKey === 'sam_set' || c.idKey === 'sam-set')) {
+        isPlayable = false;
+        unplayableReason = 'Bạn đã có Sấm Sét trong khu phán xét';
       }
 
       return {
@@ -578,10 +744,19 @@ export function toViewModel(state, mainPlayerId = 0) {
     pVM.hpText = `${p.hp}/${p.maxHp}`;
     pVM.displayName = getFullPlayerName(p);
     pVM.isRevealed = Boolean(pVM.revealedHeroes && pVM.revealedHeroes.some(Boolean));
+    const rawFac = p.faction || hero1?.faction || 'lac';
+    pVM.canonicalFaction = getCanonicalFaction(rawFac);
+    pVM.rawFaction = pVM.canonicalFaction;
     if (!isSelf && !isGameOver && !pVM.isRevealed) {
       pVM.faction = 'none';
+      pVM.rawFaction = 'none';
+      pVM.canonicalFaction = 'none';
+    } else if (pVM.isDaTam) {
+      pVM.faction = 'Dã Tâm';
+      pVM.canonicalFaction = 'datam';
+      pVM.rawFaction = 'datam';
     } else {
-      pVM.faction = p.faction || hero1?.faction || 'Lạc';
+      pVM.faction = getFactionLabel(pVM.canonicalFaction);
     }
 
     return pVM;
@@ -589,3 +764,6 @@ export function toViewModel(state, mainPlayerId = 0) {
 
   return vm;
 }
+
+export const GameViewMapperV4 = { toViewModel };
+

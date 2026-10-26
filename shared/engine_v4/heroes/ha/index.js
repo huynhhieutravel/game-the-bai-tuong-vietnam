@@ -73,6 +73,7 @@ export const YetKieu = {
       id: 'lan_sau',
       name: 'Lặn Sâu',
       type: 'active',
+      frequency: 'unlimited',
       description: 'Trong giai đoạn Hành động, bạn có thể mất 1 điểm Sinh lực, sau đó rút 2 lá bài.',
       canUse: (state, ctx) => ctx.owner.hp > 1,
       execute: (state, ctx) => {
@@ -155,12 +156,6 @@ export const ToHienThanh = {
       name: 'Nhiếp Chính',
       type: 'lock',
       description: 'Tỏa Định Kỹ: Nếu trong giai đoạn Hành động bạn không sử dụng hoặc đánh ra [Chém], thì bạn có thể bỏ qua giai đoạn Bỏ bài (giữ toàn bộ bài trên tay).'
-    }),
-    new SkillContract({
-      id: 'nhiep_chinh_to_hien_thanh',
-      name: 'Nhiếp Chính',
-      type: 'lock',
-      description: 'Alias hỗ trợ backward compatibility cho Nhiếp Chính.'
     })
   ]
 };

@@ -37,8 +37,7 @@ describe('TrickRules v4 (Cẩm Nang & Hóa Giải)', () => {
     TrickRules.respondNegate(state, 1, negateCard);
 
     // Tiếp tục hỏi người khác để xem có Hóa Giải lá Hóa Giải không:
-    // p1 pass, p2 pass, p0 pass -> Hết vòng
-    TrickRules.respondNegate(state, 1, null);
+    // p2 pass, p0 pass -> Hết vòng
     TrickRules.respondNegate(state, 2, null);
     const finalRes = TrickRules.respondNegate(state, 0, null);
 
@@ -68,12 +67,10 @@ describe('TrickRules v4 (Cẩm Nang & Hóa Giải)', () => {
     // Lần 2: p0 Hóa Giải lá Hóa Giải của p1!
     const neg2 = { id: 'neg_2', name: 'Hóa Giải 2' };
     p0.hand.push(neg2);
-    TrickRules.respondNegate(state, 1, null);
     TrickRules.respondNegate(state, 2, null);
     TrickRules.respondNegate(state, 0, neg2);
 
-    // Không ai hóa giải thêm: p0, p1, p2 đều pass
-    TrickRules.respondNegate(state, 0, null);
+    // Không ai hóa giải thêm: p1, p2 đều pass
     TrickRules.respondNegate(state, 1, null);
     const res = TrickRules.respondNegate(state, 2, null);
 

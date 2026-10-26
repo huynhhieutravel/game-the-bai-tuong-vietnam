@@ -1,7 +1,7 @@
 import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
 import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
-import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine_v4/application/index.js';
+import { hasSkill, hasSkillEvenIfHidden, getEffectiveColor } from 'shared/engine_v4/application/index.js';
 
 export function AskBocTramTrungDodgeModal({ req, gameState, onConfirm }) {
    const me = gameState.players.find(p => p.id === (req.responderId ?? req.currentActorId ?? (typeof window !== 'undefined' ? window.playerId : 0))) || gameState.players[0];
@@ -17,13 +17,13 @@ export function AskBocTramTrungDodgeModal({ req, gameState, onConfirm }) {
    const dodges = me.hand.map((c, i) => ({...c, index: i})).filter(c => {
        if (c.name === 'Né') return true;
        if (hasDoiNui && c.name === 'Chém') return true;
-       if (hasThinhChinh && c.color === 'black' && c.name !== 'Né') return true;
+       if (hasThinhChinh && getEffectiveColor(me, c) === 'black' && c.name !== 'Né') return true;
        return false;
    }).map(c => ({
       ...c,
       virtualReason: c.name !== expectedCard ? (
          (hasDoiNui && c.name === 'Chém') ? 'Dời Núi' :
-         (hasThinhChinh && c.color === 'black' && c.name !== 'Né') ? 'Nhiếp Chính' : null
+         (hasThinhChinh && getEffectiveColor(me, c) === 'black' && c.name !== 'Né') ? 'Thính Chính' : null
       ) : null
    }));
    

@@ -1,108 +1,191 @@
-import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
-import { getFullPlayerName, getHeroNameStr } from 'shared/utils/playerHelpers';
+import { getSuitEmoji } from 'shared/constants/cardTypes';
+import { getFullPlayerName } from 'shared/utils/playerHelpers';
 
 export function DuongQuanModal({ req, gameState, onConfirm }) {
-  const me = gameState.players.find(p => p.id === req.sourceId);
-  const validTargets = gameState.players.filter(p => p.id !== me.id && p.isAlive);
-  
-  // Equipments that can be discarded for Option 2
-  const myEquips = me.equipment ? Object.values(me.equipment).filter(c => c !== null) : [];
+  const me = gameState?.players?.find(p => p.id === req.responderId) ||
+             gameState?.players?.find(p => p.id === req.sourceId) ||
+             gameState?.players?.[0];
 
-  const [opt1, setOpt1] = useState(false);
-  const [opt1Target, setOpt1Target] = useState('');
-  
-  const [opt2, setOpt2] = useState(false);
-  const [opt2Target, setOpt2Target] = useState('');
-  const [opt2Equip, setOpt2Equip] = useState('');
-  
-  const [opt3, setOpt3] = useState(false);
-  const [opt3Target, setOpt3Target] = useState('');
+  const validTargets = (req.validTargets && req.validTargets.length > 0)
+    ? (gameState?.players || []).filter(p => req.validTargets.includes(p.id) && p.isAlive)
+    : (gameState?.players || []).filter(p => p.id !== me?.id && p.isAlive);
 
-  const handleConfirm = () => {
-      const choices = [];
-      if (opt1) choices.push({ type: 'opt1', targetId: parseInt(opt1Target) });
-      if (opt2) choices.push({ type: 'opt2', targetId: parseInt(opt2Target), equipId: opt2Equip });
-      if (opt3) choices.push({ type: 'opt3', targetId: parseInt(opt3Target) });
-      
-      onConfirm({ doUse: choices.length > 0, choices });
-  };
+  // Equipments that can be discarded for Option 2 (from hand or equipped)
+  const myEquips = [
+    ...(me?.hand ? me.hand.filter(c => c.type === 'equip' || c.type === 'EQUIP') : []),
+    ...(me?.equipment ? (Array.isArray(me.equipment) ? me.equipment.filter(Boolean) : Object.values(me.equipment).filter(Boolean)) : [])
+  ];
 
-  const isConfirmDisabled = () => {
-      if (!opt1 && !opt2 && !opt3) return false; // Can confirm without using skill
-      if (opt1 && !opt1Target) return true;
-      if (opt2 && (!opt2Target || !opt2Equip)) return true;
-      if (opt3 && !opt3Target) return true;
-      return false;
-  };
+  const reqType = req?.type;
+  const isOpt1 = reqType === 'ask_duong_quan_1' || (reqType === 'ask_duong_quan' && gameState?.currentPhase === 'BEGIN');
+  const isOpt3 = reqType === 'ask_duong_quan_3' || (reqType === 'ask_duong_quan' && gameState?.currentPhase === 'DISCARD');
 
+  const [selectedTarget, setSelectedTarget] = useState(validTargets[0]?.id !== undefined ? String(validTargets[0].id) : '');
+  const [selectedEquip, setSelectedEquip] = useState(myEquips[0]?.id !== undefined ? String(myEquips[0].id) : '');
+
+  // Render Option 1: Giai đoạn bắt đầu (Begin Phase)
+  if (isOpt1) {
+    return (
+      <div style={{ textAlign: 'center', minWidth: '360px', maxWidth: '440px', padding: '10px' }}>
+        <div style={{ fontSize: '1.25rem', marginBottom: '8px', color: '#10b981', fontWeight: 'bold' }}>
+          ⚡ DƯỠNG QUÂN (Pha Bắt Đầu)
+        </div>
+        <div style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)', marginBottom: '16px', lineHeight: 1.5 }}>
+          Bạn có muốn <strong>bỏ qua Pha Phán xét và Pha Rút bài</strong> để lập tức tung đòn <strong>[Chém]</strong> không giới hạn cự ly vào 1 mục tiêu?
+        </div>
+
+        <div style={{ marginBottom: '16px', textAlign: 'left' }}>
+          <label style={{ fontSize: '0.82rem', color: 'var(--color-gold)', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+            Chọn mục tiêu Chém:
+          </label>
+          <select 
+            value={selectedTarget} 
+            onChange={e => setSelectedTarget(e.target.value)} 
+            style={{ padding: '8px 10px', width: '100%', borderRadius: '4px', background: '#1f2937', color: 'white', border: '1px solid #374151', fontSize: '0.9rem' }}
+          >
+            <option value="">-- Chọn mục tiêu --</option>
+            {validTargets.map(p => (
+              <option key={p.id} value={p.id}>
+                {getFullPlayerName(p, me?.id)} ({p.hp}/{p.maxHp} HP)
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            className="btn-action secondary" 
+            style={{ flex: 1 }} 
+            onClick={() => onConfirm({ doUse: false })}
+          >
+            Bỏ qua (Rút bài)
+          </button>
+          <button 
+            className="btn-action success" 
+            style={{ flex: 1.2, fontWeight: 'bold' }} 
+            disabled={!selectedTarget} 
+            onClick={() => onConfirm({ doUse: true, targetId: parseInt(selectedTarget, 10) })}
+          >
+            ⚡ Xác nhận Chém
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Option 3: Giai đoạn bỏ bài (Discard Phase)
+  if (isOpt3) {
+    return (
+      <div style={{ textAlign: 'center', minWidth: '360px', maxWidth: '440px', padding: '10px' }}>
+        <div style={{ fontSize: '1.25rem', marginBottom: '8px', color: '#10b981', fontWeight: 'bold' }}>
+          ⚡ DƯỠNG QUÂN (Pha Bỏ Bài)
+        </div>
+        <div style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)', marginBottom: '16px', lineHeight: 1.5 }}>
+          Bạn có muốn <strong>tự lật úp mặt tướng</strong> để <strong>bỏ qua Pha Bỏ bài</strong> và Chém không giới hạn cự ly vào 1 mục tiêu?
+        </div>
+
+        <div style={{ marginBottom: '16px', textAlign: 'left' }}>
+          <label style={{ fontSize: '0.82rem', color: 'var(--color-gold)', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+            Chọn mục tiêu Chém:
+          </label>
+          <select 
+            value={selectedTarget} 
+            onChange={e => setSelectedTarget(e.target.value)} 
+            style={{ padding: '8px 10px', width: '100%', borderRadius: '4px', background: '#1f2937', color: 'white', border: '1px solid #374151', fontSize: '0.9rem' }}
+          >
+            <option value="">-- Chọn mục tiêu --</option>
+            {validTargets.map(p => (
+              <option key={p.id} value={p.id}>
+                {getFullPlayerName(p, me?.id)} ({p.hp}/{p.maxHp} HP)
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            className="btn-action secondary" 
+            style={{ flex: 1 }} 
+            onClick={() => onConfirm({ doUse: false })}
+          >
+            Bỏ qua (Bỏ bài)
+          </button>
+          <button 
+            className="btn-action success" 
+            style={{ flex: 1.2, fontWeight: 'bold' }} 
+            disabled={!selectedTarget} 
+            onClick={() => onConfirm({ doUse: true, targetId: parseInt(selectedTarget, 10) })}
+          >
+            ⚡ Lật úp & Chém
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Option 2: Giai đoạn ra bài (Action Phase)
   return (
-    <div style={{ textAlign: 'left', minWidth: '400px' }}>
-      <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#10b981', fontWeight: 'bold', textAlign: 'center' }}>
-        💪 DƯỠNG QUÂN
+    <div style={{ textAlign: 'center', minWidth: '360px', maxWidth: '440px', padding: '10px' }}>
+      <div style={{ fontSize: '1.25rem', marginBottom: '8px', color: '#10b981', fontWeight: 'bold' }}>
+        ⚡ DƯỠNG QUÂN (Pha Ra Bài)
       </div>
-      <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '15px', textAlign: 'center' }}>
-        Chọn 1 hoặc nhiều lựa chọn để đổi lấy lá [Chém] ảo không cự ly!
-      </div>
-      
-      {/* Lựa chọn 1 */}
-      <div style={{ padding: '10px', border: '1px solid #374151', borderRadius: '4px', marginBottom: '10px', background: opt1 ? 'rgba(212, 168, 67, 0.1)' : 'transparent' }}>
-          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 'bold', color: 'var(--color-gold)' }}>
-              <input type="checkbox" checked={opt1} onChange={e => setOpt1(e.target.checked)} style={{ marginRight: '10px' }} />
-              1. Bỏ qua Rút Bài & Phán Xét
-          </label>
-          {opt1 && (
-              <div style={{ marginTop: '10px', paddingLeft: '25px' }}>
-                  <select value={opt1Target} onChange={e => setOpt1Target(e.target.value)} style={{ padding: '5px', width: '100%', background: '#1f2937', color: 'white', border: '1px solid #374151' }}>
-                      <option value="">-- Chọn mục tiêu [Chém] --</option>
-                      {validTargets.map(p => <option key={p.id} value={p.id}>{p.name} {getHeroNameStr(p)}</option>)}
-                  </select>
-              </div>
-          )}
+      <div style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)', marginBottom: '16px', lineHeight: 1.5 }}>
+        Bỏ 1 trang bị để Chém không giới hạn cự ly.<br/>
+        <span style={{ color: '#f87171', fontSize: '0.8rem' }}>⚠️ Lưu ý: Pha Ra bài sẽ kết thúc ngay sau đòn Chém này!</span>
       </div>
 
-      {/* Lựa chọn 2 */}
-      <div style={{ padding: '10px', border: '1px solid #374151', borderRadius: '4px', marginBottom: '10px', background: opt2 ? 'rgba(212, 168, 67, 0.1)' : 'transparent', opacity: myEquips.length === 0 ? 0.5 : 1 }}>
-          <label style={{ display: 'flex', alignItems: 'center', cursor: myEquips.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 'bold', color: 'var(--color-gold)' }}>
-              <input type="checkbox" disabled={myEquips.length === 0} checked={opt2} onChange={e => setOpt2(e.target.checked)} style={{ marginRight: '10px' }} />
-              2. Bỏ qua Hành Động & Bỏ 1 Trang Bị
-          </label>
-          {opt2 && (
-              <div style={{ marginTop: '10px', paddingLeft: '25px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <select value={opt2Equip} onChange={e => setOpt2Equip(e.target.value)} style={{ padding: '5px', width: '100%', background: '#1f2937', color: 'white', border: '1px solid #374151' }}>
-                      <option value="">-- Chọn Trang Bị để bỏ --</option>
-                      {myEquips.map(eq => <option key={eq.id} value={eq.id}>{eq.name} ({getSuitEmoji(eq.suit)}{eq.rank})</option>)}
-                  </select>
-                  <select value={opt2Target} onChange={e => setOpt2Target(e.target.value)} style={{ padding: '5px', width: '100%', background: '#1f2937', color: 'white', border: '1px solid #374151' }}>
-                      <option value="">-- Chọn mục tiêu [Chém] --</option>
-                      {validTargets.map(p => <option key={p.id} value={p.id}>{p.name} {getHeroNameStr(p)}</option>)}
-                  </select>
-              </div>
-          )}
+      <div style={{ marginBottom: '12px', textAlign: 'left' }}>
+        <label style={{ fontSize: '0.82rem', color: 'var(--color-gold)', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+          Chọn Trang bị để bỏ:
+        </label>
+        <select 
+          value={selectedEquip} 
+          onChange={e => setSelectedEquip(e.target.value)} 
+          style={{ padding: '8px 10px', width: '100%', borderRadius: '4px', background: '#1f2937', color: 'white', border: '1px solid #374151', fontSize: '0.9rem' }}
+        >
+          <option value="">-- Chọn Trang Bị --</option>
+          {myEquips.map(eq => (
+            <option key={eq.id} value={eq.id}>
+              {eq.name} ({getSuitEmoji(eq.suit)}{eq.rank})
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* Lựa chọn 3 */}
-      <div style={{ padding: '10px', border: '1px solid #374151', borderRadius: '4px', marginBottom: '15px', background: opt3 ? 'rgba(212, 168, 67, 0.1)' : 'transparent' }}>
-          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 'bold', color: 'var(--color-gold)' }}>
-              <input type="checkbox" checked={opt3} onChange={e => setOpt3(e.target.checked)} style={{ marginRight: '10px' }} />
-              3. Bỏ qua Bỏ Bài & Lật Mặt Tướng
-          </label>
-          {opt3 && (
-              <div style={{ marginTop: '10px', paddingLeft: '25px' }}>
-                  <select value={opt3Target} onChange={e => setOpt3Target(e.target.value)} style={{ padding: '5px', width: '100%', background: '#1f2937', color: 'white', border: '1px solid #374151' }}>
-                      <option value="">-- Chọn mục tiêu [Chém] --</option>
-                      {validTargets.map(p => <option key={p.id} value={p.id}>{p.name} {getHeroNameStr(p)}</option>)}
-                  </select>
-              </div>
-          )}
+      <div style={{ marginBottom: '16px', textAlign: 'left' }}>
+        <label style={{ fontSize: '0.82rem', color: 'var(--color-gold)', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+          Chọn mục tiêu Chém:
+        </label>
+        <select 
+          value={selectedTarget} 
+          onChange={e => setSelectedTarget(e.target.value)} 
+          style={{ padding: '8px 10px', width: '100%', borderRadius: '4px', background: '#1f2937', color: 'white', border: '1px solid #374151', fontSize: '0.9rem' }}
+        >
+          <option value="">-- Chọn mục tiêu --</option>
+          {validTargets.map(p => (
+            <option key={p.id} value={p.id}>
+              {getFullPlayerName(p, me?.id)} ({p.hp}/{p.maxHp} HP)
+            </option>
+          ))}
+        </select>
       </div>
-      
-      <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-        <button className="btn-action danger" style={{ flex: 1 }} onClick={() => onConfirm({ doUse: false })}>
-          Bỏ Qua Dưỡng Quân
+
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button 
+          className="btn-action secondary" 
+          style={{ flex: 1 }} 
+          onClick={() => onConfirm({ canceled: true })}
+        >
+          Hủy bỏ
         </button>
-        <button className="btn-action success" style={{ flex: 1 }} disabled={isConfirmDisabled()} onClick={handleConfirm}>
-          Xác Nhận
+        <button 
+          className="btn-action success" 
+          style={{ flex: 1.2, fontWeight: 'bold' }} 
+          disabled={!selectedTarget || !selectedEquip} 
+          onClick={() => onConfirm({ targetId: parseInt(selectedTarget, 10), cardId: selectedEquip, doUse: true })}
+        >
+          ⚡ Chém & Kết thúc
         </button>
       </div>
     </div>

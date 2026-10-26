@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent, screen } from '@testing-library/react';
+import { render, fireEvent, screen, renderHook } from '@testing-library/react';
 import React from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { DodgeModal } from '../modals/DodgeModal';
 import { TienPhatModal } from '../modals/TienPhatModal';
 import { AskChangeJudgeModal } from '../modals/AskChangeJudgeModal';
@@ -749,5 +750,357 @@ describe('QA Toàn diện UX/UI các kỹ năng & tính năng mới cải tiến
       expect(skillBtn).not.toBeNull();
       expect(skillBtn.textContent.trim()).toBe('Duyên Thơ');
     });
+
+    it('PlayerHand hiển thị Floating Action Pill trực tiếp trên lá bài khi đang chọn (UX UI)', async () => {
+      const { PlayerHand } = await import('../game/PlayerHand');
+      const cancelTargeting = vi.fn();
+      const confirmPlayCard = vi.fn();
+      const card = { id: 'c1', name: 'Dã Man', type: 'trick', rank: '4', suit: 'spade', isPlayable: true, emoji: '🐗', desc: 'Sát thương toàn trường' };
+      const me = {
+        id: 0,
+        hand: [card]
+      };
+      const targetSession = {
+        card,
+        cardIndex: 0,
+        targetingDef: { type: 'aoe' },
+        selectedTargets: [],
+        validTargets: []
+      };
+
+      const { container } = render(
+        <PlayerHand
+          me={me}
+          gameState={{ phase: 'action', waitingForResponse: null }}
+          needsDiscard={false}
+          isMyTurn={true}
+          activeSkill={null}
+          targetSession={targetSession}
+          selectedDiscards={[]}
+          handleDiscardToggle={vi.fn()}
+          handleCardClick={vi.fn()}
+          handleUnplayableClick={vi.fn()}
+          cancelTargeting={cancelTargeting}
+          confirmPlayCard={confirmPlayCard}
+        />
+      );
+
+      const floatingPill = container.querySelector('.card-floating-actions');
+      expect(floatingPill).not.toBeNull();
+
+      const cancelBtn = floatingPill.querySelector('.btn-card-floating-cancel');
+      const confirmBtn = floatingPill.querySelector('.btn-card-floating-confirm');
+      expect(cancelBtn).not.toBeNull();
+      expect(confirmBtn).not.toBeNull();
+      expect(confirmBtn.textContent.trim()).toBe('Dùng');
+
+      fireEvent.click(confirmBtn);
+      expect(confirmPlayCard).toHaveBeenCalled();
+
+      fireEvent.click(cancelBtn);
+      expect(cancelTargeting).toHaveBeenCalled();
+    });
+
+    it('MyHeroBar hiển thị badge PHE ẨN hoặc PHE SƠN đơn lẻ, không chứa emoji 🕵️ hay 🐺', async () => {
+      const { default: MyHeroBar } = await import('../game/MyHeroBar');
+      const unrevealedMe = {
+        id: 0,
+        faction: 'none',
+        isRevealed: false,
+        isDaTam: false,
+        hp: 4,
+        maxHp: 4,
+        heroes: [
+          { name: 'Lê Ngân', emoji: '⚔️' },
+          { name: 'Đinh Điền', emoji: '🛡️' }
+        ],
+        revealedHeroes: [false, false]
+      };
+
+      const { container, rerender } = render(
+        <MyHeroBar
+          me={unrevealedMe}
+          gameState={{ phase: 'action' }}
+          activePhase="action"
+          handleRevealClick={vi.fn()}
+          actionBar={<div>BAR</div>}
+          playerHand={<div>HAND</div>}
+          setHeroPopup={vi.fn()}
+          setCardPopup={vi.fn()}
+          targetSession={null}
+          handleTargetClick={vi.fn()}
+        />
+      );
+
+      const badgesContainer = container.querySelector('.my-hero-dock-badges');
+      expect(badgesContainer.textContent).toContain('PHE ẨN');
+      expect(badgesContainer.textContent).not.toContain('🕵️');
+      expect(badgesContainer.textContent).not.toContain('PHE NONE');
+
+      // Khi đã lật tướng Sơn
+      const revealedMe = {
+        ...unrevealedMe,
+        faction: 'sơn',
+        isRevealed: true,
+        revealedHeroes: [true, true]
+      };
+
+      rerender(
+        <MyHeroBar
+          me={revealedMe}
+          gameState={{ phase: 'action' }}
+          activePhase="action"
+          handleRevealClick={vi.fn()}
+          actionBar={<div>BAR</div>}
+          playerHand={<div>HAND</div>}
+          setHeroPopup={vi.fn()}
+          setCardPopup={vi.fn()}
+          targetSession={null}
+          handleTargetClick={vi.fn()}
+        />
+      );
+
+      expect(badgesContainer.textContent).toContain('PHE SƠN');
+      expect(badgesContainer.textContent).not.toContain('🕵️');
+      expect(badgesContainer.textContent).not.toContain('🐺');
+    });
+
+    it('PlayerBoard hiển thị tên đối thủ không bị cắt cụt maxWidth: 80px và badge ẨN không emoji', async () => {
+      const { PlayerBoard } = await import('../game/PlayerBoard');
+      const opponent = {
+        id: 1,
+        name: 'Người chơi 2',
+        isAlive: true,
+        isRevealed: false,
+        faction: 'none',
+        hp: 3,
+        maxHp: 3,
+        handCount: 4,
+        heroes: [],
+        revealedHeroes: [false, false]
+      };
+      const me = {
+        id: 0,
+        attackRange: 1,
+        faction: 'sơn'
+      };
+
+      const { container } = render(
+        <PlayerBoard
+          player={opponent}
+          me={me}
+          isCurrentTurn={false}
+          gameState={{ phase: 'action' }}
+          handleTargetClick={vi.fn()}
+          setHeroPopup={vi.fn()}
+          setCardPopup={vi.fn()}
+          targetSession={null}
+        />
+      );
+
+      const nameEl = container.querySelector('.player-name');
+      expect(nameEl.textContent).toContain('Người chơi 2');
+      expect(nameEl.style.maxWidth).not.toBe('80px');
+
+      const badgeEl = container.querySelector('.player-faction-badge');
+      expect(badgeEl.textContent.trim()).toBe('ẨN');
+      expect(badgeEl.textContent).not.toContain('🕵️');
+    });
+
+    it('GameView hiển thị nút Dùng và Hủy trực tiếp trên banner thông báo targetSession', async () => {
+      const { default: GameView } = await import('../game/GameView');
+      const card = { id: 'card-ruou', name: 'Rượu', type: 'basic', rank: '2', suit: 'spade', isPlayable: true, emoji: '🍷', desc: 'Hồi 1 máu hoặc tăng sát thương Chém' };
+      const me = {
+        id: 0,
+        name: 'Người chơi 1',
+        faction: 'sơn',
+        hp: 3,
+        maxHp: 3,
+        hand: [card],
+        heroes: [{ name: 'Lê Ngân' }, { name: 'Đinh Điền' }],
+        revealedHeroes: [true, true]
+      };
+      const p2 = { id: 1, name: 'Người chơi 2', isAlive: true, isRevealed: false, hp: 3, maxHp: 3, hand: [], heroes: [], revealedHeroes: [false, false] };
+      const p3 = { id: 2, name: 'Người chơi 3', isAlive: true, isRevealed: false, hp: 3, maxHp: 3, hand: [], heroes: [], revealedHeroes: [false, false] };
+      const p4 = { id: 3, name: 'Người chơi 4', isAlive: true, isRevealed: false, hp: 3, maxHp: 3, hand: [], heroes: [], revealedHeroes: [false, false] };
+
+      const gameState = {
+        phase: 'action',
+        currentPlayerIndex: 0,
+        players: [me, p2, p3, p4],
+        deck: [1, 2, 3],
+        discardPile: [],
+        playedCards: []
+      };
+
+      const gameAPI = {
+        playCard: vi.fn(),
+        dispatcher: { dispatchAction: vi.fn() },
+        drawPhase: vi.fn(),
+        endPhase: vi.fn()
+      };
+
+      const { container } = render(
+        <MemoryRouter>
+          <GameView
+            gameState={gameState}
+            gameAPI={gameAPI}
+            onExit={vi.fn()}
+          />
+        </MemoryRouter>
+      );
+
+      // Khi người chơi chạm vào lá bài Rượu
+      const ruouCard = container.querySelector('.hand-cards .card');
+      expect(ruouCard).not.toBeNull();
+      fireEvent.click(ruouCard);
+
+      // Banner thông báo xuất hiện với thông điệp và các nút thao tác ngay tại chỗ
+      const notificationBanner = container.querySelector('.target-notification-banner');
+      expect(notificationBanner).not.toBeNull();
+      expect(notificationBanner.textContent).toContain('Bạn muốn sử dụng [Rượu]?');
+
+      const confirmBtn = notificationBanner.querySelector('.btn-notification-confirm');
+      const cancelBtn = notificationBanner.querySelector('.btn-notification-cancel');
+      expect(confirmBtn).not.toBeNull();
+      expect(cancelBtn).not.toBeNull();
+      expect(confirmBtn.textContent).toContain('Dùng Rượu');
+
+      // Nhấn nút Dùng ngay trên thông báo
+      fireEvent.click(confirmBtn);
+      expect(gameAPI.playCard).toHaveBeenCalledWith(0, 'card-ruou', [], expect.anything());
+    });
+
+    it('Tâm Công: Khi kích hoạt kỹ năng, nhấp chọn mục tiêu luôn dispatch ACTION_USE_SKILL chứ không bị nhầm thành playCard', async () => {
+      const { useTargeting } = await import('../game/hooks/useTargeting');
+      const gameAPI = {
+        playCard: vi.fn(),
+        dispatcher: { dispatchAction: vi.fn() }
+      };
+      const isActionPending = { current: false };
+      const setTargetSession = vi.fn();
+      const setActiveSkill = vi.fn();
+
+      const { result } = renderHook(() => useTargeting({
+        gameState: { players: [{ id: 0 }, { id: 1 }] },
+        gameAPI,
+        targetSession: {
+          card: { id: 'c_chem', name: 'Chém' }, // Giả định card bị dính trong session
+          targetingDef: { type: 'single' },
+          selectedTargets: [],
+          validTargets: [1]
+        },
+        setTargetSession,
+        activeSkill: 'Tâm Công',
+        setActiveSkill,
+        isActionPending,
+        mainPlayerId: 0
+      }));
+
+      // Người chơi nhấp chọn người chơi 1
+      result.current.handleTargetClick(1);
+
+      // Phải dispatch ACTION_USE_SKILL cho tam-cong, KHÔNG được gọi playCard!
+      expect(gameAPI.dispatcher.dispatchAction).toHaveBeenCalledWith({
+        type: 'ACTION_USE_SKILL',
+        payload: {
+          playerId: 0,
+          skillId: 'tam-cong',
+          targets: [1]
+        }
+      });
+      expect(gameAPI.playCard).not.toHaveBeenCalled();
+    });
+
+    it('Tâm Công: Nhấp vào lá bài trên tay khi đang bật Tâm Công sẽ cảnh báo và không ghi đè session bài', async () => {
+      const { useCardInteraction } = await import('../game/hooks/useCardInteraction');
+      const gameAPI = {
+        addLog: vi.fn()
+      };
+      const setTargetSession = vi.fn();
+
+      const { result } = renderHook(() => useCardInteraction({
+        gameState: {
+          phase: 'action',
+          players: [
+            { id: 0, hand: [{ id: 'c_chem', name: 'Chém', isPlayable: false }] }
+          ]
+        },
+        gameAPI,
+        activeSkill: 'Tâm Công',
+        targetSession: { card: null },
+        setTargetSession,
+        cancelTargeting: vi.fn(),
+        mainPlayerId: 0
+      }));
+
+      result.current.handleCardClick(0);
+
+      // Không ghi đè targetSession sang lá Chém, mà báo log hướng dẫn người chơi
+      expect(setTargetSession).not.toHaveBeenCalled();
+      expect(gameAPI.addLog).toHaveBeenCalledWith(
+        expect.stringContaining('Tâm Công'),
+        'warning'
+      );
+    });
+  });
+
+  describe('10. Mobile Landscape Layout & Combat Log Text Size Stability', () => {
+    it('GameView: Tab Cá nhân lọc chính xác log của Người chơi chính và hiển thị fallback khi trống', async () => {
+      const GameViewModule = await import('../game/GameView');
+      const GameView = GameViewModule.default;
+
+      const mockGameState = {
+        phase: 'action',
+        currentPlayerIndex: 0,
+        deck: [1, 2, 3],
+        discardPile: [],
+        playedCards: [],
+        players: [
+          {
+            id: 0,
+            name: 'Người chơi 1',
+            heroes: [{ id: 'hero-1', name: 'Nguyễn Trãi' }],
+            revealedHeroes: [true],
+            hand: [],
+            equipment: [],
+            hp: 3,
+            maxHp: 3
+          },
+          {
+            id: 1,
+            name: 'Người chơi 2',
+            heroes: [{ id: 'hero-2', name: 'Trần Hưng Đạo' }],
+            revealedHeroes: [true],
+            hand: [],
+            equipment: [],
+            hp: 3,
+            maxHp: 3
+          }
+        ],
+        logs: [
+          { text: 'Trần Hưng Đạo dùng [Sát] lên Người chơi 3', timestamp: Date.now() },
+          { text: 'Nguyễn Trãi mất 1 sinh lực', timestamp: Date.now(), important: true }
+        ]
+      };
+
+      const { container } = render(
+        <MemoryRouter>
+          <GameView gameState={mockGameState} mainPlayerId={0} />
+        </MemoryRouter>
+      );
+
+      // Mở log container và chuyển sang tab Cá nhân
+      const personalTab = screen.getByText('Cá nhân');
+      expect(personalTab).toBeTruthy();
+
+      fireEvent.click(personalTab);
+
+      // Phải thấy log liên quan đến Nguyễn Trãi
+      expect(screen.getByText(/Nguyễn Trãi mất 1 sinh lực/i)).toBeTruthy();
+      // Không thấy log chỉ dành cho Trần Hưng Đạo và Người chơi 3
+      expect(screen.queryByText(/Trần Hưng Đạo dùng \[Sát\] lên Người chơi 3/i)).toBeNull();
+    });
   });
 });
+

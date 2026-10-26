@@ -2,6 +2,7 @@
 import React from 'react';
 import { PHASES } from 'shared/data/gameData';
 import { hasSkill } from 'shared/engine_v4/application/index.js';
+import { normalizeSkillType, normalizeSkillId, getCanonicalFaction } from 'shared/utils/translationHelper';
 /**
  * @typedef {import('../../engine/types/view/PlayerViewModel').PlayerViewModel} PlayerViewModel
  * @typedef {import('../../engine/types/view/GameViewModel').GameViewModel} GameViewModel
@@ -60,7 +61,7 @@ export function ActionBar(props) {
                 Bỏ Bài ({selectedDiscards.length}/{discardAmount})
               </button>
             )}
-            {isMyTurn && gameState.phase === PHASES.DRAW && !needsDiscard && (
+            {isMyTurn && ((gameState.phase || '').toLowerCase() === 'draw') && !needsDiscard && (
               <>
                 <button className="btn-action primary" onClick={() => handleDraw()}>
                   Rút Bài
@@ -69,25 +70,48 @@ export function ActionBar(props) {
                 {/* Bình Ngô is now automatically applied by the engine if the hero is revealed. */}
               </>
             )}
-            {isMyTurn && gameState.phase === PHASES.ACTION && !targetSession && !needsDiscard && (
+            {isMyTurn && ((gameState.phase || '').toLowerCase() === 'action') && !targetSession && !needsDiscard && (
               <>
                 <button className="btn-action danger btn-end-turn" onClick={handleEndTurn}>
                   Kết Thúc
                 </button>
                 { (() => {
+                    const isActionSkill = (s) => {
+                        if (!s) return false;
+                        if (s.isActive || s.typeCode === 'active') return true;
+                        const norm = normalizeSkillType(s.type);
+                        if (norm.isActive) return true;
+                        const normId = normalizeSkillId(s.id || s.name);
+                        const activeNormIds = [
+                            'hoa_than', 'dieu_duoc', 'tu_chu', 'binh_loan', 'thuy_to', 
+                            'duyen_tho', 'tam_cong', 'bach_dang', 'lan_sau', 'van_don', 
+                            'ky_tap', 'doi_nui', 'pha_thanh', 'than_hoa', 'khai_thien', 
+                            'dinh_quoc', 'tien_phong', 'tien_duyen', 'doat_sao', 'can_gian'
+                        ];
+                        return activeNormIds.includes(normId);
+                    };
+
                     let skills = me.heroes ? me.heroes.filter(Boolean).flatMap((h, i) => {
                         return ((h && h.skills) || []).map(s => ({ ...s, heroIndex: i, isRevealed: me.revealedHeroes && me.revealedHeroes[i] }));
-                    }).filter(s => s.type === 'ACTIVE' || s.type === 'ACTIVE_DEFENSIVE') : [];
+                    }).filter(isActionSkill) : [];
                     
-                    const myFaction = me.faction;
-                    if (myFaction === 'sơn') {
+                    if (getCanonicalFaction(me.faction) === 'son') {
                         const hasDinhQuocUser = gameState.players.some(p => p.id !== me.id && p.isAlive && p.revealedHeroes.some(Boolean) && hasSkill(p, 'dinh-quoc'));
                         // Đảm bảo không bị trùng nếu chính mình là Đinh Điền
-                        const iHaveDinhQuoc = skills.some(s => s.id === 'dinh-quoc' && s.isRevealed);
+                        const iHaveDinhQuoc = skills.some(s => (s.id === 'dinh-quoc' || s.id === 'dinh_quoc' || s.name === 'Định Quốc') && s.isRevealed);
                         if (hasDinhQuocUser && !iHaveDinhQuoc) {
                             skills.push({ name: 'Định Quốc', desc: 'Đưa 1 lá [Né] hoặc [Sấm Sét] cho tướng có kỹ năng Định Quốc', isRevealed: true, isUsable: !me.dinhQuocUsedThisTurn && me.hand.length > 0 });
                         }
                     }
+
+                    // Deduplicate skills by unique identifier to ensure no duplicate buttons appear on ActionBar
+                    const seenSkillNames = new Set();
+                    skills = skills.filter(s => {
+                        const key = (s.name || s.id || '').trim();
+                        if (seenSkillNames.has(key)) return false;
+                        seenSkillNames.add(key);
+                        return true;
+                    });
                     return skills.map(s => {
                       if (!s.isRevealed) {
                         return (
@@ -137,13 +161,17 @@ export function ActionBar(props) {
                 {targetSession.targetingDef?.type === 'multiple' && (() => {
                   const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
                   const minTargets = targetSession.targetingDef.min !== undefined ? targetSession.targetingDef.min : 1;
-                  const hasEnoughTargets = targetSession.selectedTargets.length >= minTargets;
-                  const isReforge = isXiengXich && targetSession.selectedTargets.length === 0;
+                  const maxTargets = targetSession.targetingDef.max !== undefined ? targetSession.targetingDef.max : 2;
+                  const selectedCount = targetSession.selectedTargets.length;
+                  const hasEnoughTargets = selectedCount >= minTargets;
+                  const isReforge = isXiengXich && selectedCount === 0;
                   const canSubmit = isReforge || hasEnoughTargets;
                   
                   let label = `Dùng ${targetSession.virtualCardName || targetSession.card?.name || activeSkill}`;
                   if (isXiengXich) {
-                     label = isReforge ? 'Rèn Lại (Bỏ 1)' : 'Xác Nhận Xích';
+                     label = isReforge ? 'Rèn Lại (Bỏ 1)' : `Khóa Xích (${selectedCount}/${maxTargets})`;
+                  } else {
+                     label = `Xác Nhận (${selectedCount}/${maxTargets})`;
                   }
 
                   return (
@@ -154,17 +182,13 @@ export function ActionBar(props) {
                       onClick={() => {
                          if (isActionPending.current) return;
                          isActionPending.current = true;
-                         if (activeSkill === 'Tiên Duyên') {
-                             gameAPI.dispatcher.dispatchAction({
-                                 type: 'ACTION_USE_SKILL',
-                                 payload: { playerId: me.id, skillId: 'tien-duyen-active', targets: targetSession.selectedTargets, options: { cardIds: [targetSession.card.id] } }
-                             });
-                         } else {
-                             gameAPI.playCard(me.id, targetSession.card.id, targetSession.selectedTargets, { 
-                                 virtualCardName: targetSession.virtualCardName,
-                                 isReforge: isReforge
-                             });
-                         }
+                         const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
+                         gameAPI.playCard(me.id, targetSession.card.id, targetSession.selectedTargets, { 
+                             virtualCardName: targetSession.virtualCardName || (isXiengXich ? 'Xiềng Xích' : undefined),
+                             isReforge: isReforge,
+                             reforge: isReforge,
+                             asChain: isXiengXich
+                         });
                          cancelTargeting();
                       }}
                     >

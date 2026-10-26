@@ -33,12 +33,7 @@ export const CARD_SUITS = Object.freeze({
   DIAMOND: 'diamond'
 });
 
-export const SUIT_EMOJIS = Object.freeze({
-  spade: '♠',
-  heart: '♥',
-  club: '♣',
-  diamond: '♦'
-});
+import { normalizeSuit, getSuitEmoji, getSuitColor, isSameSuit, SUIT_EMOJIS, SUIT_LABELS } from '../utils/translationHelper.js';
 
-export const getSuitEmoji = (suit) => SUIT_EMOJIS[suit] || suit;
-export const getSuitColor = (suit) => (suit === CARD_SUITS.HEART || suit === CARD_SUITS.DIAMOND) ? 'red' : 'black';
+export { normalizeSuit, getSuitEmoji, getSuitColor, isSameSuit, SUIT_EMOJIS, SUIT_LABELS };
+

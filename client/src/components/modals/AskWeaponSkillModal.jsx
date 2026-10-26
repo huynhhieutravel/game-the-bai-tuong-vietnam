@@ -1,37 +1,38 @@
 import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
 import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
-import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine_v4/application/index.js';
+import { hasSkill, hasSkillEvenIfHidden, getEffectiveColor } from 'shared/engine_v4/application/index.js';
+import { isEquip, normalizeEquipKey } from 'shared/utils/translationHelper.js';
 
 
 export function AskWeaponSkillModal({ req, gameState, onConfirm }) {
   const [selectedCards, setSelectedCards] = useState([]);
   const [selectedEquips, setSelectedEquips] = useState([]);
-  const me = gameState.players.find(p => p.id === (typeof window !== 'undefined' ? window.playerId : 0)) || gameState.players[0];
+  const me = (req.responderId !== undefined ? gameState?.players?.find(p => p.id === req.responderId) : null) || gameState?.players?.find(p => p.id === (typeof window !== 'undefined' ? window.playerId : 0)) || gameState?.players?.[0];
   const weaponName = req.weapon;
-  const isTarget = weaponName === 'Song Kiếm'; // For Song Kiem, the actor is the target who must discard
+  const isTarget = weaponName === 'Song Kiếm' || isEquip(weaponName, 'song_kiem'); // For Song Kiem, the actor is the target who must discard
   
   let title = '';
   let desc = '';
   let btnText = '';
   let requiredCount = 0;
   
-  if (weaponName === 'Thanh Long Đao') {
+  if (weaponName === 'Thanh Long Đao' || isEquip(weaponName, 'thanh_long_dao')) {
      title = 'Thanh Long Đao';
      desc = 'Mục tiêu đã Né! Chọn 1 lá [Chém] để chém bồi thêm 1 phát.';
      btnText = 'Chém tiếp!';
      requiredCount = 1;
-  } else if (weaponName === 'Rìu Đá') {
+  } else if (weaponName === 'Rìu Đá' || isEquip(weaponName, 'riu_da')) {
      title = 'Rìu Đá';
      desc = 'Mục tiêu đã Né! Chọn 2 lá bài (trên tay hoặc trang bị, trừ Rìu Đá) vứt đi để chém xuyên Né.';
      btnText = 'Xuyên Né!';
      requiredCount = 2;
-  } else if (weaponName === 'Quạt Sắt') {
+  } else if (weaponName === 'Quạt Sắt' || isEquip(weaponName, 'quat_sat')) {
      title = 'Quạt Sắt';
      desc = 'Mục tiêu bị chém trúng! Chọn 2 lá bài (trên tay hoặc trang bị, trừ Quạt Sắt) vứt đi để tăng +1 sát thương.';
      btnText = 'Tăng sát thương!';
      requiredCount = 2;
-  } else if (weaponName === 'Song Kiếm') {
+  } else if (weaponName === 'Song Kiếm' || isEquip(weaponName, 'song_kiem')) {
      title = 'Kỹ năng Song Kiếm';
      desc = 'Kẻ địch dùng Song Kiếm! Bạn phải vứt 1 lá bài (trên tay hoặc trang bị), nếu không kẻ địch sẽ rút 1 lá!';
      btnText = 'Vứt lá này';
@@ -48,27 +49,32 @@ export function AskWeaponSkillModal({ req, gameState, onConfirm }) {
      else if (selectedCards.length + selectedEquips.length < requiredCount) setSelectedEquips([...selectedEquips, idx]);
   };
 
-  const hasDoiNui = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'doi-nui');
-  const hasKhaiThien = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'khai-thien');
+  const hasDoiNui = !me?.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'doi-nui');
+  const hasKhaiThien = !me?.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'khai-thien');
 
-  const validHandCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => {
-     if (weaponName === 'Thanh Long Đao') {
+  const isThanhLong = weaponName === 'Thanh Long Đao' || isEquip(weaponName, 'thanh_long_dao');
+
+  const validHandCards = (me?.hand || []).map((c, idx) => ({ ...c, idx })).filter(c => {
+     if (isThanhLong) {
          if (c.name === 'Chém') return true;
          if (hasDoiNui && c.name === 'Né') return true;
-         if (hasKhaiThien && c.color === 'red') return true;
+         if (hasKhaiThien && getEffectiveColor(me, c) === 'red') return true;
          return false;
      }
      return true;
   }).map(c => {
-      if (weaponName === 'Thanh Long Đao' && c.name !== 'Chém') {
+      if (isThanhLong && c.name !== 'Chém') {
           return { ...c, virtualReason: hasDoiNui && c.name === 'Né' ? 'Dời Núi' : 'Khai Thiên', originalName: c.name, name: 'Chém' };
       }
       return c;
   });
   
-  const validEquips = me.equipment.map((c, idx) => ({ ...c, idx })).filter(c => {
-     if (weaponName === 'Thanh Long Đao') return false;
-     if (c.name === weaponName) return false;
+  const rawEquips = Array.isArray(me?.equipment)
+    ? me.equipment
+    : Object.values(me?.equipment || {}).filter(Boolean);
+  const validEquips = rawEquips.map((c, idx) => ({ ...c, idx })).filter(c => {
+     if (isThanhLong) return false;
+     if (c.name === weaponName || isEquip(c, normalizeEquipKey(weaponName))) return false;
      return true;
   });
 

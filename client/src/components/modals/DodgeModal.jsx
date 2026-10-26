@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
 
 import { CardSelector } from './CardSelector';
-import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine_v4/application/index.js';
+import { hasSkill, hasSkillEvenIfHidden, getEffectiveColor } from 'shared/engine_v4/application/index.js';
+import { isEquip } from 'shared/utils/translationHelper.js';
 
 export function DodgeModal({ req, gameState, onConfirm }) {
   const me = gameState.players.find(p => p.id === (req.responderId ?? req.targetId ?? (typeof window !== 'undefined' ? window.playerId : 0))) || gameState.players[0];
   const source = gameState.players.find(p => p.id === req.sourceId);
   
-  const hasPassiveBagua = hasSkill(me, 'than-giap') && !me.equipment.some(c => c.name === 'Bát Quái' || c.name === 'Hắc Thuẫn');
-  const hasBagua = hasPassiveBagua || me.equipment.some(e => e.name === 'Bát Quái');
+  const equips = Array.isArray(me.equipment) ? me.equipment : Object.values(me.equipment || {}).filter(Boolean);
+  const hasPassiveBagua = hasSkill(me, 'than-giap') && !equips.some(c => c.name === 'Bát Quái' || c.name === 'Hắc Thuẫn' || isEquip(c, 'bat_quai') || isEquip(c, 'hac_thuan'));
+  const hasBagua = hasPassiveBagua || equips.some(e => e.name === 'Bát Quái' || isEquip(e, 'bat_quai'));
   const canBagua = hasBagua && req.baguaAvailable !== false;
   
   const hasDoiNui = !me.isSkillsSuppressed && hasSkillEvenIfHidden(me, 'doi-nui');
@@ -24,11 +26,11 @@ export function DodgeModal({ req, gameState, onConfirm }) {
   const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => {
      if (c.name === 'Né') return true;
      if (hasDoiNui && c.name === 'Chém') return true;
-     if (hasThinhChinh && c.color === 'black') return true;
+     if (hasThinhChinh && getEffectiveColor(me, c) === 'black') return true;
      return false;
   }).map(c => ({
      ...c,
-     virtualReason: c.name === 'Chém' && hasDoiNui ? 'Dời Núi' : (c.name !== 'Né' && hasThinhChinh && c.color === 'black' ? 'Nhiếp Chính' : null)
+     virtualReason: c.name === 'Chém' && hasDoiNui ? 'Dời Núi' : (c.name !== 'Né' && hasThinhChinh && getEffectiveColor(me, c) === 'black' ? 'Thính Chính' : null)
   }));
 
   return (
@@ -53,7 +55,7 @@ export function DodgeModal({ req, gameState, onConfirm }) {
            const c = me.hand[idx];
             if (c.name === 'Chém' && hasDoiNui) {
               onConfirm({ doReact: true, virtualCardName: 'Né', activeSkill: 'doi-nui', cardIndexSelected: idx, cardId: c.id });
-            } else if (c.name !== 'Né' && c.color === 'black' && hasThinhChinh) {
+            } else if (c.name !== 'Né' && getEffectiveColor(me, c) === 'black' && hasThinhChinh) {
               onConfirm({ doReact: true, virtualCardName: 'Né', activeSkill: 'thinh-chinh', cardIndexSelected: idx, cardId: c.id });
             } else {
               onConfirm({ doReact: true, cardIndexSelected: idx, cardId: c.id });

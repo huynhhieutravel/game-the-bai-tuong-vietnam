@@ -12,9 +12,10 @@ export class SkillContract {
     this.id = config.id;
     this.name = config.name;
     this.type = config.type || 'active'; // 'active' | 'reactive' | 'passive' | 'lock'
-    this.frequency = config.frequency || 'turn'; // 'turn' (mỗi lượt 1 lần) | 'phase' | 'limited' (hạn định 1 lần/trận) | 'unlimited'
+    this.frequency = config.frequency || (config.type === 'lock' ? 'unlimited' : 'turn'); // lock skills default to unlimited
     this.trigger = config.trigger || null; // Tên Event kích hoạt nếu là reactive / trigger
     this.description = config.description || '';
+    this.maxTriggersPerTurn = config.maxTriggersPerTurn || 20;
     
     // Custom handlers
     this._filter = config.filter || null;
@@ -52,8 +53,8 @@ export class SkillContract {
     if (this.frequency === 'limited' && usage?.usedThisGame) {
       return false;
     }
-    // Safe Turn Cap: Tối đa 5 lần kích hoạt trong một lượt để ngăn chặn loop vô hạn
-    if ((usage?.turnTriggerCount || 0) >= 5) {
+    // Safe Turn Cap: Tối đa 20 lần kích hoạt trong một lượt để ngăn chặn loop vô hạn
+    if ((usage?.turnTriggerCount || 0) >= this.maxTriggersPerTurn) {
       return false;
     }
 

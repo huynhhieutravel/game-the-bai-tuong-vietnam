@@ -6,20 +6,22 @@
 
 export class PriorityFrame {
   constructor({
+    id,
     type,
     sourceId,
     targetId,
     priorityQueue = [],
+    currentActorId,
     context = {},
     onResolve = null,
     onPass = null
   }) {
-    this.id = `frame_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    this.id = id || `frame_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     this.type = type; // 'ASK_DODGE' | 'ASK_PEACH' | 'ASK_NEGATE' | 'ASK_SKILL' | 'ACTION_DECISION'
     this.sourceId = sourceId;
     this.targetId = targetId;
     this.priorityQueue = [...priorityQueue]; // Mảng ID người chơi cần phản hồi theo chiều kim đồng hồ
-    this.currentActorId = this.priorityQueue.length > 0 ? this.priorityQueue[0] : targetId;
+    this.currentActorId = currentActorId !== undefined ? currentActorId : (this.priorityQueue.length > 0 ? this.priorityQueue[0] : targetId);
     this.context = context;
     this.onResolve = onResolve;
     this.onPass = onPass;

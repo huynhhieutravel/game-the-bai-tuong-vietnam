@@ -184,7 +184,17 @@ export class StateMachine {
    */
   endActionPhase() {
     if (this.state.currentPhase !== PHASES.ACTION) {
-      throw new Error(`[StateMachine] Không thể kết thúc Pha Hành động khi đang ở pha ${this.state.currentPhase}`);
+      if (this.state.currentPhase === PHASES.DISCARD) {
+        const player = this.state.getCurrentPlayer();
+        this._checkDiscardLimit(player);
+        return;
+      }
+      if (this.state.currentPhase === PHASES.END) {
+        this.nextTurn();
+        return;
+      }
+      console.warn(`[StateMachine] Bỏ qua kết thúc Pha Hành động khi đang ở pha ${this.state.currentPhase}`);
+      return;
     }
 
     const player = this.state.getCurrentPlayer();
@@ -304,7 +314,7 @@ export class StateMachine {
     }
 
     const player = this.state.getPlayer(playerId);
-    const required = currentFrame.context.cardsToDiscard;
+    const required = Math.min(player.hand?.length || 0, currentFrame.context.cardsToDiscard);
 
     if (cardIds.length !== required) {
       throw new Error(`[StateMachine] Cần bỏ chính xác ${required} lá bài, nhưng nhận được ${cardIds.length} lá.`);

@@ -5,6 +5,15 @@
  */
 
 import { HEROES as GAME_DATA_HEROES } from '../../data/gameData.js';
+import { 
+  getPlayerGender as getCanonicalPlayerGender, 
+  isSameFaction, 
+  getCanonicalFaction, 
+  getFactionLabel,
+  normalizeGender,
+  normalizeSkillId,
+  normalizeSuit
+} from '../../utils/translationHelper.js';
 
 export class HeroRegistry {
   constructor() {
@@ -57,7 +66,7 @@ export class HeroRegistry {
     // Đăng ký toàn bộ kỹ năng của tướng này
     if (Array.isArray(heroModule.skills)) {
       for (const skill of heroModule.skills) {
-        this.registerSkill(skill);
+        this.registerSkill(skill, heroModule);
       }
     }
   }
@@ -65,7 +74,7 @@ export class HeroRegistry {
   /**
    * Đăng ký một Kỹ năng vào hệ thống
    */
-  registerSkill(skillContract) {
+  registerSkill(skillContract, heroModule = null) {
     if (!skillContract.id) {
       throw new Error(`[HeroRegistry] Kỹ năng không hợp lệ: thiếu id`);
     }
@@ -76,11 +85,21 @@ export class HeroRegistry {
     this._skills.set(snakeId, skillContract);
 
     if (skillContract.name) {
-      this._skills.set(skillContract.name, skillContract);
-      // Tự động liên kết các alias ID từ database (vd: tien-phong -> Tiên Phong)
-      for (const gh of GAME_DATA_HEROES) {
+      // Ưu tiên kỹ năng chủ động / chính nếu trùng tên với kỹ năng bị động hoặc tỏa định
+      if (!this._skills.has(skillContract.name) || skillContract.type === 'active') {
+        this._skills.set(skillContract.name, skillContract);
+      }
+
+      // Tự động liên kết các alias ID từ database (chỉ quét trong đúng hero tương ứng hoặc trùng tên chuẩn xác)
+      const targetHeroes = heroModule && heroModule.id
+        ? GAME_DATA_HEROES.filter(gh => (gh.id || '').replace(/-/g, '_') === heroModule.id.replace(/-/g, '_'))
+        : GAME_DATA_HEROES;
+
+      for (const gh of targetHeroes) {
         for (const gs of (gh.skills || [])) {
-          if (gs.name === skillContract.name || gs.name.includes(skillContract.name) || skillContract.name.includes(gs.name)) {
+          const isExactNameMatch = gs.name === skillContract.name;
+          const isExactIdMatch = gs.id === skillContract.id || gs.id?.replace(/-/g, '_') === snakeId || gs.id?.replace(/_/g, '-') === kebabId;
+          if (isExactNameMatch || isExactIdMatch) {
             this._skills.set(gs.id, skillContract);
             this._skills.set(gs.id.replace(/-/g, '_'), skillContract);
             this._skills.set(gs.id.replace(/_/g, '-'), skillContract);
@@ -123,23 +142,29 @@ export class HeroRegistry {
     if (!player) return 0;
     const norm = skillId.replace(/-/g, '_');
     const keb = skillId.replace(/_/g, '-');
+    const canonical = normalizeSkillId(skillId);
+
+    const matchSkill = s => {
+      const sid = s.id || s;
+      return sid === skillId || sid === norm || sid === keb || normalizeSkillId(sid) === canonical;
+    };
 
     if (player.heroes && player.heroes[0]) {
       const s0 = player.heroes[0].skills || [];
-      if (s0.some(s => (s.id || s) === skillId || (s.id || s) === norm || (s.id || s) === keb)) return 0;
+      if (s0.some(matchSkill)) return 0;
     }
     if (player.heroes && player.heroes[1]) {
       const s1 = player.heroes[1].skills || [];
-      if (s1.some(s => (s.id || s) === skillId || (s.id || s) === norm || (s.id || s) === keb)) return 1;
+      if (s1.some(matchSkill)) return 1;
     }
 
     const h1 = this.getHero(player.mainHeroId || player.heroId);
-    if (h1 && (h1.skills || []).some(s => s.id === skillId || s.id === norm || s.id === keb)) {
+    if (h1 && (h1.skills || []).some(matchSkill)) {
       return 0;
     }
 
     const h2 = this.getHero(player.subHeroId);
-    if (h2 && (h2.skills || []).some(s => s.id === skillId || s.id === norm || s.id === keb)) {
+    if (h2 && (h2.skills || []).some(matchSkill)) {
       return 1;
     }
 
@@ -156,23 +181,25 @@ export class HeroRegistry {
     if (!player) return false;
     const normalized = skillId.replace(/-/g, '_');
     const kebab = skillId.replace(/_/g, '-');
+    const canonical = normalizeSkillId(skillId);
 
-    let has = Array.isArray(player.skills) && (
-      player.skills.includes(skillId) ||
-      player.skills.includes(normalized) ||
-      player.skills.includes(kebab)
-    );
+    const matchSkill = s => {
+      const sid = s.id || s;
+      return sid === skillId || sid === normalized || sid === kebab || normalizeSkillId(sid) === canonical;
+    };
+
+    let has = Array.isArray(player.skills) && player.skills.some(matchSkill);
 
     if (!has) {
       const h1 = this.getHero(player.mainHeroId || player.heroId);
       const h2 = this.getHero(player.subHeroId);
-      if (h1 && (h1.skills || []).some(s => s.id === skillId || s.id === normalized || s.id === kebab)) has = true;
-      if (h2 && (h2.skills || []).some(s => s.id === skillId || s.id === normalized || s.id === kebab)) has = true;
+      if (h1 && (h1.skills || []).some(matchSkill)) has = true;
+      if (h2 && (h2.skills || []).some(matchSkill)) has = true;
     }
 
     if (!has && Array.isArray(player.heroes)) {
-      if (player.heroes[0] && (player.heroes[0].skills || []).some(s => (s.id || s) === skillId || (s.id || s) === normalized || (s.id || s) === kebab)) has = true;
-      if (player.heroes[1] && (player.heroes[1].skills || []).some(s => (s.id || s) === skillId || (s.id || s) === normalized || (s.id || s) === kebab)) has = true;
+      if (player.heroes[0] && (player.heroes[0].skills || []).some(matchSkill)) has = true;
+      if (player.heroes[1] && (player.heroes[1].skills || []).some(matchSkill)) has = true;
     }
 
     if (!has) return false;
@@ -198,43 +225,75 @@ export class HeroRegistry {
   isLockSkill(skillId) {
     if (!skillId) return false;
     const norm = skillId.replace(/-/g, '_');
+    const canonical = normalizeSkillId(skillId);
     const lockSkills = [
       'thiet_ma',
       'no_than_cao_lo',
+      'no_than',
       'tien_duyen_khoang_cach',
       'dam_bac',
       'than_giap',
       'ho_gia',
-      'quoc_sac'
+      'quoc_sac',
+      'nghe_an_ke',
+      'nhiep_chinh',
+      'nhiep_chinh_to_hien_thanh',
+      'ho_chu',
+      'uy_chan',
+      'khai_quoc',
+      'pha_quan_nguyen_xi',
+      'pha_quan'
     ];
-    return lockSkills.includes(norm);
+    return lockSkills.includes(norm) || lockSkills.includes(canonical);
   }
 
   /**
    * Lấy chất thực tế của lá bài khi tính đến các kỹ năng biến đổi chất (Quốc Sắc - Ngọc Hân Công Chúa: Spade -> Heart)
+   * Hỗ trợ đa hình tham số: (player, card) hoặc (card, player)
    */
-  getEffectiveSuit(player, card) {
+  getEffectiveSuit(arg1, arg2) {
+    let player, card;
+    if (arg1 && (arg1.hp !== undefined || arg1.heroes || arg1.hand || arg1.equipment)) {
+      player = arg1;
+      card = arg2;
+    } else if (arg2 && (arg2.hp !== undefined || arg2.heroes || arg2.hand || arg2.equipment)) {
+      player = arg2;
+      card = arg1;
+    } else {
+      player = arg1;
+      card = arg2;
+    }
     if (!card) return null;
-    const suit = card.suit;
-    if (this.hasSkill(player, 'quoc_sac', true) && (suit === 'spade' || suit === '♠')) {
+    const suit = (card.suit || '').toString().toLowerCase();
+    if (player && this.hasSkill(player, 'quoc_sac', true) && (suit === 'spade' || suit === 'spades' || suit === '♠' || suit === 'bích')) {
       return 'heart';
     }
-    return suit;
+    return card.suit;
   }
 
   /**
    * Lấy màu thực tế của lá bài khi tính đến các kỹ năng biến đổi chất
+   * Hỗ trợ đa hình tham số: (player, card) hoặc (card, player)
    */
-  getEffectiveColor(player, card) {
+  getEffectiveColor(arg1, arg2) {
+    let player, card;
+    if (arg1 && (arg1.hp !== undefined || arg1.heroes || arg1.hand || arg1.equipment)) {
+      player = arg1;
+      card = arg2;
+    } else if (arg2 && (arg2.hp !== undefined || arg2.heroes || arg2.hand || arg2.equipment)) {
+      player = arg2;
+      card = arg1;
+    } else {
+      player = arg1;
+      card = arg2;
+    }
     if (!card) return null;
-    const effSuit = this.getEffectiveSuit(player, card);
-    if (effSuit === 'heart' || effSuit === 'diamond' || effSuit === '♥' || effSuit === '♦') {
-      return 'red';
+    const effSuit = this.getEffectiveSuit(player, card) || card.suit;
+    if (effSuit) {
+      const norm = normalizeSuit(effSuit);
+      if (norm && norm.color && norm.code !== 'unknown') return norm.color;
     }
-    if (effSuit === 'spade' || effSuit === 'club' || effSuit === '♠' || effSuit === '♣') {
-      return 'black';
-    }
-    return card.color || 'black';
+    return card.color || (card.suit ? normalizeSuit(card.suit).color : 'black');
   }
 
   /**
@@ -296,6 +355,21 @@ export class HeroRegistry {
     player.revealedHeroes = player.revealedHeroes || [false, false];
     if (player.revealedHeroes[heroIndex]) return;
 
+    // QUY TẮC QUỐC CHIẾN BẮT BUỘC:
+    // Tướng đầu tiên lật mở BẮT BUỘC trở thành TƯỚNG CHÍNH (slot 0).
+    // Nếu người chơi chọn lật tướng ở slot 1 đầu tiên (khi cả 2 đều đang úp):
+    // Tướng này được xác lập làm Tướng Chính (swap sang slot 0), tướng còn lại là Tướng Phó (vẫn úp ở slot 1)!
+    if (!player.revealedHeroes[0] && !player.revealedHeroes[1] && heroIndex === 1) {
+      const tempMainId = player.mainHeroId || player.heroId;
+      player.mainHeroId = player.subHeroId;
+      player.subHeroId = tempMainId;
+      player.heroId = player.mainHeroId;
+      if (Array.isArray(player.heroes) && player.heroes.length >= 2) {
+        [player.heroes[0], player.heroes[1]] = [player.heroes[1], player.heroes[0]];
+      }
+      heroIndex = 0;
+    }
+
     player.revealedHeroes[heroIndex] = true;
 
     const heroId = heroIndex === 0 ? (player.mainHeroId || player.heroId) : player.subHeroId;
@@ -312,16 +386,13 @@ export class HeroRegistry {
       state.addLog(`👁️ ${player.name} đã lộ diện tướng [${heroName}]${faction}!`);
     }
 
-    // Cập nhật giới tính theo tướng đã lộ diện (ưu tiên Chủ tướng nếu đã lật, hoặc Phó tướng nếu chỉ lật Phó tướng)
+    // QUY TẮC GIỚI TÍNH BẮT BUỘC:
+    // Giới tính của nhân vật LUÔN LUÔN thuộc về Tướng Chính (slot 0).
     const h1Id = player.mainHeroId || player.heroId;
     const h2Id = player.subHeroId;
     const h1 = this.getHero(h1Id);
     const h2 = this.getHero(h2Id);
-    if (player.revealedHeroes[0]) {
-      player.gender = h1?.gender || 'male';
-    } else if (player.revealedHeroes[1]) {
-      player.gender = h2?.gender || 'male';
-    }
+    player.gender = h1?.gender || 'male';
 
     // Phần thưởng Lộ Diện Tướng (chỉ trao khi người chơi chủ động lật tướng / Mở Tướng)
     if (isExplicitReveal) {
@@ -357,7 +428,7 @@ export class HeroRegistry {
       const maxAllowed = Math.floor(state.players.length / 2);
       const revealedSameFactionCount = state.players.filter(p =>
         p.revealedHeroes?.some(Boolean) &&
-        p.faction === player.faction &&
+        isSameFaction(p, player) &&
         !p.isDaTam
       ).length;
 
@@ -385,14 +456,20 @@ import { SON_HEROES } from './son/index.js';
 export const hasSkill = (player, skillId) => globalHeroRegistry.hasSkill(player, skillId, true);
 export const hasSkillEvenIfHidden = (player, skillId) => globalHeroRegistry.hasSkill(player, skillId, false);
 export function getPlayerGender(player) {
-  if (!player) return 'none';
-  const hasHeroes = Boolean(player.mainHeroId || player.subHeroId || (player.heroes && player.heroes.length > 0));
-  if (hasHeroes && player.revealedHeroes && Array.isArray(player.revealedHeroes) && !player.revealedHeroes.some(Boolean)) {
-    return 'none';
-  }
-  return player.gender || 'male';
+  return getCanonicalPlayerGender(player);
 }
 export const getEffectiveSuit = (player, card) => globalHeroRegistry.getEffectiveSuit(player, card);
 export const getEffectiveColor = (player, card) => globalHeroRegistry.getEffectiveColor(player, card);
+export const getEffectiveCard = (player, card) => {
+  if (!card) return null;
+  return {
+    ...card,
+    suit: globalHeroRegistry.getEffectiveSuit(player, card) || card.suit,
+    color: globalHeroRegistry.getEffectiveColor(player, card) || card.color
+  };
+};
+
+export { isSameFaction, getCanonicalFaction, getFactionLabel };
+
 
 

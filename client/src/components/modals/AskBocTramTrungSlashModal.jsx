@@ -1,7 +1,7 @@
 import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
 import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
-import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine_v4/application/index.js';
+import { hasSkill, hasSkillEvenIfHidden, getEffectiveColor } from 'shared/engine_v4/application/index.js';
 
 
 export function AskBocTramTrungSlashModal({ req, gameState, onConfirm }) {
@@ -19,13 +19,13 @@ export function AskBocTramTrungSlashModal({ req, gameState, onConfirm }) {
    const slashes = me.hand.map((c, i) => ({...c, index: i})).filter(c => {
        if (c.name === 'Chém') return true;
        if (hasDoiNui && c.name === 'Né') return true;
-       if (hasKhaiThien && c.color === 'red') return true;
+       if (hasKhaiThien && getEffectiveColor(me, c) === 'red') return true;
        return false;
    }).map(c => ({
       ...c,
       virtualReason: c.name !== expectedCard ? (
          (hasDoiNui && c.name === 'Né') ? 'Dời Núi' :
-         (hasKhaiThien && c.color === 'red') ? 'Khai Thiên' : null
+         (hasKhaiThien && getEffectiveColor(me, c) === 'red') ? 'Khai Thiên' : null
       ) : null
    }));
    

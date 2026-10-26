@@ -12,12 +12,16 @@ export class GameAPIV4 {
 
   // --- Core Card Actions ---
   playCard(sourceId, cardId, targetIds = [], customData = {}) {
+    const player = this.dispatcher.state?.getPlayer ? this.dispatcher.state.getPlayer(sourceId) : null;
+    const isHuman = player ? !player.isBot : true;
+    const interactive = customData.interactive !== undefined ? customData.interactive : isHuman;
     this.dispatcher.dispatchAction({
       type: 'ACTION_PLAY_CARD',
       payload: {
         sourceId,
         cardId,
         targetIds,
+        interactive,
         ...customData
       }
     });
@@ -54,6 +58,9 @@ export class GameAPIV4 {
 
   // --- Skill Actions ---
   useSkill(playerId, skillId, cardIds = [], targets = [], options = {}) {
+    const player = this.dispatcher.state?.getPlayer ? this.dispatcher.state.getPlayer(playerId) : null;
+    const isHuman = player ? !player.isBot : true;
+    const interactive = options.interactive !== undefined ? options.interactive : isHuman;
     this.dispatcher.dispatchAction({
       type: 'ACTION_USE_SKILL',
       payload: {
@@ -61,6 +68,7 @@ export class GameAPIV4 {
         skillId,
         cardIds,
         targets,
+        interactive,
         ...options
       }
     });

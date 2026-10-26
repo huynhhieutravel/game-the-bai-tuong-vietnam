@@ -5,6 +5,7 @@ import { PHASES } from 'shared/constants/phases';
 import { CARD_TYPES } from 'shared/constants/cardTypes';
 import { CARD_TYPE_LABELS } from '../../i18n/vi/cardLabels';
 import { getCardBg } from 'shared/utils/cardStyles';
+import { getEffectiveSuit, getEffectiveColor } from 'shared/engine_v4/heroes/HeroRegistry.js';
 
 // Helper for card badge colors
 function getBadgeColor(card) {
@@ -88,6 +89,8 @@ function renderCardNameBadge(card) {
  */
 
 
+const CARD_CONVERTING_SKILLS = ['Tiên Duyên', 'Khai Thiên', 'Định Quốc', 'Thần Hỏa', 'Kỳ Tập', 'Dời Núi', 'Phá Thành', 'Hòa Thân'];
+
 export function PlayerHand(props) {
     const {
         me,
@@ -100,7 +103,8 @@ export function PlayerHand(props) {
         handleDiscardToggle,
         handleCardClick,
         handleUnplayableClick,
-        cancelTargeting
+        cancelTargeting,
+        confirmPlayCard
     } = props;
 
     const [isExpanded, setIsExpanded] = useState(false);
@@ -113,12 +117,133 @@ export function PlayerHand(props) {
     const displayCards = hasOverflow ? me.hand.slice(0, 5) : me.hand;
     const hiddenCount = me.hand.length - 5;
 
+    const renderFloatingActionPill = (card, originalIndex) => {
+        if (!targetSession) return null;
+        const isSelectedForTargeting = (targetSession.card?.id === card.id || targetSession.cardIndex === originalIndex);
+        if (!isSelectedForTargeting) return null;
+
+        const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
+        const isReforge = isXiengXich && (!targetSession.selectedTargets || targetSession.selectedTargets.length === 0);
+        const hasEnoughTargets = targetSession.targetingDef?.type === 'multiple' 
+            ? (targetSession.selectedTargets?.length >= (targetSession.targetingDef.min !== undefined ? targetSession.targetingDef.min : 1))
+            : (targetSession.selectedTargets?.length > 0);
+
+        const canConfirm = Boolean(
+            ['none', 'aoe', 'self'].includes(targetSession.targetingDef?.type) ||
+            isReforge ||
+            hasEnoughTargets
+        );
+
+        let confirmLabel = `Dùng`;
+        if (isXiengXich) {
+            confirmLabel = isReforge ? 'Rèn Lại' : 'Xác Nhận';
+        }
+
+        return (
+            <div 
+                className="card-floating-actions" 
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                    position: 'absolute',
+                    top: '-36px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    zIndex: 60,
+                    background: 'rgba(15, 23, 42, 0.96)',
+                    padding: '2px 5px',
+                    borderRadius: '14px',
+                    border: '1.2px solid #f59e0b',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.7), 0 0 8px rgba(245, 158, 11, 0.45)',
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'auto'
+                }}
+            >
+                <button
+                    type="button"
+                    className="btn-card-floating-cancel"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        cancelTargeting();
+                    }}
+                    style={{
+                        background: 'rgba(51, 65, 85, 0.95)',
+                        color: '#f8fafc',
+                        border: '1px solid rgba(255, 255, 255, 0.25)',
+                        borderRadius: '10px',
+                        padding: '2px 7px',
+                        fontSize: '0.68rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        lineHeight: 1.4
+                    }}
+                    title="Bỏ chọn lá bài này"
+                >
+                    ✕ Hủy
+                </button>
+                {canConfirm && (
+                    <button
+                        type="button"
+                        className="btn-card-floating-confirm"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirmPlayCard) confirmPlayCard();
+                            setIsExpanded(false);
+                        }}
+                        style={{
+                            background: 'linear-gradient(135deg, #fcd34d 0%, #f59e0b 50%, #d97706 100%)',
+                            color: '#1e1b4b',
+                            border: '1px solid #fef08a',
+                            borderRadius: '10px',
+                            padding: '2px 9px',
+                            fontSize: '0.70rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            lineHeight: 1.4,
+                            boxShadow: '0 2px 6px rgba(245, 158, 11, 0.6)'
+                        }}
+                        title={`Xác nhận sử dụng [${targetSession.virtualCardName || card.name}]`}
+                    >
+                        {confirmLabel}
+                    </button>
+                )}
+                {!canConfirm && (
+                    <span 
+                        className="card-floating-hint"
+                        style={{
+                            fontSize: '0.62rem',
+                            color: '#fef08a',
+                            fontWeight: 'bold',
+                            padding: '0 3px',
+                            lineHeight: 1.4
+                        }}
+                    >
+                        🎯 Chọn mục tiêu
+                    </span>
+                )}
+            </div>
+        );
+    };
+
     return (
         <>
-            <div className="hand-cards">
+            <div 
+                className="hand-cards"
+                style={needsDiscard ? {
+                    boxShadow: '0 0 16px rgba(239, 68, 68, 0.45)',
+                    borderRadius: '10px',
+                    padding: '2px 6px',
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    transition: 'box-shadow 0.3s ease'
+                } : {}}
+            >
                 {displayCards.map((card, i) => {
                     // Keep original index for interaction logic
                     const originalIndex = i; 
+                    const effColor = getEffectiveColor(me, card);
+                    const effSuit = getEffectiveSuit(me, card);
                     let isPlayable = false;
                     if (needsDiscard) {
                         isPlayable = true;
@@ -126,21 +251,23 @@ export function PlayerHand(props) {
                         // If there is an active skill, check if the skill makes it playable visually
                         if (activeSkill === 'Dời Núi' && (card.name === 'Né' || card.name === 'Chém')) {
                             isPlayable = true;
-                        } else if (activeSkill === 'Khai Thiên' && card.type === CARD_TYPES.EQUIP) {
+                        } else if (activeSkill === 'Khai Thiên' && effColor === 'red') {
                             isPlayable = true;
-                        } else if (activeSkill === 'Kỳ Tập' && card.color === 'black') {
+                        } else if (activeSkill === 'Kỳ Tập' && effColor === 'black') {
                             isPlayable = true;
-                        } else if (activeSkill === 'Tiên Duyên' && card.suit === 'club') {
+                        } else if (activeSkill === 'Tiên Duyên' && (effSuit === 'club' || effSuit === '♣' || effSuit === 'clubs' || effSuit === 'chuồn')) {
                             isPlayable = true;
-                        } else if (activeSkill === 'Thần Hỏa' && card.color === 'red') {
+                        } else if (activeSkill === 'Thần Hỏa' && effColor === 'red') {
                             isPlayable = true;
                         } else if (activeSkill === 'Định Quốc' && (card.name === 'Né' || card.name === 'Sấm Sét')) {
                             isPlayable = true;
                         } else if (activeSkill === 'Phá Thành') {
                             // Cần kiểm tra phaThanhColor của me
-                            if (me.phaThanhColor && card.color !== me.phaThanhColor) {
+                            if (me.phaThanhColor && effColor !== me.phaThanhColor) {
                                 isPlayable = true;
                             }
+                        } else if ((activeSkill === 'Hòa Thân' || activeSkill === 'hoa_than_an_tu') && (effSuit === 'diamond' || effSuit === '♦' || effSuit === 'diamonds' || effSuit === 'rô')) {
+                            isPlayable = true;
                         } else {
                             isPlayable = card.isPlayable;
                         }
@@ -156,11 +283,12 @@ export function PlayerHand(props) {
                             if (needsDiscard) {
                                 handleDiscardToggle(originalIndex);
                             } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
-                                if (isPlayable || activeSkill) { // Allow click if activeSkill is converting it
+                                const isConvertingSkill = activeSkill && CARD_CONVERTING_SKILLS.includes(activeSkill);
+                                if (isPlayable || isConvertingSkill) { // Allow click only if card is playable or activeSkill converts it
                                     handleCardClick(originalIndex);
                                 } else {
                                     if (handleUnplayableClick) handleUnplayableClick(originalIndex);
-                                    if (targetSession) cancelTargeting();
+                                    if (targetSession && !activeSkill) cancelTargeting();
                                 }
                             } else if (gameState.waitingForResponse) {
                                 // Nếu có event response thì cứ click, hook kia sẽ lo
@@ -171,8 +299,9 @@ export function PlayerHand(props) {
                         }}
                         title={`${card.name}: ${card.desc}`}
                     >
-                        <div className="card-suit-corner" style={{ position: 'absolute', top: '3px', left: '4px', fontSize: '0.7rem', color: card.color === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.9)', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)', zIndex: 4 }}>
-                        {getSuitEmoji(card.suit)} {card.rank}
+                        {renderFloatingActionPill(card, originalIndex)}
+                        <div className="card-suit-corner" style={{ position: 'absolute', top: '3px', left: '4px', fontSize: '0.7rem', color: effColor === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.9)', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)', zIndex: 4 }}>
+                        {getSuitEmoji(effSuit)} {card.rank}
                         </div>
                         {getCardBg(card.name) ? renderCardNameBadge(card) : (
                         <div className="card-inner" style={{ paddingTop: '12px' }}>
@@ -322,26 +451,30 @@ export function PlayerHand(props) {
                         }}>
                             {me.hand.map((card, i) => {
                                 const originalIndex = i; 
+                                const effColor = getEffectiveColor(me, card);
+                                const effSuit = getEffectiveSuit(me, card);
                                 let isPlayable = false;
                                 if (needsDiscard) {
                                     isPlayable = true;
                                 } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
                                     if (activeSkill === 'Dời Núi' && (card.name === 'Né' || card.name === 'Chém')) {
                                         isPlayable = true;
-                                    } else if (activeSkill === 'Khai Thiên' && card.type === CARD_TYPES.EQUIP) {
+                                    } else if (activeSkill === 'Khai Thiên' && effColor === 'red') {
                                         isPlayable = true;
-                                    } else if (activeSkill === 'Kỳ Tập' && card.color === 'black') {
+                                    } else if (activeSkill === 'Kỳ Tập' && effColor === 'black') {
                                         isPlayable = true;
-                                    } else if (activeSkill === 'Tiên Duyên' && card.suit === 'club') {
+                                    } else if (activeSkill === 'Tiên Duyên' && (effSuit === 'club' || effSuit === '♣' || effSuit === 'clubs' || effSuit === 'chuồn')) {
                                         isPlayable = true;
-                                    } else if (activeSkill === 'Thần Hỏa' && card.color === 'red') {
+                                    } else if (activeSkill === 'Thần Hỏa' && effColor === 'red') {
                                         isPlayable = true;
                                     } else if (activeSkill === 'Định Quốc' && (card.name === 'Né' || card.name === 'Sấm Sét')) {
                                         isPlayable = true;
                                     } else if (activeSkill === 'Phá Thành') {
-                                        if (me.phaThanhColor && card.color !== me.phaThanhColor) {
+                                        if (me.phaThanhColor && effColor !== me.phaThanhColor) {
                                             isPlayable = true;
                                         }
+                                    } else if ((activeSkill === 'Hòa Thân' || activeSkill === 'hoa_than_an_tu') && (effSuit === 'diamond' || effSuit === '♦' || effSuit === 'diamonds' || effSuit === 'rô')) {
+                                        isPlayable = true;
                                     } else {
                                         isPlayable = card.isPlayable;
                                     }
@@ -357,12 +490,13 @@ export function PlayerHand(props) {
                                         if (needsDiscard) {
                                             handleDiscardToggle(originalIndex);
                                         } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
-                                            if (isPlayable || activeSkill) {
+                                            const isConvertingSkill = activeSkill && CARD_CONVERTING_SKILLS.includes(activeSkill);
+                                            if (isPlayable || isConvertingSkill) {
                                                 handleCardClick(originalIndex);
                                                 setIsExpanded(false);
                                             } else {
                                                 if (handleUnplayableClick) handleUnplayableClick(originalIndex);
-                                                if (targetSession) cancelTargeting();
+                                                if (targetSession && !activeSkill) cancelTargeting();
                                             }
                                         } else if (gameState.waitingForResponse) {
                                             handleCardClick(originalIndex);
@@ -373,8 +507,9 @@ export function PlayerHand(props) {
                                     }}
                                     title={`${card.name}: ${card.desc}`}
                                 >
-                                    <div className="card-suit-corner" style={{ position: 'absolute', top: '3px', left: '4px', fontSize: '0.7rem', color: card.color === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.9)', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)', zIndex: 4 }}>
-                                    {getSuitEmoji(card.suit)} {card.rank}
+                                    {renderFloatingActionPill(card, originalIndex)}
+                                    <div className="card-suit-corner" style={{ position: 'absolute', top: '3px', left: '4px', fontSize: '0.7rem', color: effColor === 'red' ? '#ef4444' : '#111', background: 'rgba(255, 255, 255, 0.9)', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.5)', zIndex: 4 }}>
+                                    {getSuitEmoji(effSuit)} {card.rank}
                                     </div>
                                     {getCardBg(card.name) ? renderCardNameBadge(card) : (
                                     <div className="card-inner" style={{ paddingTop: '12px' }}>

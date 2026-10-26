@@ -7,44 +7,38 @@
 
 import { RangeSystem } from './RangeSystem.js';
 import { globalHeroRegistry } from '../heroes/HeroRegistry.js';
+import { 
+  normalizeSuit, 
+  getSuitColor, 
+  isEquip, 
+  normalizeCardKey, 
+  normalizeEquipKey, 
+  isDelayedTrick, 
+  isTrick 
+} from '../../utils/translationHelper.js';
 
 export function mapVietnameseToSlug(name) {
-  if (!name) return name;
-  const map = {
-    'Chém': 'chem', 'Né': 'ne', 'Đào': 'dao', 'Rượu': 'ruou',
-    'Dã Man': 'da-man', 'Loạn Tiễn': 'loan-tien', 'Hồi Xuân': 'hoi-xuan',
-    'Tước Bài': 'tuoc-bai', 'Cướp Bài': 'cuop-bai', 'Quyết Đấu': 'quyet-dau',
-    'Mượn Đao': 'muon-dao', 'Vô Trung Sinh Hữu': 'vo-trung', 'Hỏa Công': 'hoa-cong',
-    'Xiềng Xích': 'xieng-xich', 'Sấm Sét': 'sam-set', 'Binh Lương Thốn Đoạn': 'binh-luong',
-    'Hỗn Loạn': 'hon-loan', 'Hóa Giải': 'hoa-giai',
-    // ID Keys / Types
-    'slash': 'chem', 'dodge': 'ne', 'peach': 'dao', 'wine': 'ruou',
-    'da_man': 'da-man', 'loan_tien': 'loan-tien', 'hoi_xuan': 'hoi-xuan',
-    'tuoc_bai': 'tuoc-bai', 'cuop_bai': 'cuop-bai', 'quyet_dau': 'quyet-dau',
-    'muon_dao': 'muon-dao', 'vo_trung': 'vo-trung', 'hoa_cong': 'hoa-cong',
-    'xieng_xich': 'xieng-xich', 'sam_set': 'sam-set', 'binh_luong': 'binh-luong',
-    'hon_loan': 'hon-loan', 'hoa_giai': 'hoa-giai',
-    // Equips
-    'Liên Nỏ': 'lien-no', 'Thanh Long Đao': 'thanh-long-dao', 'Rìu Đá': 'riu-da',
-    'Bát Quái': 'bat-quai', 'Hắc Thuẫn': 'hac-thuan', 'Bạch Ngân': 'bach-ngan',
-    'Ngựa Chiến (-1)': 'ngua-chien', 'Ngựa Thần (+1)': 'ngua-than',
-    'Phương Thiên Kích': 'phuong-thien-kich', 'Song Kiếm': 'song-kiem', 'Quạt Sắt': 'quat-sat'
-  };
+  if (!name) return '';
+  const canonical = normalizeCardKey(name);
+  if (canonical) {
+    return canonical.replace(/_/g, '-');
+  }
   const str = typeof name === 'object' && name !== null ? (name.name || name.idKey || name.id || '') : String(name || '');
-  return map[str] || str.replace(/-[0-9]+-[0-9]+$/, '').replace(/_[0-9]+$/, '');
+  return str.replace(/-[0-9]+-[0-9]+$/, '').replace(/_[0-9]+$/, '');
 }
 
 /**
  * Lấy định nghĩa cơ chế chọn mục tiêu (Targeting Definition) của một lá bài
  */
 export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCard = null) {
-  // 1. Trang bị -> Luôn là self (tự trang bị)
-  if (physicalCard && (physicalCard.type === 'equip' || physicalCard.type === 'EQUIP')) {
+  // 1. Tra cứu card name / slug & trạng thái bài ảo
+  const isVirtual = Boolean(cardNameOrId && physicalCard && cardNameOrId !== physicalCard.id && cardNameOrId !== physicalCard.name);
+
+  // Trang bị thật (không biến đổi thành cẩm nang/chém) -> Luôn là self (tự trang bị)
+  if (!isVirtual && physicalCard && (physicalCard.type === 'equip' || physicalCard.type === 'EQUIP' || physicalCard.type === 'equipment')) {
     return { type: 'self' };
   }
 
-  // 2. Tra cứu card name / slug
-  const isVirtual = Boolean(cardNameOrId && physicalCard && cardNameOrId !== physicalCard.id && cardNameOrId !== physicalCard.name);
   let actualCardName = cardNameOrId;
   if (physicalCard && cardNameOrId === physicalCard.id) {
     actualCardName = physicalCard.name;
@@ -55,8 +49,11 @@ export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCa
   let slug = mapVietnameseToSlug(actualCardName);
   const player = state ? (state.getPlayer ? state.getPlayer(playerId) : (state.players || []).find(p => p.id === playerId)) : null;
 
-  const isRed = physicalCard && (physicalCard.color === 'red' || physicalCard.suit === 'heart' || physicalCard.suit === 'diamond' || physicalCard.suit === '♥' || physicalCard.suit === '♦');
-  const isBlack = physicalCard && (physicalCard.color === 'black' || physicalCard.suit === 'spade' || physicalCard.suit === 'club' || physicalCard.suit === '♠' || physicalCard.suit === '♣');
+  const effColor = physicalCard && player ? globalHeroRegistry.getEffectiveColor(player, physicalCard) : physicalCard?.color;
+  const effSuit = physicalCard && player ? globalHeroRegistry.getEffectiveSuit(player, physicalCard) : physicalCard?.suit;
+
+  const isRed = effColor ? effColor === 'red' : Boolean(physicalCard && (physicalCard.color === 'red' || getSuitColor(physicalCard.suit) === 'red'));
+  const isBlack = effColor ? effColor === 'black' : Boolean(physicalCard && (physicalCard.color === 'black' || getSuitColor(physicalCard.suit) === 'black'));
 
   // Sơn Tinh Dời Núi: Có thể dùng [Né] làm [Chém]
   if (slug === 'ne' && player && globalHeroRegistry.hasSkill(player, 'doi_nui', true)) {
@@ -77,7 +74,7 @@ export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCa
     slug = 'hoa-giai';
   }
   // Chử Đồng Tử Tiên Duyên: Dùng bài ♣ làm [Xiềng Xích]
-  const isClub = physicalCard && (physicalCard.suit === 'club' || physicalCard.suit === '♣');
+  const isClub = normalizeSuit(effSuit || physicalCard?.suit).code === 'club';
   if (player && globalHeroRegistry.hasSkill(player, 'tien_duyen_chu_dong_tu', true) && isClub && (cardNameOrId === 'Xiềng Xích' || actualCardName === 'Xiềng Xích')) {
     slug = 'xieng-xich';
   }
@@ -86,8 +83,8 @@ export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCa
     slug = 'tuoc-bai';
   }
   // Công chúa An Tư Hòa Thân: Dùng bài ♦ làm [Hỗn Loạn]
-  const isDiamond = physicalCard && (physicalCard.suit === 'diamond' || physicalCard.suit === '♦');
-  if (player && (globalHeroRegistry.hasSkill(player, 'hoa_than_an_tu', true) || globalHeroRegistry.hasSkill(player, 'hoa-than-an-tu', true)) && isDiamond && (cardNameOrId === 'Hỗn Loạn' || actualCardName === 'Hỗn Loạn' || actualCardName === 'hon_loan' || cardNameOrId === 'hon_loan')) {
+  const isDiamond = normalizeSuit(effSuit || physicalCard?.suit).code === 'diamond';
+  if (player && (globalHeroRegistry.hasSkill(player, 'hoa_than_an_tu', true) || globalHeroRegistry.hasSkill(player, 'hoa-than-an-tu', true)) && isDiamond && (cardNameOrId === 'Hỗn Loạn' || actualCardName === 'Hỗn Loạn' || actualCardName === 'hon_loan' || cardNameOrId === 'hon_loan' || cardNameOrId === 'Lạc Bất Tư Thục' || actualCardName === 'Lạc Bất Tư Thục')) {
     slug = 'hon-loan';
   }
 
@@ -108,7 +105,14 @@ export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCa
 
       // Kiểm tra Phương Thiên Kích khi là lá bài cuối cùng trên tay
       const isLastHandCard = player && player.hand && player.hand.length === 1 && (!physicalCard || player.hand[0].id === physicalCard.id);
-      const hasPhuongThienKich = player?.equipment?.weapon?.name === 'Phương Thiên Kích' || player?.equipment?.weapon?.idKey === 'phuong_thien_kich';
+      const weapon = player?.equipment?.weapon;
+      const hasPhuongThienKich = weapon && (
+        weapon.name === 'Phương Thiên Kích' ||
+        isEquip(weapon, 'phuong_thien_kich') ||
+        weapon.idKey === 'phuong_thien_kich' ||
+        String(weapon.id || '').includes('phuong-thien') ||
+        String(weapon.id || '').includes('phương-thiên')
+      );
       if (hasPhuongThienKich && isLastHandCard) {
         return {
           type: 'multiple',
@@ -224,7 +228,7 @@ export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCa
             if (x.id === p.id) return false;
             const dist = RangeSystem.calculateDistance(p, x, alive);
             if (!hasInfiniteTrickRange && dist > 1) return false;
-            const alreadyHas = x.judgementArea && x.judgementArea.some(c => c.name === 'Binh Lương Thốn Đoạn' || c.idKey === 'binh_luong' || c.idKey === 'binh-luong');
+            const alreadyHas = x.judgementArea && x.judgementArea.some(c => isDelayedTrick(c, 'binh_luong'));
             return !alreadyHas;
           });
         }
@@ -239,7 +243,7 @@ export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCa
             if (x.id === p.id) return false;
             // Nghệ An Kế (Nguyễn Chích): Miễn nhiễm Hỗn Loạn
             if (globalHeroRegistry.hasSkill(x, 'nghe_an_ke') || x.skills?.includes('nghe_an_ke')) return false;
-            const alreadyHas = x.judgementArea && x.judgementArea.some(c => c.name === 'Hỗn Loạn' || c.idKey === 'hon_loan' || c.idKey === 'hon-loan');
+            const alreadyHas = x.judgementArea && x.judgementArea.some(c => isDelayedTrick(c, 'hon_loan'));
             return !alreadyHas;
           });
         }
@@ -394,15 +398,17 @@ export function canPlayCard(state, playerId, cardNameOrId, physicalCardId = null
     physicalCard = player.hand.find(c => c.id === searchId);
   }
 
-  if (physicalCard && (physicalCard.type === 'equip' || physicalCard.type === 'EQUIP')) {
+  const isVirtual = Boolean(cardNameOrId && physicalCardId && cardNameOrId !== physicalCardId && (!physicalCard || cardNameOrId !== physicalCard.name));
+
+  if (!isVirtual && physicalCard && (physicalCard.type === 'equip' || physicalCard.type === 'EQUIP' || physicalCard.type === 'equipment')) {
     return { valid: true };
   }
 
-  const isVirtual = cardNameOrId && physicalCardId && cardNameOrId !== physicalCardId;
   const actualCardName = isVirtual ? cardNameOrId : (physicalCard ? physicalCard.name : cardNameOrId);
   let slug = mapVietnameseToSlug(actualCardName);
 
-  const isRedCard = physicalCard && (physicalCard.color === 'red' || physicalCard.suit === 'heart' || physicalCard.suit === 'diamond' || physicalCard.suit === '♥' || physicalCard.suit === '♦');
+  const effColor = physicalCard && player ? globalHeroRegistry.getEffectiveColor(player, physicalCard) : physicalCard?.color;
+  const isRedCard = effColor ? effColor === 'red' : Boolean(physicalCard && (physicalCard.color === 'red' || getSuitColor(physicalCard.suit) === 'red'));
   const hasDoiNui = player && globalHeroRegistry.hasSkill(player, 'doi_nui', true);
   const hasKhaiThien = player && globalHeroRegistry.hasSkill(player, 'khai_thien', true) && isRedCard;
 
@@ -451,9 +457,16 @@ export function canPlayCard(state, playerId, cardNameOrId, physicalCardId = null
     if (player.temporaryFlags?.vanDonLose) {
       return { valid: false, reason: 'Thất bại đấu điểm Vân Đồn, bị cấm Chém lượt này' };
     }
+    const weapon = player.equipment?.weapon;
+    const weaponName = weapon?.name || '';
+    const weaponId = String(weapon?.id || weapon?.idKey || weapon?.key || '');
     const hasUnlimitedSlash = player.temporaryFlags?.unlimitedSlash ||
-      player.equipment?.weapon?.name === 'Liên Nỏ' ||
-      player.equipment?.weapon?.idKey === 'lien_no';
+      isEquip(weapon, 'lien_no') ||
+      weaponName === 'Liên Nỏ' ||
+      weaponId === 'crossbow' ||
+      weaponId.includes('lien-no') ||
+      weaponId.includes('liên-nỏ') ||
+      weaponId.includes('lien_no');
     const hasVanDonExtraSlash = player.temporaryFlags?.vanDonWin && (player.turnStats?.slashCount || player.slashCount || 0) < 2;
     const currentSlashCount = player.turnStats?.slashCount || player.slashCount || player.slashesPlayed || 0;
     if (!hasUnlimitedSlash && !hasVanDonExtraSlash && currentSlashCount >= 1) {
@@ -471,6 +484,13 @@ export function canPlayCard(state, playerId, cardNameOrId, physicalCardId = null
     const targets = getAvailableTargets(state, playerId, cardNameOrId, physicalCardId, []);
     if (targets.length === 0) {
       return { valid: false, reason: 'Không có mục tiêu hợp lệ để sử dụng lá bài này' };
+    }
+    return { valid: true };
+  }
+
+  if (slug === 'sam-set') {
+    if (player.judgementArea && player.judgementArea.some(c => isDelayedTrick(c, 'sam_set'))) {
+      return { valid: false, reason: 'Bạn đã có Sấm Sét trong khu phán xét' };
     }
     return { valid: true };
   }

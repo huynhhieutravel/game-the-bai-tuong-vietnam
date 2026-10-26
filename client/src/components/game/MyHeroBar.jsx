@@ -31,6 +31,7 @@ export default function MyHeroBar(props) {
     
     const isTargetable = targetSession?.validTargets.includes(me.id);
     const isSelected = targetSession?.selectedTargets.includes(me.id);
+    const isDead = me?.isAlive === false || (typeof me?.hp === 'number' && me.hp <= 0);
     
     const onAvatarClick = (e) => {
         if (e) e.stopPropagation();
@@ -54,14 +55,76 @@ export default function MyHeroBar(props) {
                    { type: CARD_SUBTYPES.EQUIP_MOUNT_ATK, icon: <MountAtkIcon size={18} />, title: 'Ngựa công (-1)' },
                    { type: CARD_SUBTYPES.EQUIP_MOUNT_DEF, icon: <MountDefIcon size={18} />, title: 'Ngựa thủ (+1)' }
                  ].map((slot, i) => {
-                   const eqCard = me.equipment?.find(c => getCardSubType(c) === slot.type);
-                   const bgImage = eqCard ? getCardBg(eqCard.name) : null;
+                   const eqCard = Array.isArray(me.equipment)
+                     ? me.equipment.find(c => getCardSubType(c) === slot.type)
+                     : (me.equipment?.[slot.type] ||
+                        me.equipment?.[slot.type.replace('equip_', '')] ||
+                        (slot.type === CARD_SUBTYPES.EQUIP_MOUNT_DEF ? (me.equipment?.horse_defense || me.equipment?.mount_defense) : null) ||
+                        (slot.type === CARD_SUBTYPES.EQUIP_MOUNT_ATK ? (me.equipment?.horse_attack || me.equipment?.mount_attack) : null));
+                   const isHorse = slot.type === CARD_SUBTYPES.EQUIP_MOUNT_DEF || slot.type === CARD_SUBTYPES.EQUIP_MOUNT_ATK;
+                   const isHorseDef = slot.type === CARD_SUBTYPES.EQUIP_MOUNT_DEF;
+                   const bgImage = (!isHorse && eqCard) ? getCardBg(eqCard.name) : null;
+
+                   if (isHorse && eqCard) {
+                     return (
+                       <div 
+                         key={i} 
+                         className="my-hero-equip-slot equipped horse-equipped" 
+                         title={`${eqCard.name}: ${eqCard.desc || (isHorseDef ? 'Cự ly đối thủ đến bạn +1' : 'Tầm đánh đến đối thủ -1 cự ly')} (Nhấn để phóng to)`} 
+                         style={{ 
+                           background: isHorseDef 
+                             ? 'radial-gradient(circle, rgba(14, 165, 233, 0.4) 0%, rgba(15, 23, 42, 0.95) 100%)' 
+                             : 'radial-gradient(circle, rgba(239, 68, 68, 0.4) 0%, rgba(15, 23, 42, 0.95) 100%)',
+                           border: isHorseDef ? '1.5px solid #38bdf8' : '1.5px solid #ef4444',
+                           boxShadow: isHorseDef ? '0 0 8px rgba(56, 189, 248, 0.5)' : '0 0 8px rgba(239, 68, 68, 0.5)'
+                         }}
+                         onClick={(e) => { e.stopPropagation(); setCardPopup(eqCard); }}
+                       >
+                         <span style={{ 
+                           display: 'flex', 
+                           alignItems: 'center', 
+                           justifyContent: 'center', 
+                           width: '100%', 
+                           height: '100%', 
+                           filter: isHorseDef ? 'drop-shadow(0 0 4px rgba(56, 189, 248, 0.8))' : 'drop-shadow(0 0 4px rgba(239, 68, 68, 0.8))' 
+                         }}>
+                           {slot.icon}
+                         </span>
+                         <span 
+                           className={`my-hero-equip-horse-val ${isHorseDef ? 'def' : 'atk'}`}
+                           style={{ 
+                             position: 'absolute', 
+                             bottom: '1px', 
+                             right: '1px', 
+                             background: isHorseDef ? '#0284c7' : '#b91c1c', 
+                             color: '#ffffff', 
+                             border: isHorseDef ? '1px solid #38bdf8' : '1px solid #f87171', 
+                             borderRadius: '3px', 
+                             fontSize: '0.62rem', 
+                             fontWeight: '900', 
+                             padding: '0 2px', 
+                             lineHeight: 1, 
+                             textShadow: '0 1px 2px black' 
+                           }}
+                         >
+                           {isHorseDef ? '+1' : '-1'}
+                         </span>
+                       </div>
+                     );
+                   }
+
                    return (
                      <div 
                        key={i} 
                        className={`my-hero-equip-slot ${eqCard ? 'equipped' : 'empty'}`} 
                        title={eqCard ? `${eqCard.name}: ${eqCard.desc} (Nhấn để phóng to)` : slot.title} 
-                       style={{ ...(bgImage ? { backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1.5px solid var(--color-gold)' } : {}) }} 
+                       style={{ 
+                         backgroundImage: bgImage ? `url(${bgImage})` : 'none', 
+                         backgroundSize: 'cover', 
+                         backgroundPosition: 'center', 
+                         backgroundRepeat: 'no-repeat',
+                         border: eqCard ? '1.5px solid var(--color-gold)' : '1.5px dashed rgba(212, 168, 67, 0.35)' 
+                       }}
                        onClick={(e) => { e.stopPropagation(); if (eqCard) setCardPopup(eqCard); }}
                      >
                        {eqCard ? (
@@ -87,12 +150,17 @@ export default function MyHeroBar(props) {
                {/* 2. Thanh HP & Phe: Nằm ở giữa, dưới Khung trang bị và trên Khung thẻ tướng */}
                <div className="my-hero-dock-header">
                    <div className="my-hero-dock-badges">
-                       <div className={`my-hero-faction-tag ${me.isDaTam ? 'datam' : (getPlayerFaction(me) === 'Lạc' ? 'lac' : getPlayerFaction(me) === 'Sơn' ? 'son' : getPlayerFaction(me) === 'Hà' ? 'ha' : 'default')}`}>
-                         {me.isDaTam ? '🐺 DÃ TÂM' : `PHE ${getPlayerFaction(me)?.toUpperCase()}`}
-                       </div>
-                       {!me.isRevealed && (
+                       {isDead ? (
+                         <div className="my-hero-faction-tag" style={{ background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)', border: '1px solid #ef4444', color: '#fef08a', fontWeight: '900', boxShadow: '0 0 8px rgba(239,68,68,0.6)' }}>
+                           💀 TỬ TRẬN
+                         </div>
+                       ) : !me.isRevealed ? (
                          <div className="my-hero-faction-tag unrevealed">
-                           🕵️ ẨN
+                           PHE ẨN
+                         </div>
+                       ) : (
+                         <div className={`my-hero-faction-tag ${me.isDaTam ? 'datam' : (getPlayerFaction(me) === 'Lạc' ? 'lac' : getPlayerFaction(me) === 'Sơn' ? 'son' : getPlayerFaction(me) === 'Hà' ? 'ha' : 'default')}`}>
+                           {me.isDaTam ? 'DÃ TÂM' : `PHE ${getPlayerFaction(me)?.toUpperCase()}`}
                          </div>
                        )}
                    </div>
@@ -112,9 +180,47 @@ export default function MyHeroBar(props) {
 
                {/* 3. Khung thẻ Tướng: Nằm ở dưới cùng */}
                <div className="my-hero-dock">
-                   <div className="my-hero-dock-body">
+                   <div className="my-hero-dock-body" style={{ position: 'relative' }}>
+                       {/* Overlay BẠN ĐÃ TỬ TRẬN nổi bật */}
+                       {isDead && (
+                         <div 
+                           style={{ 
+                             position: 'absolute', 
+                             top: 0, 
+                             left: 0, 
+                             width: '100%', 
+                             height: '100%', 
+                             background: 'rgba(11, 15, 25, 0.82)', 
+                             backdropFilter: 'blur(2px)', 
+                             display: 'flex', 
+                             alignItems: 'center', 
+                             justifyContent: 'center', 
+                             zIndex: 35, 
+                             borderRadius: '8px' 
+                           }}
+                         >
+                           <div 
+                             style={{ 
+                               background: 'linear-gradient(135deg, #b91c1c 0%, #450a0a 100%)', 
+                               border: '2px solid #ef4444', 
+                               color: '#fef08a', 
+                               padding: '4px 12px', 
+                               borderRadius: '5px', 
+                               fontSize: '0.82rem', 
+                               fontWeight: '900', 
+                               letterSpacing: '1px', 
+                               boxShadow: '0 4px 16px rgba(0,0,0,0.9), 0 0 12px rgba(239,68,68,0.7)', 
+                               textTransform: 'uppercase', 
+                               transform: 'rotate(-5deg)',
+                               whiteSpace: 'nowrap'
+                             }}
+                           >
+                             💀 BẠN ĐÃ TỬ TRẬN
+                           </div>
+                         </div>
+                       )}
                        {/* Avatars */}
-                       <div className="my-hero-avatars">
+                       <div className="my-hero-avatars" style={{ filter: isDead ? 'grayscale(70%) opacity(0.55)' : 'none' }}>
                            {/* Avatar 1 */}
                            <div className={`my-hero-avatar-card ${isTargetable ? 'targetable' : ''} ${isSelected ? 'selected' : ''}`} onClick={onAvatarClick}>
                                <div className="judgement-area my-hero-judgement-area" style={{ display: 'flex', gap: '4px', position: 'absolute', top: '4px', left: '4px', zIndex: 15 }}>
@@ -155,7 +261,8 @@ export default function MyHeroBar(props) {
                                {(me.heroes?.[0]?.image) ? <img src={`/images/heroes/${me.heroes?.[0]?.image}`} className="my-hero-avatar-img" /> : <div className="my-hero-avatar-emoji">{(me.heroes?.[0]?.emoji)}</div>}
                                {me.revealedHeroes && !me.revealedHeroes[0] && (
                                  <div className="my-hero-reveal-overlay" onClick={(e) => { e.stopPropagation(); setHeroPopup(me); }}>
-                                   <button className="btn-action warning my-hero-reveal-btn" onClick={(e) => { e.stopPropagation(); handleRevealClick(0); }}>Lật</button>
+                                   <span className="my-hero-reveal-label">{(!me.revealedHeroes[0] && !me.revealedHeroes[1]) ? "TƯỚNG 1" : "CHÍNH ẨN"}</span>
+                                   <button className="btn-action warning my-hero-reveal-btn" title="Lật mở tướng này làm Tướng Chính" onClick={(e) => { e.stopPropagation(); handleRevealClick(0); }}>Lật</button>
                                    <button className="btn-action secondary my-hero-view-btn" onClick={(e) => { e.stopPropagation(); setHeroPopup(me); }}>Xem</button>
                                  </div>
                                )}
@@ -166,7 +273,14 @@ export default function MyHeroBar(props) {
                                {me.heroes?.[1]?.image ? <img src={`/images/heroes/${me.heroes?.[1].image}`} className="my-hero-avatar-img" /> : <div className="my-hero-avatar-emoji">{(me.heroes?.[1]?.emoji || '')}</div>}
                                {me.revealedHeroes && !me.revealedHeroes[1] && (
                                  <div className="my-hero-reveal-overlay" onClick={(e) => { e.stopPropagation(); setHeroPopup(me); }}>
-                                   <button className="btn-action warning my-hero-reveal-btn" onClick={(e) => { e.stopPropagation(); handleRevealClick(1); }}>Lật</button>
+                                   <span className="my-hero-reveal-label">{(!me.revealedHeroes[0] && !me.revealedHeroes[1]) ? "TƯỚNG 2" : "PHÓ ẨN"}</span>
+                                   <button 
+                                     className="btn-action warning my-hero-reveal-btn" 
+                                     title={!me.revealedHeroes[0] ? "Lật mở tướng này làm Tướng Chính" : "Lật mở Phó Tướng"}
+                                     onClick={(e) => { e.stopPropagation(); handleRevealClick(1); }}
+                                   >
+                                     Lật
+                                   </button>
                                    <button className="btn-action secondary my-hero-view-btn" onClick={(e) => { e.stopPropagation(); setHeroPopup(me); }}>Xem</button>
                                  </div>
                                )}

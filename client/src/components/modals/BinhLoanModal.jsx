@@ -1,7 +1,7 @@
 import { getSuitEmoji } from 'shared/constants/cardTypes';
 import React, { useState } from 'react';
 import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
-
+import { getEffectiveSuit, getEffectiveColor } from 'shared/engine_v4/heroes/HeroRegistry.js';
 
 export function BinhLoanModal({ req, gameState, onConfirm }) {
   const [selectedCards, setSelectedCards] = useState([]);
@@ -19,7 +19,11 @@ export function BinhLoanModal({ req, gameState, onConfirm }) {
       }
   };
   
-  const isSameSuit = selectedCards.length === 2 && me.hand[selectedCards[0]]?.suit === me.hand[selectedCards[1]]?.suit;
+  const c1 = me.hand[selectedCards[0]];
+  const c2 = me.hand[selectedCards[1]];
+  const s1 = c1 ? (getEffectiveSuit(me, c1) || c1.suit) : null;
+  const s2 = c2 ? (getEffectiveSuit(me, c2) || c2.suit) : null;
+  const isSameSuit = selectedCards.length === 2 && s1 && s2 && s1.toString().toLowerCase() === s2.toString().toLowerCase();
 
   return (
     <div style={{ textAlign: 'center', minWidth: '350px' }}>
@@ -31,20 +35,24 @@ export function BinhLoanModal({ req, gameState, onConfirm }) {
       </div>
       
       <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', paddingBottom: '10px', justifyContent: 'center' }}>
-        {me.hand.map((c, i) => (
-           <div 
-             key={i} 
-             onClick={() => handleCardClick(i)}
-             style={{ 
-               padding: '5px 10px', border: selectedCards.includes(i) ? '2px solid var(--color-gold)' : '1px solid #374151',
-               borderRadius: '4px', background: selectedCards.includes(i) ? 'rgba(212, 168, 67, 0.2)' : '#1f2937',
-               cursor: 'pointer', whiteSpace: 'nowrap'
-             }}
-           >
-             <div style={{ fontSize: '0.75rem', color: c.color === 'red' ? '#ef4444' : '#f1f5f9' }}>{getSuitEmoji(c.suit)}{c.rank}</div>
-             <div>{c.name}</div>
-           </div>
-        ))}
+        {me.hand.map((c, i) => {
+           const effColor = getEffectiveColor(me, c);
+           const effSuit = getEffectiveSuit(me, c);
+           return (
+             <div 
+               key={i} 
+               onClick={() => handleCardClick(i)}
+               style={{ 
+                 padding: '5px 10px', border: selectedCards.includes(i) ? '2px solid var(--color-gold)' : '1px solid #374151',
+                 borderRadius: '4px', background: selectedCards.includes(i) ? 'rgba(212, 168, 67, 0.2)' : '#1f2937',
+                 cursor: 'pointer', whiteSpace: 'nowrap'
+               }}
+             >
+               <div style={{ fontSize: '0.75rem', color: effColor === 'red' ? '#ef4444' : '#f1f5f9' }}>{getSuitEmoji(effSuit)}{c.rank}</div>
+               <div>{c.name}</div>
+             </div>
+           );
+        })}
       </div>
       
       <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>

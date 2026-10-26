@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { getFullPlayerName, getHeroNameStr, getPlayerFaction } from 'shared/utils/playerHelpers';
 
 import { CardSelector } from './CardSelector';
-import { hasSkill, hasSkillEvenIfHidden } from 'shared/engine_v4/application/index.js';
+import { hasSkill, hasSkillEvenIfHidden, getEffectiveColor } from 'shared/engine_v4/application/index.js';
 
 export function TienPhatModal({ req, gameState, onConfirm }) {
   const targetPlayerId = req.responderId ?? req.currentActorId ?? (typeof window !== 'undefined' ? window.playerId : 0);
@@ -16,11 +16,11 @@ export function TienPhatModal({ req, gameState, onConfirm }) {
   const validCards = (me.hand || []).map((c, idx) => ({ ...c, idx })).filter(c => {
     if (c.name === 'Né') return true;
     if (hasDoiNui && c.name === 'Chém') return true;
-    if (hasThinhChinh && c.color === 'black') return true;
+    if (hasThinhChinh && getEffectiveColor(me, c) === 'black') return true;
     return false;
   }).map(c => ({
     ...c,
-    virtualReason: c.name === 'Chém' && hasDoiNui ? 'Dời Núi' : (c.name !== 'Né' && hasThinhChinh && c.color === 'black' ? 'Nhiếp Chính' : null)
+    virtualReason: c.name === 'Chém' && hasDoiNui ? 'Dời Núi' : (c.name !== 'Né' && hasThinhChinh && getEffectiveColor(me, c) === 'black' ? 'Thính Chính' : null)
   }));
 
   return (
@@ -40,7 +40,7 @@ export function TienPhatModal({ req, gameState, onConfirm }) {
           const c = me.hand[idx];
           if (c.name === 'Chém' && hasDoiNui) {
             onConfirm({ doReact: true, cardId: c.id, virtualCardName: 'Né', activeSkill: 'doi-nui', dodgeCard: c });
-          } else if (c.name !== 'Né' && c.color === 'black' && hasThinhChinh) {
+          } else if (c.name !== 'Né' && getEffectiveColor(me, c) === 'black' && hasThinhChinh) {
             onConfirm({ doReact: true, cardId: c.id, virtualCardName: 'Né', activeSkill: 'thinh-chinh', dodgeCard: c });
           } else {
             onConfirm({ doReact: true, cardId: c.id, dodgeCard: c });

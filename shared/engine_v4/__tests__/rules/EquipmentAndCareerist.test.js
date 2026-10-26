@@ -212,8 +212,8 @@ describe('Equipment Passives, Bát Quái & Dã Tâm (Engine v4)', () => {
     const dodge = { id: 'dodge_1', name: 'Né', type: 'dodge' };
     p1.hand.push(dodge);
 
-    const res = CombatRules.respondDodge(state, 1, dodge);
-    // Rìu Đá tự động bỏ 2 lá bài và xuyên phá cú Né!
+    const res = CombatRules.respondDodge(state, 1, dodge, { rockAxeCardIds: ['c1', 'c2'] });
+    // Rìu Đá bỏ 2 lá bài chỉ định và xuyên phá cú Né!
     expect(res.penetrated).toBe(true);
     expect(p0.hand.length).toBe(0); // Đã bỏ 2 lá còn lại
     expect(p1.hp).toBe(3); // Bị mất 1 HP
@@ -234,7 +234,7 @@ describe('Equipment Passives, Bát Quái & Dã Tâm (Engine v4)', () => {
     const dodge1 = { id: 'dodge_1', name: 'Né', type: 'dodge' };
     p1.hand.push(dodge1);
 
-    const res = CombatRules.respondDodge(state, 1, dodge1);
+    const res = CombatRules.respondDodge(state, 1, dodge1, { dragonBladeCardId: slash2.id });
     // Thanh Long Đao kích hoạt, đánh tiếp lá Chém thứ hai!
     expect(res.retriggeredSlash).toBe(true);
     expect(state.priorityStack.peek().type).toBe('ASK_DODGE');

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useGameState, useGameAPI } from '../../contexts/GameProvider';
 import { getFullPlayerName, getPlayerFaction } from "shared/utils/playerHelpers";
+import { hasSkill, getEffectiveSuit, getEffectiveColor } from "shared/engine_v4/application/index.js";
 import { CardSelector } from './CardSelector';
 
 import { AskBocTramTrungSlashModal } from './AskBocTramTrungSlashModal';
@@ -21,6 +22,7 @@ import { DuongQuanModal } from './DuongQuanModal';
 import { HoGiaModal } from './HoGiaModal';
 import { HoaThanModal } from './HoaThanModal';
 import { HoaThanAnTuModal } from './HoaThanAnTuModal';
+import { VanDonModal } from './VanDonModal';
 import { HienHauModal } from './HienHauModal';
 import { XaThanModal } from './XaThanModal';
 import { KhoanDanModal } from './KhoanDanModal';
@@ -37,14 +39,18 @@ import { TuChuTargetModal } from './TuChuTargetModal';
 import { VipHeroSelectorModal } from './VipHeroSelectorModal';
 import { HoaCongRevealModal } from './HoaCongRevealModal';
 import { HoaCongDiscardModal } from './HoaCongDiscardModal';
+import { ThatTramSoPunishModal } from './ThatTramSoPunishModal';
+import { DuyenThoModal } from './DuyenThoModal';
+import HoaNghiModal from './HoaNghiModal';
+import { DinhQuocModal } from './DinhQuocModal';
 
 export function ModalContainer({ mainPlayerId = 0 }) {
   const gameState = useGameState();
   const gameAPI = useGameAPI();
   
   const handleResponseAction = useCallback((payload) => {
-    gameAPI.respond(payload);
-  }, [gameAPI]);
+    gameAPI.respond({ playerId: mainPlayerId, ...payload });
+  }, [gameAPI, mainPlayerId]);
 
   const req = gameState?.waitingForResponse;
   const me = gameState?.players.find(p => p.id === mainPlayerId) || gameState?.players[0];
@@ -58,12 +64,12 @@ export function ModalContainer({ mainPlayerId = 0 }) {
 
   const askNegateValidCards = useMemo(() => {
       if (!isAskNegate || !me) return [];
-      const hasLinhGiam = me.heroes?.some(h => h.skills?.some(s => s.id === 'linh-giam'));
-      const hasChuongDuong = me.heroes?.some(h => h.skills?.some(s => s.id === 'chuong-duong'));
+      const hasLinhGiam = hasSkill(me, 'linh_giam');
+      const hasChuongDuong = hasSkill(me, 'chuong_duong');
       
       const cards = me.hand.map((c, idx) => ({ ...c, idx, fromEquip: false })).filter(c => {
          if (c.name === 'Hóa Giải') return true;
-         if (hasLinhGiam && c.color === 'black') return true;
+         if (hasLinhGiam && getEffectiveColor(me, c) === 'black') return true;
          return false;
       }).map(c => ({
          ...c,
@@ -71,21 +77,24 @@ export function ModalContainer({ mainPlayerId = 0 }) {
       }));
       
       if (hasChuongDuong) {
-         me.equipment.forEach((c, idx) => {
+         const equips = Array.isArray(me.equipment) ? me.equipment : Object.values(me.equipment || {}).filter(Boolean);
+         equips.forEach((c, idx) => {
              cards.push({ ...c, idx, fromEquip: true, virtualReason: 'Chương Dương', originalName: c.name, name: 'Hóa Giải' });
          });
       }
       return cards;
   }, [isAskNegate, me]);
 
-  // Auto-skip logic for ask_negate if player has no valid cards
+  // Auto-skip logic for ask_negate if player has no valid cards OR if player was the one who just played Hóa Giải
   useEffect(() => {
-     if (isAskNegate && askNegateValidCards.length === 0) {
+     if (isAskNegate) {
+       if (req?.lastNegaterId === mainPlayerId || askNegateValidCards.length === 0) {
          gameAPI.respond({ playerId: mainPlayerId, doNegate: false, _isAuto: true });
+       }
      }
-  }, [isAskNegate, askNegateValidCards, mainPlayerId, gameAPI]);
+  }, [isAskNegate, req?.lastNegaterId, askNegateValidCards, mainPlayerId, gameAPI]);
 
-  // Client-Side Watchdog Timer (15s Auto-skip)
+  // Client-Side Watchdog Timer (Timeline badge - Tạm dừng auto-skip để người chơi thực chiến thoải mái)
   const [timeLeft, setTimeLeft] = useState(15);
   const activeReqKey = useMemo(() => {
     if (!req || req.responderId !== me?.id) return null;
@@ -106,18 +115,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          console.warn(`[WATCHDOG TIMER] 15s expired for request [${activeReqKey}]. Auto-skipping to prevent deadlock.`);
-          handleResponseAction({
-            playerId: me?.id ?? 0,
-            askerId: me?.id ?? 0,
-            canceled: true,
-            doReact: false,
-            doNegate: false,
-            doSave: false,
-            doProvide: false,
-            doUse: false,
-            _isAuto: true
-          });
+          // Tạm dừng tự động skip theo yêu cầu để người chơi thực chiến và thử nghiệm không bị gián đoạn
           return 0;
         }
         return prev - 1;
@@ -125,7 +123,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [activeReqKey, handleResponseAction, me?.id]);
+  }, [activeReqKey]);
 
   if (!gameState || !req) return null;
 
@@ -162,7 +160,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
                   confirmText="Đưa bài"
                   cancelText="Hủy"
                   requireTarget={true}
-                  validTargets={gameState.players.filter(p => p.id !== 0 && p.isAlive)}
+                  validTargets={gameState.players.filter(p => p.id !== me.id && p.isAlive)}
                   onSelect={(idx, targetId) => {
                       if (targetId === null) {
                          alert('Vui lòng chọn mục tiêu!');
@@ -252,24 +250,17 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         
         
         
-        if (req.type === 'ask_can_gian' && req.responderId === me.id) {
-          return (
-            <div style={modalStyle}>
-              
-<div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: '#ef4444' }}>🌟 Can Gián (Chưa code Modal)</div>
-<button className="btn-action secondary" onClick={() => handleResponseAction({ doReact: false })}>Bỏ qua</button>
-
-            </div>
-          );
-        }
-
         if (req.type === 'ask_thong_ngon' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
-              
-<div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: '#ef4444' }}>🌟 Thông Ngôn (Chưa code Modal)</div>
-<button className="btn-action secondary" onClick={() => handleResponseAction({ doReact: false })}>Bỏ qua</button>
-
+              <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#10b981', fontWeight: 'bold' }}>📜 THÔNG NGÔN</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '15px' }}>
+                Lá bài phán xét của bạn vừa có hiệu lực. Bạn có muốn thu hồi lá bài này về tay không?
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button className="btn-action success" onClick={() => handleResponseAction({ doUse: true })}>Thu Hồi Bài</button>
+                <button className="btn-action secondary" onClick={() => handleResponseAction({ doUse: false })}>Bỏ qua</button>
+              </div>
             </div>
           );
         }
@@ -330,12 +321,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         if (req.type === 'ask_that_tram_so_punish' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
-              <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#ef4444', fontWeight: 'bold' }}>⚖️ HÌNH PHẠT THẤT TRẢM SỚ</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '15px' }}>Bạn phải chọn một hình phạt:</div>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                  <button className="btn-action success" onClick={() => handleResponseAction({ option: 'damage' })}>Nhận 1 Sát Thương</button>
-                  {me.hand.length >= 2 && <button className="btn-action success" onClick={() => handleResponseAction({ option: 'discard', cardIndexes: [0, 1] })}>Bỏ 2 Lá Bài (Tự động chọn 2 lá đầu)</button>}
-              </div>
+              <ThatTramSoPunishModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
             </div>
           );
         }
@@ -356,12 +342,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         if (req.type === 'ask_hoa_nghi' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
-              <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#10b981', fontWeight: 'bold' }}>🕊️ HÒA NGHỊ</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '15px' }}>Xem 2 lá bài trên cùng và phân phối. (Tạm thời tự chia cho mình)</div>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                  <button className="btn-action success" onClick={() => handleResponseAction({ doUse: true, distribution: [{ targetId: 0, card: gameState.deck[gameState.deck.length-1] }, { targetId: 0, card: gameState.deck[gameState.deck.length-2] }] })}>Lấy 2 lá</button>
-                  <button className="btn-action secondary" onClick={() => handleResponseAction({ doUse: false })}>Bỏ qua</button>
-              </div>
+              <HoaNghiModal req={req} me={me} gameState={gameState} onConfirm={handleResponseAction} />
             </div>
           );
         }
@@ -445,14 +426,10 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
 
-        if (req.type === 'ask_van_don' && (req.responderId === me.id || req.responderId === me.id)) {
+        if (req.type === 'ask_van_don' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
-              <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#f59e0b', fontWeight: 'bold' }}>⚔️ ĐẤU ĐIỂM (Vân Đồn)</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '15px' }}>Đang đấu điểm... (Tính năng đang hoàn thiện)</div>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                  <button className="btn-action secondary" onClick={() => handleResponseAction({ canceled: true })}>Hủy đấu</button>
-              </div>
+              <VanDonModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
             </div>
           );
         }
@@ -460,10 +437,13 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         if (req.type === 'ask_phat_tam' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
-              <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#f59e0b', fontWeight: 'bold' }}>🙏 PHÁT TÂM</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '15px' }}>Phát tâm ban bài cho đồng minh... (Tính năng đang hoàn thiện)</div>
+              <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#10b981', fontWeight: 'bold' }}>🧘 PHẬT TÂM</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '15px' }}>
+                Giai đoạn Chuẩn bị: Bạn có muốn tiến hành phán xét Phật Tâm để thu các lá bài Đen liên tiếp?
+              </div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                  <button className="btn-action secondary" onClick={() => handleResponseAction({ canceled: true })}>Bỏ qua</button>
+                <button className="btn-action success" onClick={() => handleResponseAction({ doUse: true })}>🧘 Phán Xét</button>
+                <button className="btn-action secondary" onClick={() => handleResponseAction({ doUse: false })}>⏭️ Bỏ qua</button>
               </div>
             </div>
           );
@@ -473,12 +453,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         if (req.type === 'ask_duyen_tho' && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
-              <div style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#ec4899', fontWeight: 'bold' }}>🌸 DUYÊN THƠ</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '15px' }}>Chọn 2 lá bài để bỏ (tạm thời chọn 2 lá đầu tiên của bạn), sau đó cả 2 hồi 1 HP.</div>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                  <button className="btn-action success" onClick={() => handleResponseAction({ cardIndexes: [0, 1] })}>Bỏ 2 lá & Hồi HP</button>
-                  <button className="btn-action secondary" onClick={() => handleResponseAction({ canceled: true })}>Hủy</button>
-              </div>
+              <DuyenThoModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
             </div>
           );
         }
@@ -580,7 +555,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
         
-        if (req.type === 'ask_duong_quan' && req.responderId === me.id) {
+        if ((req.type === 'ask_duong_quan' || req.type === 'ask_duong_quan_1' || req.type === 'ask_duong_quan_2' || req.type === 'ask_duong_quan_3') && req.responderId === me.id) {
           return (
             <div style={modalStyle}>
               <DuongQuanModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
@@ -592,6 +567,14 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           return (
             <div style={modalStyle}>
               <TienPhongModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
+            </div>
+          );
+        }
+
+        if (req.type === 'ask_dinh_quoc' && req.responderId === me.id) {
+          return (
+            <div style={modalStyle}>
+              <DinhQuocModal req={req} gameState={gameState} me={me} onConfirm={handleResponseAction} />
             </div>
           );
         }
@@ -639,7 +622,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         }
 
         if (req.type === 'ask_phat_toi' && req.responderId === me.id) {
-          const validTargets = gameState.players.filter(p => p.id !== 0 && p.isAlive);
+          const validTargets = gameState.players.filter(p => p.id !== me.id && p.isAlive);
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: 'var(--color-gold)' }}>
@@ -694,6 +677,14 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           return (
             <div style={modalStyle}>
               <HoaThanModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
+            </div>
+          );
+        }
+
+        if (req.type === 'ask_hoa_than_an_tu' && req.responderId === me.id) {
+          return (
+            <div style={modalStyle}>
+              <HoaThanAnTuModal req={req} gameState={gameState} onConfirm={handleResponseAction} />
             </div>
           );
         }
@@ -812,7 +803,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
 
         if (req.type === 'ask_tre_nga_discard' && req.responderId === me.id) {
           const suitFilter = req.judgeSuit;
-          const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => c.suit === suitFilter);
+          const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => (getEffectiveSuit(me, c) || c.suit) === suitFilter);
           
           return (
             <div style={modalStyle}>
@@ -844,19 +835,22 @@ export function ModalContainer({ mainPlayerId = 0 }) {
 
         if (req.type === 'ask_slash' && req.reason === 'quyet-dau' && req.responderId === me.id) {
           // Dời Núi (Né -> Chém)
-          const hasDoiNui = me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'doi-nui'));
+          const hasDoiNui = hasSkill(me, 'doi_nui') || hasSkill(me, 'doi-nui');
           
           // Khai Thiên (Bài đỏ -> Chém)
-          const hasKhaiThien = me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'khai-thien'));
+          const hasKhaiThien = hasSkill(me, 'khai_thien') || hasSkill(me, 'khai-thien');
           
           // Bọc Trăm Trứng
-          const canBocTramTrung = !req.bocTramTrungFailed && me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'boc-tram-trung')) && 
-                                  gameState.players.some(p => p.id !== me.id && p.isAlive && getPlayerFaction(p) === 'Lạc');
+          const canBocTramTrung = !req.bocTramTrungFailed && (hasSkill(me, 'boc_tram_trung') || hasSkill(me, 'boc-tram-trung')) && 
+                                  gameState.players.some(p => p.id !== me.id && p.isAlive && (p.faction === 'lac' || p.faction === 'Lạc' || getPlayerFaction(p) === 'Lạc'));
+
+          const opponent = findPlayer(req.duelTargetId ?? req.opponentId ?? (req.attackerId === me.id ? req.targetId : (req.sourceId ?? req.attackerId)));
+          const opponentName = getFullPlayerName(opponent, me.id);
 
           const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => {
              if (c.name === 'Chém') return true;
              if (hasDoiNui && c.name === 'Né') return true;
-             if (hasKhaiThien && c.color === 'red') return true;
+             if (hasKhaiThien && getEffectiveColor(me, c) === 'red') return true;
              return false;
           }).map(c => ({
              ...c,
@@ -866,10 +860,10 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           return (
             <div style={modalStyle}>
               <div style={{ fontSize: '1.2rem', marginBottom: 'var(--space-md)', color: 'var(--color-gold)' }}>
-                ⚡ Quyết Đấu!
+                ⚡ Quyết Đấu với {opponentName}!
               </div>
               <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-lg)' }}>
-                Đến lượt bạn ra "Chém"!
+                {opponentName} vừa đánh ra [Chém]! Đến lượt bạn phải ra <strong>[Chém]</strong> để đánh trả:
               </div>
               <CardSelector 
                 validCards={validCards}
@@ -943,13 +937,13 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           const isSelf = dyingId === me.id;
           const dyingPlayer = findPlayer(dyingId) || me;
           
-          const hasNamDuoc = me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'nam-duoc'));
+          const hasNamDuoc = hasSkill(me, 'nam-duoc');
           const isOutsideTurn = gameState.currentPlayerIndex !== me.id;
           
           const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => {
              if (c.name === 'Đào') return true;
              if (isSelf && c.name === 'Rượu') return true;
-             if (hasNamDuoc && isOutsideTurn && c.color === 'red') return true;
+             if (hasNamDuoc && isOutsideTurn && getEffectiveColor(me, c) === 'red') return true;
              return false;
           }).map(c => ({
              ...c,
@@ -986,6 +980,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         }
 
         if (req.type === 'ask_negate' && req.responderId === mainPlayerId) {
+          if (req.lastNegaterId === mainPlayerId) return null; // Không bao giờ bắt người chơi tự Hóa Giải lại chính mình!
           const validCards = askNegateValidCards;
 
           if (validCards.length === 0) return null; // Ngăn chặn flash pop-up rác trước khi useEffect auto-skip kịp chạy
@@ -1009,7 +1004,9 @@ export function ModalContainer({ mainPlayerId = 0 }) {
               <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-lg)' }}>
                 {req.isNegated 
                   ? <span>{req.lastNegaterId !== undefined ? getFullPlayerName(findPlayer(req.lastNegaterId), me.id) : 'Ai đó'} vừa dùng [Hóa Giải] vô hiệu hóa lá <strong>[{cardName}]</strong>. Bạn có muốn dùng [Hóa Giải] để phục hồi nó không?</span>
-                  : <span>{sourceName} đang dùng <strong>[{cardName}]</strong> lên {targetName}. Bạn có muốn Hóa Giải không?</span>
+                  : req.isJudgementNegate
+                    ? <span>⚖️ Sắp phán xét cẩm nang trì hoãn <strong>[{cardName}]</strong> cho {targetName}. Bạn có muốn dùng [Hóa Giải] để vô hiệu hóa không?</span>
+                    : <span>{sourceName} đang dùng <strong>[{cardName}]</strong> lên {targetName}. Bạn có muốn Hóa Giải không?</span>
                 }
                 {!validCards.some(c => c.name === 'Hóa Giải' && !c.virtualReason) && (
                   <div style={{ marginTop: '8px', fontStyle: 'italic', color: '#9ca3af' }}>
@@ -1043,28 +1040,43 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           const sourceName = getFullPlayerName(findPlayer(req.sourceId), me.id);
           
           // Dời Núi (Chém <-> Né)
-          const hasDoiNui = me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'doi-nui'));
+          const hasDoiNui = hasSkill(me, 'doi-nui');
           
           // Khai Thiên (Bài đỏ -> Chém)
-          const hasKhaiThien = me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'khai-thien'));
+          const hasKhaiThien = hasSkill(me, 'khai-thien');
           
           // Bọc Trăm Trứng (Chỉ cho Dã Man - Cần Chém)
-          const canBocTramTrung = !req.bocTramTrungFailed && reqCardName === 'Chém' && me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'boc-tram-trung')) && 
+          const canBocTramTrung = !req.bocTramTrungFailed && reqCardName === 'Chém' && hasSkill(me, 'boc-tram-trung') && 
                                   gameState.players.some(p => p.id !== me.id && p.isAlive && getPlayerFaction(p) === 'Lạc');
           
           // Thính Chính (Bài đen -> Né)
-          const hasThinhChinh = reqCardName === 'Né' && me.heroes?.some((h, i) => me.revealedHeroes?.[i] && h.skills?.some(s => s.id === 'thinh-chinh'));
+          const hasThinhChinh = reqCardName === 'Né' && hasSkill(me, 'thinh-chinh', true);
           
+          // Linh Giám (Bài đen -> Hóa Giải)
+          const hasLinhGiam = hasSkill(me, 'linh-giam', true) || hasSkill(me, 'linh_giam', true);
+
           const validCards = me.hand.map((c, idx) => ({ ...c, idx })).filter(c => {
              if (c.name === reqCardName) return true;
              if (hasDoiNui && c.name === (reqCardName === 'Chém' ? 'Né' : 'Chém')) return true;
-             if (hasKhaiThien && reqCardName === 'Chém' && c.color === 'red') return true;
-             if (hasThinhChinh && c.color === 'black') return true;
+             if (hasKhaiThien && reqCardName === 'Chém' && getEffectiveColor(me, c) === 'red') return true;
+             if (hasThinhChinh && getEffectiveColor(me, c) === 'black') return true;
+             if (c.name === 'Hóa Giải' || c.idKey === 'hoa_giai') return true;
+             if (hasLinhGiam && getEffectiveColor(me, c) === 'black') return true;
              return false;
-          }).map(c => ({
-             ...c,
-             virtualReason: c.name !== reqCardName ? (c.name === (reqCardName === 'Chém' ? 'Né' : 'Chém') && hasDoiNui ? 'Dời Núi' : (hasThinhChinh && c.color === 'black' ? 'Thính Chính' : 'Khai Thiên')) : null
-          }));
+          }).map(c => {
+             let virtualReason = null;
+             if (c.name === 'Hóa Giải' || c.idKey === 'hoa_giai') {
+                virtualReason = 'Hóa Giải (Cá nhân)';
+             } else if (hasLinhGiam && getEffectiveColor(me, c) === 'black' && c.name !== reqCardName) {
+                virtualReason = 'Linh Giám (Hóa Giải)';
+             } else if (c.name !== reqCardName) {
+                virtualReason = c.name === (reqCardName === 'Chém' ? 'Né' : 'Chém') && hasDoiNui ? 'Dời Núi' : (hasThinhChinh && getEffectiveColor(me, c) === 'black' ? 'Thính Chính' : 'Khai Thiên');
+             }
+             return {
+                ...c,
+                virtualReason
+             };
+          });
 
           return (
             <div style={modalStyle}>
@@ -1072,16 +1084,20 @@ export function ModalContainer({ mainPlayerId = 0 }) {
                 ⚠️ Trúng {req.card?.name || 'Cẩm nang'}!
               </div>
               <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-lg)' }}>
-                {sourceName} dùng <strong>[{req.card?.name || 'Cẩm nang'}]</strong>. Bạn phải ra lá <strong>[{reqCardName}]</strong>!
+                {sourceName} dùng <strong>[{req.card?.name || 'Cẩm nang'}]</strong>. Bạn phải ra lá <strong>[{reqCardName}]</strong> hoặc dùng <strong>[Hóa Giải]</strong> để tự bảo vệ mình!
               </div>
               <CardSelector 
                 validCards={validCards}
-                confirmText={`🃏 Ra ${reqCardName}!`}
+                confirmText="🃏 Xác nhận ra bài!"
                 cancelText="🩸 Chịu sát thương"
                 onSelect={(idx) => {
                    const c = me.hand[idx];
-                   if (c.name !== reqCardName) {
-                      const activeSkill = c.name === (reqCardName === 'Chém' ? 'Né' : 'Chém') && hasDoiNui ? 'Dời Núi' : 'Khai Thiên';
+                   if (c.name === 'Hóa Giải' || c.idKey === 'hoa_giai') {
+                      handleResponseAction({ doReact: true, virtualCardName: 'Hóa Giải', cardIndexSelected: idx, cardId: c.id });
+                   } else if (hasLinhGiam && getEffectiveColor(me, c) === 'black' && c.name !== reqCardName && (!hasThinhChinh || reqCardName !== 'Né')) {
+                      handleResponseAction({ doReact: true, virtualCardName: 'Hóa Giải', activeSkill: 'Linh Giám', cardIndexSelected: idx, cardId: c.id });
+                   } else if (c.name !== reqCardName) {
+                      const activeSkill = c.name === (reqCardName === 'Chém' ? 'Né' : 'Chém') && hasDoiNui ? 'Dời Núi' : (hasThinhChinh ? 'Thính Chính' : 'Khai Thiên');
                       handleResponseAction({ doReact: true, virtualCardName: reqCardName, activeSkill, cardIndexSelected: idx, cardId: c.id });
                    } else {
                       handleResponseAction({ doReact: true, cardIndexSelected: idx, cardId: c.id });
@@ -1096,12 +1112,12 @@ export function ModalContainer({ mainPlayerId = 0 }) {
                         🐉 Bọc Trăm Trứng (Gọi Lạc)
                       </button>
                     )}
-                    {reqCardName === 'Né' && me.heroes?.some((h, i) => h.id === 'ly-thuong-kiet') && me.isLord && (
+                    {reqCardName === 'Né' && (hasSkill(me, 'tien_phat') || hasSkill(me, 'tien-phat')) && me.isLord && (
                       <button className="btn-action" style={{ backgroundColor: '#ec4899', color: '#fff', flex: '1 1 100%' }} onClick={() => handleResponseAction({ doTienPhat: true })}>
                         👑 Kích Hoạt Tiên Phát
                       </button>
                     )}
-                    {reqCardName === 'Né' && me.heroes?.some((h, i) => h.skills?.some(s => s.id === 'ho-gia')) && me.isLord && (
+                    {reqCardName === 'Né' && hasSkill(me, 'ho-gia') && me.isLord && (
                       <button className="btn-action" style={{ backgroundColor: '#f59e0b', color: '#fff', flex: '1 1 100%' }} onClick={() => handleResponseAction({ doHoGia: true })}>
                         👑 Kích Hoạt Hộ Giá
                       </button>
@@ -1113,7 +1129,9 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           );
         }
         
-        const isWeaponActor = (req.weapon === 'Song Kiếm' ? req.targetId : req.sourceId) === 0;
+        const isWeaponActor = req.responderId !== undefined 
+          ? req.responderId === me.id 
+          : (req.weapon === 'Song Kiếm' ? req.targetId : req.sourceId) === me.id;
         if (req.type === 'ask_weapon_skill' && isWeaponActor) {
            return (
              <div style={modalStyle}>
@@ -1161,12 +1179,12 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           right: '20px',
           padding: '6px 14px',
           borderRadius: '20px',
-          background: timeLeft <= 5 ? 'rgba(239, 68, 68, 0.9)' : 'rgba(15, 23, 42, 0.85)',
-          border: timeLeft <= 5 ? '2px solid #ef4444' : '2px solid #f59e0b',
+          background: timeLeft === 0 ? 'rgba(75, 85, 99, 0.85)' : (timeLeft <= 5 ? 'rgba(239, 68, 68, 0.9)' : 'rgba(15, 23, 42, 0.85)'),
+          border: timeLeft === 0 ? '2px solid #9ca3af' : (timeLeft <= 5 ? '2px solid #ef4444' : '2px solid #f59e0b'),
           color: '#ffffff',
           fontWeight: 700,
           fontSize: '0.85rem',
-          boxShadow: timeLeft <= 5 ? '0 0 16px rgba(239, 68, 68, 0.8)' : '0 4px 12px rgba(0,0,0,0.5)',
+          boxShadow: timeLeft <= 5 && timeLeft > 0 ? '0 0 16px rgba(239, 68, 68, 0.8)' : '0 4px 12px rgba(0,0,0,0.5)',
           zIndex: 99999,
           pointerEvents: 'none',
           display: 'flex',
@@ -1178,7 +1196,7 @@ export function ModalContainer({ mainPlayerId = 0 }) {
         }}
       >
         <span>⏳</span>
-        <span>{timeLeft}s</span>
+        <span>{timeLeft > 0 ? `${timeLeft}s` : '0s (Chờ thao tác)'}</span>
       </div>
     </>
   );

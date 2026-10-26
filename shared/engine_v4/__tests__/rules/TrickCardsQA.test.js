@@ -462,16 +462,16 @@ describe('QA Toàn Diện Thẻ Bài Cẩm Nang (Trick Cards QA Suite v4)', () =
 
       TrickRules._executeTrickEffect(state, 0, [1, 2], barbarianCard);
 
-      // Frame 1: p2 dùng Hóa Giải
+      // Frame 1 (đỉnh stack): p1 giải quyết trước theo chiều kim đồng hồ, dùng Chém
+      const resP1 = TrickRules.respondBarbarian(state, 1, slashCard);
+      expect(resP1.defended).toBe(true);
+      expect(p1.hp).toBe(3); // Không mất máu
+
+      // Frame 2: p2 giải quyết tiếp theo, dùng Hóa Giải
       const resP2 = TrickRules.respondBarbarian(state, 2, negateCard);
       expect(resP2.defended).toBe(true);
       expect(resP2.negatedSingle).toBe(true);
       expect(p2.hp).toBe(2); // Không mất máu
-
-      // Frame 2: p1 dùng Chém
-      const resP1 = TrickRules.respondBarbarian(state, 1, slashCard);
-      expect(resP1.defended).toBe(true);
-      expect(p1.hp).toBe(3); // Không mất máu
     });
   });
 
@@ -816,8 +816,7 @@ describe('QA Toàn Diện Thẻ Bài Cẩm Nang (Trick Cards QA Suite v4)', () =
       TrickRules.respondNegate(state, 3, null);
       // p0 phản hồi lại bằng Hóa Giải 2 (lần 2 - chẵn -> khôi phục hiệu lực)
       TrickRules.respondNegate(state, 0, negate2);
-      // Mọi người skip: p0, p1, p2, p3
-      TrickRules.respondNegate(state, 0, null);
+      // Mọi người skip: p1, p2, p3
       TrickRules.respondNegate(state, 1, null);
       TrickRules.respondNegate(state, 2, null);
       const res = TrickRules.respondNegate(state, 3, null);
