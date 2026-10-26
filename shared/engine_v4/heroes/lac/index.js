@@ -341,8 +341,8 @@ export const LacLongQuan = {
     new SkillContract({
       id: 'boc_tram_trung',
       name: 'Bọc Trăm Trứng',
-      type: 'reactive',
-      description: 'Chủ Công Kỹ: Khi cần Chém, tướng Lạc có thể Chém giùm.'
+      type: 'active',
+      description: 'Chủ Công Kỹ: Khi cần sử dụng hoặc đánh ra lá [Chém] (hoặc Né), tướng Lạc có thể ra bài giùm.'
     })
   ]
 };

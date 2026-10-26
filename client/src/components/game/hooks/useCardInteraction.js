@@ -19,10 +19,11 @@ import { PHASES } from 'shared/data/gameData';
  * @param {UseCardInteractionProps} props
  */
 export function useCardInteraction(props) {
-    const { gameState, gameAPI, activeSkill, targetSession, setTargetSession, cancelTargeting, mainPlayerId = 0 } = props;
+    const { gameState, gameAPI, activeSkill, targetSession, setTargetSession, cancelTargeting, mainPlayerId = 0, clickGuardUntilRef } = props;
     const [selectedDiscards, setSelectedDiscards] = useState([]);
 
     const handleCardClick = useCallback((cardIndex) => {
+        if (clickGuardUntilRef && Date.now() < clickGuardUntilRef.current) return;
         if (!gameState || !gameAPI) return;
         if (gameState.waitingForResponse && gameState.waitingForResponse.type !== 'play_phase') return;
         const player = gameState.players.find(p => p.id === mainPlayerId);
@@ -206,12 +207,13 @@ export function useCardInteraction(props) {
         setSelectedDiscards([]);
     }, [gameState, selectedDiscards, gameAPI, mainPlayerId]);
     const handleUnplayableClick = useCallback((cardIndex) => {
+        if (clickGuardUntilRef && Date.now() < clickGuardUntilRef.current) return;
         const player = gameState?.players?.find(p => p.id === mainPlayerId);
         const card = player?.hand[cardIndex];
         if (card && card.unplayableReason) {
             gameAPI.addLog(card.unplayableReason, 'warning');
         }
-    }, [gameState, gameAPI, mainPlayerId]);
+    }, [gameState, gameAPI, mainPlayerId, clickGuardUntilRef]);
 
     return {
         selectedDiscards,

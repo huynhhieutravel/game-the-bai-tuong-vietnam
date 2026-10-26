@@ -117,7 +117,11 @@ export function DraftScreen(props) {
         });
     };
     
-    const handleDraftConfirm = () => {
+    const handleDraftConfirm = (e) => {
+        if (e && typeof e.preventDefault === 'function') {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         gameController.selectDraftHeroes(me.id, draftSelection[0], draftSelection[1] || draftSelection[0]);
     };
 

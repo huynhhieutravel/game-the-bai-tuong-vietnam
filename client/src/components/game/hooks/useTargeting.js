@@ -78,10 +78,10 @@ export function useTargeting({
                    type: 'ACTION_USE_SKILL',
                    payload: { playerId: mainPlayerId, skillId: skillMap[activeSkill], targets: newSelectedTargets }
                });
-           } else if (activeSkill === 'Bọc Trăm Trứng' || activeSkill === 'Bọc Trăm Trứng (Chủ Công Kỹ)') {
+           } else if (activeSkill === 'Bọc Trăm Trứng' || activeSkill === 'Bọc Trăm Trứng (Chủ Công Kỹ)' || activeSkill === 'boc_tram_trung' || activeSkill === 'boc-tram-trung') {
                gameAPI.dispatcher.dispatchAction({
                    type: 'ACTION_USE_SKILL',
-                   payload: { playerId: mainPlayerId, skillId: 'boc-tram-trung', targets: newSelectedTargets }
+                   payload: { playerId: mainPlayerId, skillId: 'boc_tram_trung', targets: newSelectedTargets }
                });
            } else if (card) {
                gameAPI.playCard(mainPlayerId, card.id, newSelectedTargets, virtualCardName ? { virtualCardName } : {});

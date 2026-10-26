@@ -649,6 +649,14 @@ export class CombatRules {
       state.discardFromHand(allyId, [slashCard.id]);
       state.addLog(`🐉 [Bọc Trăm Trứng] ${ally.name} đánh ra lá [Chém] giùm cho ${llq.name}!`);
 
+      if (frame.context?.isInitiatedAttack) {
+        llq.turnStats = llq.turnStats || {};
+        llq.turnStats.slashCount = (llq.turnStats.slashCount || 0) + 1;
+        const targetId = frame.targetId;
+        this.playSlash(state, llq.id, targetId, { ...slashCard, name: 'Chém', type: 'slash', virtual: true }, { isVirtualSlash: true });
+        return { slashed: true };
+      }
+
       // Nếu trong Quyết Đấu
       const underlyingFrame = state.priorityStack.peek();
       if (underlyingFrame && underlyingFrame.type === 'ASK_SLASH_DUEL') {
@@ -670,6 +678,10 @@ export class CombatRules {
         return { continued: true, nextAllyId };
       } else {
         state.priorityStack.pop();
+        if (frame.context?.isInitiatedAttack) {
+          state.addLog(`🐉 Đồng minh hệ Lạc không ai ra [Chém] giùm cho ${llq.name}. ${llq.name} vẫn có thể tự mình dùng bài!`);
+          return { slashed: false };
+        }
         const underlyingFrame = state.priorityStack.peek();
         if (underlyingFrame && underlyingFrame.context) {
           underlyingFrame.context.bocTramTrungFailed = true;

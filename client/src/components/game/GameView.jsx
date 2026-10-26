@@ -128,6 +128,18 @@ export default function GameView(props = {}) {
   
   const logRef = useRef(null);
 
+  const clickGuardUntilRef = useRef(0);
+  const prevPhaseRef = useRef(gameState?.phase);
+
+  useEffect(() => {
+    if (prevPhaseRef.current === PHASES.DRAFT && gameState?.phase !== PHASES.DRAFT) {
+      setTargetSession(null);
+      setActiveSkill(null);
+      clickGuardUntilRef.current = Date.now() + 450;
+    }
+    prevPhaseRef.current = gameState?.phase;
+  }, [gameState?.phase]);
+
   const { cancelTargeting, handleTargetClick } = useTargeting({
       gameAPI,
       gameState,
@@ -157,7 +169,8 @@ export default function GameView(props = {}) {
       targetSession,
       setTargetSession,
       cancelTargeting,
-      mainPlayerId
+      mainPlayerId,
+      clickGuardUntilRef
   });
 
   const dismissBanner = useCallback(() => {

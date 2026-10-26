@@ -427,5 +427,144 @@ describe('QA Toàn Diện Tướng Hệ Lạc: Lạc Long Quân (Lac Long Quan Q
       expect(state.priorityStack.peek().type).toBe('ASK_SLASH_DUEL');
       expect(state.priorityStack.peek().currentActorId).toBe(3);
     });
+
+    it('2.5. Chủ động Hành Động: Lạc Long Quân phát động Bọc Trăm Trứng chỉ định kẻ địch, đồng minh Chém giùm thành công', () => {
+      const state = createMockGameState();
+      const dispatcher = new DispatcherV4(state, new StateMachine(state));
+
+      const p0 = state.getPlayer(0); // LLQ
+      const p1 = state.getPlayer(1); // Đồng minh Lạc
+      const p3 = state.getPlayer(3); // Kẻ địch
+      p1.hand = [{ id: 'slash_ally', name: 'Chém', type: 'slash', suit: 'spade' }];
+      p3.hand = [{ id: 'dodge_enemy', name: 'Né', type: 'dodge', suit: 'heart' }];
+
+      // LLQ phát động Bọc Trăm Trứng tấn công kẻ địch p3
+      dispatcher.dispatchAction({
+        playerId: 0,
+        type: 'ACTION_USE_SKILL',
+        skillId: 'boc_tram_trung',
+        targets: [3]
+      });
+
+      // Frame hỏi đồng minh Lạc ra Chém được tạo
+      expect(state.priorityStack.peek().type).toBe('ASK_BOC_TRAM_TRUNG_SLASH');
+      expect(state.priorityStack.peek().currentActorId).toBe(1);
+
+      // Đồng minh p1 ra lá Chém giùm
+      dispatcher.dispatchAction({
+        playerId: 1,
+        type: 'ACTION_REACT',
+        doProvide: true,
+        cardId: 'slash_ally'
+      });
+
+      // Kẻ địch p3 bị tấn công bằng Chém -> mở frame ASK_DODGE cho p3
+      expect(state.priorityStack.peek().type).toBe('ASK_DODGE');
+      expect(state.priorityStack.peek().targetId).toBe(3);
+      // Lạc Long Quân đã tính 1 lần Chém trong lượt
+      expect(p0.turnStats.slashCount).toBe(1);
+    });
+
+    it('2.6. Chủ động Hành Động: Đồng minh Lạc từ chối Chém -> Lạc Long Quân KHÔNG bị mất lượt Chém và vẫn tự Chém được', () => {
+      const state = createMockGameState();
+      const dispatcher = new DispatcherV4(state, new StateMachine(state));
+
+      const p0 = state.getPlayer(0); // LLQ
+      const p3 = state.getPlayer(3); // Kẻ địch
+      p0.hand = [{ id: 'slash_llq', name: 'Chém', type: 'slash', suit: 'spade' }];
+
+      // LLQ phát động Bọc Trăm Trứng tấn công kẻ địch p3
+      dispatcher.dispatchAction({
+        playerId: 0,
+        type: 'ACTION_USE_SKILL',
+        skillId: 'boc_tram_trung',
+        targets: [3]
+      });
+
+      // Đồng minh 1 từ chối
+      dispatcher.dispatchAction({
+        playerId: 1,
+        type: 'ACTION_REACT',
+        doProvide: false,
+        responseType: 'skip'
+      });
+
+      // Đồng minh 2 từ chối
+      dispatcher.dispatchAction({
+        playerId: 2,
+        type: 'ACTION_REACT',
+        doProvide: false,
+        responseType: 'skip'
+      });
+
+      // Frame Bọc Trăm Trứng đã gỡ bỏ hoàn toàn
+      expect(state.priorityStack.isEmpty()).toBe(true);
+      // Lạc Long Quân KHÔNG bị tính lượt Chém (slashCount vẫn bằng 0)
+      expect(p0.turnStats.slashCount).toBe(0);
+
+      // LLQ có thể tự mình dùng lá Chém trên tay để tấn công p3
+      dispatcher.dispatchAction({
+        playerId: 0,
+        type: 'ACTION_PLAY_CARD',
+        cardId: 'slash_llq',
+        targetIds: [3]
+      });
+
+      expect(state.priorityStack.peek().type).toBe('ASK_DODGE');
+      expect(state.priorityStack.peek().targetId).toBe(3);
+      expect(p0.turnStats.slashCount).toBe(1);
+    });
+
+    it('2.7. Bị Chém: Đồng minh từ chối Né giùm -> Lạc Long Quân vẫn giữ quyền tự dùng lá [Né] trên tay để đỡ đòn', () => {
+      const state = createMockGameState();
+      const dispatcher = new DispatcherV4(state, new StateMachine(state));
+
+      const p0 = state.getPlayer(0); // LLQ
+      const p3 = state.getPlayer(3); // Kẻ địch
+      p0.hand = [{ id: 'dodge_llq', name: 'Né', type: 'dodge', suit: 'diamond' }];
+      p3.hand = [{ id: 'slash_enemy', name: 'Chém', type: 'slash', suit: 'spade' }];
+
+      CombatRules.playSlash(state, 3, 0, p3.hand[0]);
+
+      // LLQ gọi Bọc Trăm Trứng
+      dispatcher.dispatchAction({
+        playerId: 0,
+        type: 'ACTION_REACT',
+        callBocTramTrung: true
+      });
+
+      // Đồng minh 1 từ chối
+      dispatcher.dispatchAction({
+        playerId: 1,
+        type: 'ACTION_REACT',
+        doProvide: false,
+        responseType: 'skip'
+      });
+
+      // Đồng minh 2 từ chối
+      dispatcher.dispatchAction({
+        playerId: 2,
+        type: 'ACTION_REACT',
+        doProvide: false,
+        responseType: 'skip'
+      });
+
+      // Frame ASK_DODGE quay lại đỉnh stack với currentActorId là chính Lạc Long Quân (p0)
+      const topFrame = state.priorityStack.peek();
+      expect(topFrame.type).toBe('ASK_DODGE');
+      expect(topFrame.currentActorId).toBe(0);
+      expect(topFrame.context.bocTramTrungFailed).toBe(true);
+
+      // Lạc Long Quân tự đánh lá Né trên tay mình
+      dispatcher.dispatchAction({
+        playerId: 0,
+        type: 'ACTION_REACT',
+        cardId: 'dodge_llq'
+      });
+
+      // Đỡ đòn thành công, LLQ không mất máu
+      expect(state.priorityStack.isEmpty()).toBe(true);
+      expect(p0.hp).toBe(3);
+    });
   });
 });

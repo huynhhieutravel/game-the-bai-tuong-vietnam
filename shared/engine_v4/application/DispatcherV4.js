@@ -889,7 +889,11 @@ export class DispatcherV4 {
       case 'ASK_BOC_TRAM_TRUNG_DODGE': {
         let dodgeCard = null;
         if (!isCancelOrSkip && (data.doProvide || data.doReact)) {
-          this._ensureHeroRevealedForSkill(player, 'boc_tram_trung', 'Bọc Trăm Trứng');
+          const frame = this.state.priorityStack.peek();
+          if (frame && frame.sourceId !== undefined) {
+            const lord = this.state.getPlayer(frame.sourceId);
+            if (lord) this._ensureHeroRevealedForSkill(lord, 'boc_tram_trung', 'Bọc Trăm Trứng');
+          }
           dodgeCard = this._resolveCard(player, data) || player.hand.find(c => c.type === 'dodge' || c.name === 'Né');
         }
         CombatRules.respondBocTramTrungDodge(this.state, playerId, dodgeCard);
@@ -899,7 +903,11 @@ export class DispatcherV4 {
       case 'ASK_BOC_TRAM_TRUNG_SLASH': {
         let slashCard = null;
         if (!isCancelOrSkip && (data.doProvide || data.doReact)) {
-          this._ensureHeroRevealedForSkill(player, 'boc_tram_trung', 'Bọc Trăm Trứng');
+          const frame = this.state.priorityStack.peek();
+          if (frame && frame.sourceId !== undefined) {
+            const lord = this.state.getPlayer(frame.sourceId);
+            if (lord) this._ensureHeroRevealedForSkill(lord, 'boc_tram_trung', 'Bọc Trăm Trứng');
+          }
           slashCard = this._resolveCard(player, data) || player.hand.find(c => c.type === 'slash' || c.name === 'Chém');
         }
         CombatRules.respondBocTramTrungSlash(this.state, playerId, slashCard);
@@ -2148,6 +2156,51 @@ export class DispatcherV4 {
         currentActorId: playerId,
         priorityQueue: [playerId],
         context: { reason: 'pha_thanh' }
+      });
+      return;
+    }
+
+    if (normSkillId === 'boc_tram_trung') {
+      const targetId = targets[0] !== undefined ? targets[0] : options.targetId;
+      if (targetId === undefined) {
+        throw new Error('[Bọc Trăm Trứng] Vui lòng chọn 1 mục tiêu kẻ địch!');
+      }
+      const target = this.state.getPlayer(targetId);
+      if (!target || !target.isAlive) {
+        throw new Error('[Bọc Trăm Trứng] Mục tiêu không hợp lệ!');
+      }
+      const alivePlayers = this.state.getAlivePlayers();
+      if (!RangeSystem.inSlashRange(player, target, alivePlayers)) {
+        throw new Error('[Bọc Trăm Trứng] Mục tiêu nằm ngoài tầm đánh!');
+      }
+      const hasCrossbow = player.equipment?.weapon?.idKey === 'lien_no';
+      if (!hasCrossbow && (player.turnStats?.slashCount || 0) >= 1) {
+        throw new Error('[Bọc Trăm Trứng] Đã hết số lần Chém trong lượt này!');
+      }
+      const allies = this.state.players.filter(p =>
+        p.id !== playerId &&
+        p.isAlive &&
+        !p.isDaTam &&
+        (p.revealedHeroes ? p.revealedHeroes.some(Boolean) : p.isRevealed !== false) &&
+        getCanonicalFaction(p.faction) === 'lac'
+      );
+      if (allies.length === 0) {
+        this.state.addLog(`🐉 Không có đồng minh hệ Lạc nào có thể ra [Chém] giùm cho ${player.name}!`);
+        return;
+      }
+      this.state.addLog(`🐉 ${player.name} phát động [Bọc Trăm Trứng], kêu gọi đồng minh hệ Lạc ra [Chém] tấn công ${target.name}!`);
+      this.state.priorityStack.push({
+        type: 'ASK_BOC_TRAM_TRUNG_SLASH',
+        sourceId: playerId,
+        targetId: targetId,
+        priorityQueue: allies.map(a => a.id),
+        currentActorId: allies[0].id,
+        context: {
+          allies: allies.map(a => a.id),
+          allyIndex: 0,
+          isInitiatedAttack: true,
+          targetId: targetId
+        }
       });
       return;
     }

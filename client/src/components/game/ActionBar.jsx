@@ -86,7 +86,8 @@ export function ActionBar(props) {
                             'hoa_than', 'dieu_duoc', 'tu_chu', 'binh_loan', 'thuy_to', 
                             'duyen_tho', 'tam_cong', 'bach_dang', 'lan_sau', 'van_don', 
                             'ky_tap', 'doi_nui', 'pha_thanh', 'than_hoa', 'khai_thien', 
-                            'dinh_quoc', 'tien_phong', 'tien_duyen', 'doat_sao', 'can_gian'
+                            'dinh_quoc', 'tien_phong', 'tien_duyen', 'doat_sao', 'can_gian',
+                            'boc_tram_trung'
                         ];
                         return activeNormIds.includes(normId);
                     };
@@ -131,8 +132,24 @@ export function ActionBar(props) {
                         );
                       }
                       
-                      const isSkillDisabled = me.isSilenced || !s.isUsable;
-                      const disableReason = me.isSilenced ? 'Kỹ năng bị khóa!' : (s.disableReason || 'Không thể sử dụng lúc này');
+                      const normId = normalizeSkillId(s.id || s.name);
+                      let isSkillDisabled = me.isSilenced || !s.isUsable;
+                      let disableReason = me.isSilenced ? 'Kỹ năng bị khóa!' : (s.disableReason || 'Không thể sử dụng lúc này');
+
+                      if (normId === 'boc_tram_trung') {
+                        const hasCrossbow = me.equipment?.weapon?.idKey === 'lien_no';
+                        const hasUsedSlash = (me.turnStats?.slashCount || 0) >= 1 && !hasCrossbow;
+                        const hasLacAlly = gameState.players.some(p => p.id !== me.id && p.isAlive && !p.isDaTam && (p.revealedHeroes ? p.revealedHeroes.some(Boolean) : p.isRevealed !== false) && (getCanonicalFaction(p.faction) === 'lac'));
+                        if (hasUsedSlash) {
+                          isSkillDisabled = true;
+                          disableReason = 'Đã hết số lần Chém trong lượt này!';
+                        } else if (!hasLacAlly) {
+                          isSkillDisabled = true;
+                          disableReason = 'Không có đồng minh hệ Lạc nào đang lộ diện!';
+                        } else {
+                          isSkillDisabled = me.isSilenced;
+                        }
+                      }
 
                       return (
                         <button 
