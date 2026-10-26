@@ -33,12 +33,13 @@ describe('Engine v4 Application Layer Adapter', () => {
     // After all drafted, state is v4 GameState
     expect(state.currentPhase).toBe('ACTION');
     expect(state.players.length).toBe(4);
-    expect(state.players[0].hand.length).toBe(4);
+    // Player 0 khởi đầu với 4 lá ban đầu + 2 lá rút trong Pha Rút bài của Lượt 1
+    expect(state.players[0].hand.length).toBe(6);
     expect(state.players[1].hand.length).toBe(4);
 
     const vm = toViewModel(state);
     expect(vm.phase).toBe(PHASES.ACTION);
-    expect(vm.players[0].hand.length).toBe(4);
+    expect(vm.players[0].hand.length).toBe(6);
     expect(vm.players[0].heroes.length).toBe(2);
     expect(vm.players[0].heroes[0].name).toBe('Lạc Long Quân');
   });

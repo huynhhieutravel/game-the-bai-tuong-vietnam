@@ -2506,6 +2506,10 @@ export class DispatcherV4 {
       console.warn(`[DispatcherV4] Cannot end phase: Not player ${targetId}'s turn.`);
       return;
     }
+    if (this.state.priorityStack && !this.state.priorityStack.isEmpty()) {
+      console.warn(`[DispatcherV4] Cannot end phase while priority stack is not empty.`);
+      return;
+    }
     if (this.state.currentPhase === PHASES.ACTION) {
       this.stateMachine.endActionPhase();
     } else if (this.state.currentPhase === PHASES.DISCARD) {

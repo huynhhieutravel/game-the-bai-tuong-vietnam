@@ -32,6 +32,10 @@ export class CombatRules {
       throw new Error(`[CombatRules] Người chơi không hợp lệ hoặc đã tử trận.`);
     }
 
+    if (target.hp <= 0) {
+      throw new Error(`[CombatRules] Mục tiêu ${target.name} đang trong trạng thái Hấp Hối (HP: ${target.hp}), không thể tấn công!`);
+    }
+
     const hasDoiNui = globalHeroRegistry.hasSkill(source, 'doi_nui', true) && (card?.name === 'Né' || card?.type === 'dodge');
     const effColor = card && source ? globalHeroRegistry.getEffectiveColor(source, card) : card?.color;
     const isRed = effColor ? effColor === 'red' : Boolean(card && (card.color === 'red' || getSuitColor(card.suit) === 'red'));

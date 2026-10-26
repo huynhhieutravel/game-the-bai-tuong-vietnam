@@ -80,83 +80,87 @@ export class BotRunnerV4 {
       context: gameState.waitingForResponse
     } : null);
 
-    if (frame && frame.currentActorId !== undefined && frame.currentActorId !== null) {
-      const actor = (gameState.players || []).find(p => p.id === frame.currentActorId);
-      if (actor && actor.isBot) {
-        this._clearTimer();
-        this.isProcessing = true;
-        this.timerId = setTimeout(() => {
-          this.timerId = null;
-          try {
-            const latestState = this.gameAPI.dispatcher.state;
-            const latestFrame = latestState.priorityStack?.peek?.();
-            if (!latestFrame) {
-              this.isProcessing = false;
-              return;
-            }
-
-            // Kiểm tra chính xác ai đang thực sự được chờ phản hồi trên latestFrame
-            const expectedActorId = latestFrame.context?.currentResponderId ?? 
-                                    latestFrame.currentActorId ?? 
-                                    latestFrame.priorityQueue?.[0] ?? 
-                                    latestFrame.targetId;
-
-            // NẾU actor.id KHÔNG CÒN LÀ NGƯỜI CẦN PHẢN HỒI -> THOÁT NGAY ĐỂ TRÁNH LỖI ĐỌ CHÉM/NÉ CỦA NGƯỜI KHÁC!
-            if (expectedActorId !== actor.id) {
-              this.isProcessing = false;
-              return;
-            }
-
-            const currentActor = latestState.getPlayer ? latestState.getPlayer(actor.id) : latestState.players.find(p => p.id === actor.id);
-
-            if (currentActor && currentActor.isAlive) {
-              const reaction = BotBrain.decideReaction(latestState, actor.id, latestFrame);
-
-              if (latestFrame.type === 'ASK_DISCARD') {
-                const required = Math.min((currentActor.hand || []).length, latestFrame.context?.cardsToDiscard || 1);
-                const discardIds = (reaction.discardCardIds && reaction.discardCardIds.length === required)
-                  ? reaction.discardCardIds
-                  : (currentActor.hand || []).slice(0, required).map(c => c.id);
-                this.isProcessing = false;
-                this.gameAPI.discardCards(actor.id, discardIds);
-              } else {
-                const chosenCard = reaction.dodgeCard || reaction.peachCard || reaction.slashCard || reaction.negateCard || null;
-                const chosenCardId = reaction.cardId || chosenCard?.id;
-                const isCanceled = reaction.canceled !== undefined 
-                  ? reaction.canceled 
-                  : (!chosenCard && !chosenCardId && !reaction.useBagua && !reaction.doUse && !reaction.orderedCards && !reaction.doProvide && !reaction.doReact && !reaction.doJudge && !reaction.doDiscard && !reaction.option && !reaction.selectedAlly && !reaction.suit && !reaction.virtualCardName && !reaction.costType && !reaction.cardIds && !reaction.targetId && !reaction.targetA && !reaction.targets);
-                this.isProcessing = false;
-                this.gameAPI.respond({
-                  playerId: actor.id,
-                  cardId: chosenCardId,
-                  canceled: isCanceled,
-                  _isAuto: true,
-                  ...reaction
-                });
-              }
-            } else if (currentActor && !currentActor.isAlive) {
-              // Actor đã chết -> Tự động bỏ qua yêu cầu phản hồi để giải phóng PriorityFrame
-              this.isProcessing = false;
-              this.gameAPI.respond({ playerId: actor.id, canceled: true, _isAuto: true });
-            }
-          } catch (err) {
-            console.error('[BotRunnerV4] Error during bot reaction:', err);
-            this.isProcessing = false;
-            // Chỉ fallback canceled nếu latestFrame vẫn đang thực sự chờ actor này
+    if (frame) {
+      if (frame.currentActorId !== undefined && frame.currentActorId !== null) {
+        const actor = (gameState.players || []).find(p => p.id === frame.currentActorId);
+        if (actor && actor.isBot) {
+          this._clearTimer();
+          this.isProcessing = true;
+          this.timerId = setTimeout(() => {
+            this.timerId = null;
             try {
-              const state = this.gameAPI.dispatcher.state;
-              const frame = state.priorityStack?.peek?.();
-              const expectedId = frame?.context?.currentResponderId ?? frame?.currentActorId ?? frame?.priorityQueue?.[0] ?? frame?.targetId;
-              if (expectedId === actor.id) {
+              const latestState = this.gameAPI.dispatcher.state;
+              const latestFrame = latestState.priorityStack?.peek?.();
+              if (!latestFrame) {
+                this.isProcessing = false;
+                return;
+              }
+
+              // Kiểm tra chính xác ai đang thực sự được chờ phản hồi trên latestFrame
+              const expectedActorId = latestFrame.context?.currentResponderId ?? 
+                                      latestFrame.currentActorId ?? 
+                                      latestFrame.priorityQueue?.[0] ?? 
+                                      latestFrame.targetId;
+
+              // NẾU actor.id KHÔNG CÒN LÀ NGƯỜI CẦN PHẢN HỒI -> THOÁT NGAY ĐỂ TRÁNH LỖI ĐỌ CHÉM/NÉ CỦA NGƯỜI KHÁC!
+              if (expectedActorId !== actor.id) {
+                this.isProcessing = false;
+                return;
+              }
+
+              const currentActor = latestState.getPlayer ? latestState.getPlayer(actor.id) : latestState.players.find(p => p.id === actor.id);
+
+              if (currentActor && currentActor.isAlive) {
+                const reaction = BotBrain.decideReaction(latestState, actor.id, latestFrame);
+
+                if (latestFrame.type === 'ASK_DISCARD') {
+                  const required = Math.min((currentActor.hand || []).length, latestFrame.context?.cardsToDiscard || 1);
+                  const discardIds = (reaction.discardCardIds && reaction.discardCardIds.length === required)
+                    ? reaction.discardCardIds
+                    : (currentActor.hand || []).slice(0, required).map(c => c.id);
+                  this.isProcessing = false;
+                  this.gameAPI.discardCards(actor.id, discardIds);
+                } else {
+                  const chosenCard = reaction.dodgeCard || reaction.peachCard || reaction.slashCard || reaction.negateCard || null;
+                  const chosenCardId = reaction.cardId || chosenCard?.id;
+                  const isCanceled = reaction.canceled !== undefined 
+                    ? reaction.canceled 
+                    : (!chosenCard && !chosenCardId && !reaction.useBagua && !reaction.doUse && !reaction.orderedCards && !reaction.doProvide && !reaction.doReact && !reaction.doJudge && !reaction.doDiscard && !reaction.option && !reaction.selectedAlly && !reaction.suit && !reaction.virtualCardName && !reaction.costType && !reaction.cardIds && !reaction.targetId && !reaction.targetA && !reaction.targets);
+                  this.isProcessing = false;
+                  this.gameAPI.respond({
+                    playerId: actor.id,
+                    cardId: chosenCardId,
+                    canceled: isCanceled,
+                    _isAuto: true,
+                    ...reaction
+                  });
+                }
+              } else if (currentActor && !currentActor.isAlive) {
+                // Actor đã chết -> Tự động bỏ qua yêu cầu phản hồi để giải phóng PriorityFrame
+                this.isProcessing = false;
                 this.gameAPI.respond({ playerId: actor.id, canceled: true, _isAuto: true });
               }
-            } catch (_) {}
-          } finally {
-            this.isProcessing = false;
-          }
-        }, 600);
-        return;
+            } catch (err) {
+              console.error('[BotRunnerV4] Error during bot reaction:', err);
+              this.isProcessing = false;
+              // Chỉ fallback canceled nếu latestFrame vẫn đang thực sự chờ actor này
+              try {
+                const state = this.gameAPI.dispatcher.state;
+                const frame = state.priorityStack?.peek?.();
+                const expectedId = frame?.context?.currentResponderId ?? frame?.currentActorId ?? frame?.priorityQueue?.[0] ?? frame?.targetId;
+                if (expectedId === actor.id) {
+                  this.gameAPI.respond({ playerId: actor.id, canceled: true, _isAuto: true });
+                }
+              } catch (_) {}
+            } finally {
+              this.isProcessing = false;
+            }
+          }, 600);
+          return;
+        }
       }
+      // Đang có PriorityFrame chờ phản hồi (của người chơi Người hoặc chờ tiến trình) -> DỪNG LẠI, KHÔNG rơi xuống xử lý lượt hành động!
+      return;
     }
 
     // --- 3. Xử lý Lượt Hành Động của Bot ---
@@ -175,8 +179,8 @@ export class BotRunnerV4 {
             const latestState = this.gameAPI.dispatcher.state;
             const latestPhase = (latestState.currentPhase || latestState.phase || '').toUpperCase();
             
-            // NẾU LATEST STATE KHÔNG CÒN Ở ACTION PHASE -> THOÁT NGAY!
-            if (latestPhase !== 'ACTION') {
+            // NẾU LATEST STATE KHÔNG CÒN Ở ACTION PHASE HOẶC ĐANG CÓ PRIORITY FRAME CHỜ PHẢN HỒI -> THOÁT NGAY!
+            if (latestPhase !== 'ACTION' || (latestState.priorityStack && !latestState.priorityStack.isEmpty()) || latestState.waitingForResponse) {
               this.isProcessing = false;
               return;
             }
@@ -268,10 +272,14 @@ export class BotRunnerV4 {
               const cardIds = (latestBot.hand || []).slice(0, requiredCards).map(c => c.id);
               this.isProcessing = false;
               this.gameAPI.discardCards(currentTurnId, cardIds);
-            } else {
-              // Không cần bỏ bài hoặc stack rỗng -> Kết thúc pha Bỏ bài để chuyển sang END
+            } else if (excess <= 0 && (!currentFrame || currentFrame.type !== 'ASK_DISCARD')) {
+              // Thỏa mãn giới hạn bài tay -> Kết thúc pha Bỏ bài để chuyển sang END
               this.isProcessing = false;
               this.gameAPI.endPhase(currentTurnId);
+            } else {
+              // Đang có frame khác chờ hoặc chưa sẵn sàng discard -> chờ vòng lặp tiếp theo
+              this.isProcessing = false;
+              return;
             }
           } catch (err) {
             console.error('[BotRunnerV4] Error during bot discard phase:', err);

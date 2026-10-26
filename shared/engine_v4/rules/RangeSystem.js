@@ -170,6 +170,7 @@ export class RangeSystem {
   static getValidSlashTargets(source, alivePlayers, card = null) {
     return alivePlayers.filter(target => {
       if (target.id === source.id) return false;
+      if (target.hp <= 0) return false;
       // Đạm Bạc (Lang Liêu): Khi không có bài trên tay, không thể là mục tiêu của [Chém]
       if (globalHeroRegistry.hasSkill(target, 'dam_bac', false) && (!target.hand || target.hand.length === 0)) {
         return false;

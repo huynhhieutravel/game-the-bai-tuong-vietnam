@@ -228,9 +228,9 @@ export function selectDraftHeroes(state, playerId, hero1Id, hero2Id) {
       v4GameState.drawCards(player.id, 4);
     }
 
-    // Bắt đầu lượt đầu tiên cho người chơi 0
-    v4GameState.currentPhase = PHASES.ACTION;
-    v4GameState.addLog('Trận đấu bắt đầu! Lượt của Bạn.');
+    // Bắt đầu lượt đầu tiên cho người chơi 0 theo đúng chuẩn vòng đời (Begin -> Judge -> Draw -> Action)
+    const stateMachine = new StateMachine(v4GameState);
+    stateMachine.startTurn(0);
 
     return v4GameState;
   }

@@ -101,9 +101,12 @@ describe('Server RoomManager & GameRoom Integration with Engine v4', () => {
     expect(room.gameState.players[0].isBot).toBe(false);
     expect(room.gameState.players[1].isBot).toBe(false);
 
-    // 2. Người chơi 1 chọn tướng draft
+    // 2. Người chơi 1 chọn tướng draft (chọn tướng không có trigger trong pha Rút bài để vào thẳng ACTION phase)
+    const drawTriggerHeroes = ['trieu_quang_phuc', 'phung_hung', 'do_doc_bao'];
     const p1Draft = room.gameState.players[0].draftHeroes;
-    room.handleDraftSelect('socket_1', p1Draft[0].id, p1Draft[1].id);
+    const hero1A = p1Draft.find(h => !drawTriggerHeroes.includes(h.id)) || p1Draft[0];
+    const hero1B = p1Draft.find(h => h.id !== hero1A.id && !drawTriggerHeroes.includes(h.id)) || p1Draft[1];
+    room.handleDraftSelect('socket_1', hero1A.id, hero1B.id);
     expect(room.gameState.phase).toBe('draft');
     expect(room.dispatcher).toBeNull(); // Chưa xong draft vì người 2 chưa chọn
 
@@ -113,7 +116,8 @@ describe('Server RoomManager & GameRoom Integration with Engine v4', () => {
 
     expect(room.dispatcher).toBeDefined();
     expect(room.gameState.currentPhase).toBe('ACTION');
-    expect(room.gameState.players[0].hand.length).toBe(4);
+    // Player 0 bắt đầu lượt 1: 4 lá ban đầu + 2 lá rút trong Pha Rút bài = 6 lá
+    expect(room.gameState.players[0].hand.length).toBe(6);
     expect(room.gameState.players[1].hand.length).toBe(4);
 
     // 4. Dispatch Action qua Engine V4

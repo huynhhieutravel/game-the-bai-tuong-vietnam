@@ -32,6 +32,15 @@ export class TrickRules {
 
     const targets = Array.isArray(targetIds) ? targetIds : [targetIds];
 
+    if (!isAOETrick(card)) {
+      for (const tId of targets) {
+        const t = state.getPlayer(tId);
+        if (t && t.isAlive && t.hp <= 0) {
+          throw new Error(`[TrickRules] Mục tiêu ${t.name} đang trong trạng thái Hấp Hối (HP: ${t.hp}), không thể trở thành mục tiêu của Cẩm nang!`);
+        }
+      }
+    }
+
     // 0. Kiểm tra Đạm Bạc (Lang Liêu) nếu là Quyết Đấu
     if ((isTrick(card, 'quyet_dau') || card.type === 'duel') && targets.length > 0) {
       const target = state.getPlayer(targets[0]);

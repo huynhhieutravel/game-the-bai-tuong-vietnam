@@ -781,7 +781,7 @@ export class BotBrain {
    * Sắp xếp mục tiêu theo độ ưu tiên: Kẻ địch lộ diện (máu thấp trước) -> Người chơi ẩn -> Tuyệt đối không đánh đồng minh
    */
   static _sortTargetsByPriority(bot, candidates) {
-    const nonAllies = candidates.filter(t => !this._isKnownAlly(bot, t));
+    const nonAllies = candidates.filter(t => !this._isKnownAlly(bot, t) && (t.hp === undefined || t.hp > 0));
     if (nonAllies.length === 0) return [];
 
     const knownEnemies = nonAllies.filter(t => this._isKnownEnemy(bot, t));
