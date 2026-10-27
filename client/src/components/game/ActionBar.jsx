@@ -101,7 +101,8 @@ export function ActionBar(props) {
                         // Đảm bảo không bị trùng nếu chính mình là Đinh Điền
                         const iHaveDinhQuoc = skills.some(s => (s.id === 'dinh-quoc' || s.id === 'dinh_quoc' || s.name === 'Định Quốc') && s.isRevealed);
                         if (hasDinhQuocUser && !iHaveDinhQuoc) {
-                            skills.push({ name: 'Định Quốc', desc: 'Đưa 1 lá [Né] hoặc [Sấm Sét] cho tướng có kỹ năng Định Quốc', isRevealed: true, isUsable: !me.dinhQuocUsedThisTurn && me.hand.length > 0 });
+                            const isUsed = Boolean(me.dinhQuocUsedThisTurn || me.skillUsage?.dinh_quoc?.usedThisTurn);
+                            skills.push({ name: 'Định Quốc', desc: 'Đưa 1 lá [Né] hoặc [Sấm Sét] cho tướng có kỹ năng Định Quốc', isRevealed: true, isUsable: !isUsed && me.hand.length > 0 });
                         }
                     }
 
@@ -176,13 +177,15 @@ export function ActionBar(props) {
                   Hủy
                 </button>
                 {targetSession.targetingDef?.type === 'multiple' && (() => {
-                  const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
+                  const hasCard = Boolean(targetSession.card);
+                  const isTienDuyen = activeSkill === 'Tiên Duyên' || normalizeSkillId(activeSkill) === 'tien_duyen';
+                  const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || isTienDuyen;
                   const minTargets = targetSession.targetingDef.min !== undefined ? targetSession.targetingDef.min : 1;
                   const maxTargets = targetSession.targetingDef.max !== undefined ? targetSession.targetingDef.max : 2;
                   const selectedCount = targetSession.selectedTargets.length;
                   const hasEnoughTargets = selectedCount >= minTargets;
-                  const isReforge = isXiengXich && selectedCount === 0;
-                  const canSubmit = isReforge || hasEnoughTargets;
+                  const isReforge = hasCard && isXiengXich && selectedCount === 0;
+                  const canSubmit = hasCard && (isReforge || hasEnoughTargets);
                   
                   let label = `Dùng ${targetSession.virtualCardName || targetSession.card?.name || activeSkill}`;
                   if (isXiengXich) {
@@ -197,9 +200,9 @@ export function ActionBar(props) {
                       disabled={!canSubmit}
                       style={{ opacity: canSubmit ? 1 : 0.5, filter: canSubmit ? 'none' : 'grayscale(1)' }}
                       onClick={() => {
-                         if (isActionPending.current) return;
+                         if (isActionPending.current || !targetSession.card) return;
                          isActionPending.current = true;
-                         const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
+                         const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || isTienDuyen;
                          gameAPI.playCard(me.id, targetSession.card.id, targetSession.selectedTargets, { 
                              virtualCardName: targetSession.virtualCardName || (isXiengXich ? 'Xiềng Xích' : undefined),
                              isReforge: isReforge,
@@ -216,14 +219,15 @@ export function ActionBar(props) {
                 {['none', 'aoe', 'self'].includes(targetSession.targetingDef?.type) && (
                   <button
                     className="btn-action primary"
+                    disabled={!targetSession.card}
                     onClick={() => {
-                        if (isActionPending.current) return;
+                        if (isActionPending.current || !targetSession.card) return;
                         isActionPending.current = true;
                         gameAPI.playCard(me.id, targetSession.card.id, [], { virtualCardName: targetSession.virtualCardName });
                         cancelTargeting();
                     }}
                   >
-                    Dùng {targetSession.virtualCardName || targetSession.card.name}
+                    Dùng {targetSession.virtualCardName || targetSession.card?.name}
                   </button>
                 )}
               </>

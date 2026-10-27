@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { CARD_TYPES, CARD_SUITS } from 'shared/constants/cardTypes';
 import { getTargetingDefinition, getAvailableTargets, canPlayCard } from 'shared/engine_v4/rules/TargetResolverV4.js';
 import { hasSkill, getEffectiveSuit, getEffectiveColor } from 'shared/engine_v4/application/index.js';
+import { normalizeSkillId } from 'shared/utils/translationHelper';
 import { PHASES } from 'shared/data/gameData';
 
 /**
@@ -30,9 +31,11 @@ export function useCardInteraction(props) {
         const card = player?.hand[cardIndex];
         if (!card) return;
 
+        const normActiveSkill = normalizeSkillId(activeSkill);
         const NON_CONVERTING_TARGETED_SKILLS = ['Tâm Công', 'Vân Đồn', 'Duyên Thơ', 'Tiên Phong', 'Bọc Trăm Trứng', 'Bọc Trăm Trứng (Chủ Công Kỹ)'];
-        if (activeSkill && NON_CONVERTING_TARGETED_SKILLS.includes(activeSkill)) {
-            if (activeSkill === 'Tâm Công') {
+        const NON_CONVERTING_TARGETED_SKILLS_NORM = ['tam_cong', 'van_don', 'duyen_tho', 'tien_phong', 'boc_tram_trung'];
+        if (activeSkill && (NON_CONVERTING_TARGETED_SKILLS.includes(activeSkill) || NON_CONVERTING_TARGETED_SKILLS_NORM.includes(normActiveSkill))) {
+            if (activeSkill === 'Tâm Công' || normActiveSkill === 'tam_cong') {
                 gameAPI.addLog('🔮 [Tâm Công] Đối thủ sẽ tự động rút ngẫu nhiên 1 lá bài từ tay bạn! Hãy nhấp chọn TƯỚNG MỤC TIÊU trên bàn cờ.', 'warning');
             } else {
                 gameAPI.addLog(`🎯 Bạn đang dùng [${activeSkill}]. Hãy nhấp chọn TƯỚNG MỤC TIÊU trên bàn cờ!`, 'warning');
@@ -45,11 +48,13 @@ export function useCardInteraction(props) {
         if (activeSkill) {
           const effColor = getEffectiveColor(player, card);
           const effSuit = getEffectiveSuit(player, card);
+          const normSkill = normalizeSkillId(activeSkill);
 
-          if (activeSkill === 'Tiên Duyên') {
-              const isClub = effSuit === CARD_SUITS.CLUB || effSuit === 'club' || effSuit === '♣' || effSuit === 'clubs' || effSuit === 'chuồn';
+          const isTienDuyen = activeSkill === 'Tiên Duyên' || normSkill === 'tien_duyen';
+          if (isTienDuyen) {
+              const isClub = effSuit === CARD_SUITS.CLUB || effSuit === 'club' || effSuit === '♣' || effSuit === 'clubs' || effSuit === 'chuồn' || effSuit === 'nhép';
               if (!isClub) {
-                  gameAPI.addLog('Tiên Duyên chỉ dùng được với bài ♣ (Chuồn)!', 'danger');
+                  gameAPI.addLog('Tiên Duyên chỉ dùng được với bài ♣ (Chuồn/Nhép)!', 'danger');
                   return;
               }
               setTargetSession({
@@ -60,18 +65,18 @@ export function useCardInteraction(props) {
                   step: 0,
                   selectedTargets: [],
                   validTargets: gameState.players.filter(p => p.isAlive).map(p => p.id),
-                  message: '✨ Chọn 0 mục tiêu để Rút 1 bài, hoặc 1-2 mục tiêu để gán Xiềng Xích.'
+                  message: '✨ Chọn 0 mục tiêu để Rút 1 bài (Rèn Lại), hoặc 1-2 mục tiêu để gán Xiềng Xích.'
               });
               return;
           }
-          if (activeSkill === 'Khai Thiên') {
+          if (activeSkill === 'Khai Thiên' || normSkill === 'khai_thien') {
               if (effColor !== 'red') {
                   gameAPI.addLog('Khai Thiên chỉ dùng được với bài màu Đỏ!', 'danger');
                   return;
               }
               virtualName = 'Chém';
           }
-          if (activeSkill === 'Định Quốc') {
+          if (activeSkill === 'Định Quốc' || normSkill === 'dinh_quoc') {
               if (card.name !== 'Né' && card.name !== 'Sấm Sét') {
                   gameAPI.addLog('Định Quốc chỉ được truyền lá [Né] hoặc [Sấm Sét]!', 'danger');
                   return;
@@ -88,7 +93,7 @@ export function useCardInteraction(props) {
               });
               return;
           }
-          if (activeSkill === 'Thần Hỏa') {
+          if (activeSkill === 'Thần Hỏa' || normSkill === 'than_hoa') {
               if (effColor !== 'red') {
                   gameAPI.addLog('Thần Hỏa chỉ dùng được với bài ĐỎ!', 'danger');
                   return;
@@ -97,14 +102,14 @@ export function useCardInteraction(props) {
               // Không return, để logic bên dưới (dòng 93) tự set targetingDef dựa trên 'Hỏa Công'
           }
     
-          if (activeSkill === 'Kỳ Tập') {
+          if (activeSkill === 'Kỳ Tập' || normSkill === 'ky_tap') {
             if (effColor !== 'black') {
               gameAPI.addLog('Kỳ Tập chỉ dùng được với bài màu ĐEN!', 'danger');
               return;
             }
             virtualName = 'Tước Bài';
           }
-          if (activeSkill === 'Dời Núi') {
+          if (activeSkill === 'Dời Núi' || normSkill === 'doi_nui') {
             if (card.name === 'Né') virtualName = 'Chém';
             else if (card.name === 'Chém') virtualName = 'Né';
             else {
@@ -112,7 +117,7 @@ export function useCardInteraction(props) {
               return;
             }
           }
-          if (activeSkill === 'Phá Thành') {
+          if (activeSkill === 'Phá Thành' || normSkill === 'pha_thanh') {
             const p = gameState.players.find(p => p.id === mainPlayerId);
             if (!p || !p.phaThanhColor || effColor === p.phaThanhColor) {
               gameAPI.addLog('Phá Thành chỉ dùng được với bài KHÁC MÀU lá phán xét!', 'danger');
@@ -120,7 +125,7 @@ export function useCardInteraction(props) {
             }
             virtualName = 'Quyết Đấu';
           }
-          if ((activeSkill === 'Hòa Thân' || activeSkill === 'hoa_than_an_tu') && player && hasSkill(player, 'hoa_than_an_tu')) {
+          if ((activeSkill === 'Hòa Thân' || activeSkill === 'hoa_than_an_tu' || normSkill === 'hoa_than') && player && hasSkill(player, 'hoa_than_an_tu')) {
             const isDiamond = effSuit === 'diamond' || effSuit === 'diamonds' || effSuit === '♦' || effSuit === 'rô';
             if (!isDiamond) {
               gameAPI.addLog('Hòa Thân (An Tư) chỉ dùng được với bài chất Rô ♦!', 'danger');
@@ -161,7 +166,7 @@ export function useCardInteraction(props) {
            // Needs target selection
            let defaultMsg = '🎯 HÃY CHỌN 1 MỤC TIÊU! 🎯';
            if (targetingDef.type === 'multiple') {
-               const isXiengXich = virtualName === 'Xiềng Xích' || card.name === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
+               const isXiengXich = virtualName === 'Xiềng Xích' || card.name === 'Xiềng Xích' || activeSkill === 'Tiên Duyên' || normalizeSkillId(activeSkill) === 'tien_duyen';
                defaultMsg = isXiengXich
                    ? `Đã chọn 0/${targetingDef.max || 2} mục tiêu (Bấm "Rèn Lại" nếu không khóa ai)`
                    : `Đã chọn 0/${targetingDef.max || 2} mục tiêu (Chọn từ ${targetingDef.min} - ${targetingDef.max})`;

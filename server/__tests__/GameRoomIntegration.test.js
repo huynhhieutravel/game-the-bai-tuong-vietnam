@@ -102,7 +102,7 @@ describe('Server RoomManager & GameRoom Integration with Engine v4', () => {
     expect(room.gameState.players[1].isBot).toBe(false);
 
     // 2. Người chơi 1 chọn tướng draft (chọn cặp tướng cùng phe không có trigger trong pha Bắt đầu / Rút bài để vào thẳng ACTION phase)
-    const triggerHeroes = ['trieu_quang_phuc', 'phung_hung', 'do_doc_bao', 'lang_lieu', 'nguyen_phi_y_lan', 'ly_thuong_kiet'];
+    const triggerHeroes = ['trieu_quang_phuc', 'phung_hung', 'do_doc_bao', 'lang_lieu', 'nguyen_phi_y_lan', 'ly_thuong_kiet', 'dinh_dien'];
     const p1Draft = room.gameState.players[0].draftHeroes;
     const byFaction = {};
     for (const h of p1Draft) {
@@ -120,7 +120,10 @@ describe('Server RoomManager & GameRoom Integration with Engine v4', () => {
 
     // 3. Người chơi 2 chọn tướng draft -> Hoàn tất draft -> Engine V4 khởi tạo
     const p2Draft = room.gameState.players[1].draftHeroes;
-    room.handleDraftSelect('socket_2', p2Draft[0].id, p2Draft[1].id);
+    const p2Safe = p2Draft.filter(h => !triggerHeroes.includes(h.id));
+    const p2A = p2Safe[0] || p2Draft[0];
+    const p2B = p2Safe[1] || p2Draft[1];
+    room.handleDraftSelect('socket_2', p2A.id, p2B.id);
 
     expect(room.dispatcher).toBeDefined();
     expect(room.gameState.currentPhase).toBe('ACTION');

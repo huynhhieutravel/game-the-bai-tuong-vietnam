@@ -6,6 +6,7 @@ import { CARD_TYPES } from 'shared/constants/cardTypes';
 import { CARD_TYPE_LABELS } from '../../i18n/vi/cardLabels';
 import { getCardBg } from 'shared/utils/cardStyles';
 import { getEffectiveSuit, getEffectiveColor } from 'shared/engine_v4/heroes/HeroRegistry.js';
+import { normalizeSkillId } from 'shared/utils/translationHelper';
 
 // Helper for card badge colors
 function getBadgeColor(card) {
@@ -90,6 +91,7 @@ function renderCardNameBadge(card) {
 
 
 const CARD_CONVERTING_SKILLS = ['Tiên Duyên', 'Khai Thiên', 'Định Quốc', 'Thần Hỏa', 'Kỳ Tập', 'Dời Núi', 'Phá Thành', 'Hòa Thân'];
+const CARD_CONVERTING_SKILLS_NORM = ['tien_duyen', 'khai_thien', 'dinh_quoc', 'than_hoa', 'ky_tap', 'doi_nui', 'pha_thanh', 'hoa_than'];
 
 export function PlayerHand(props) {
     const {
@@ -122,8 +124,9 @@ export function PlayerHand(props) {
         const isSelectedForTargeting = (targetSession.card?.id === card.id || targetSession.cardIndex === originalIndex);
         if (!isSelectedForTargeting) return null;
 
-        const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
-        const isReforge = isXiengXich && (!targetSession.selectedTargets || targetSession.selectedTargets.length === 0);
+        const isTienDuyen = activeSkill === 'Tiên Duyên' || normalizeSkillId(activeSkill) === 'tien_duyen';
+        const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || isTienDuyen;
+        const isReforge = Boolean(targetSession.card) && isXiengXich && (!targetSession.selectedTargets || targetSession.selectedTargets.length === 0);
         const hasEnoughTargets = targetSession.targetingDef?.type === 'multiple' 
             ? (targetSession.selectedTargets?.length >= (targetSession.targetingDef.min !== undefined ? targetSession.targetingDef.min : 1))
             : (targetSession.selectedTargets?.length > 0);
@@ -247,26 +250,27 @@ export function PlayerHand(props) {
                     let isPlayable = false;
                     if (needsDiscard) {
                         isPlayable = true;
-                    } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
+                    } else if (isMyTurn && (gameState.phase || '').toLowerCase() === 'action' && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
                         // If there is an active skill, check if the skill makes it playable visually
-                        if (activeSkill === 'Dời Núi' && (card.name === 'Né' || card.name === 'Chém')) {
+                        const normSkill = normalizeSkillId(activeSkill);
+                        if ((activeSkill === 'Dời Núi' || normSkill === 'doi_nui') && (card.name === 'Né' || card.name === 'Chém')) {
                             isPlayable = true;
-                        } else if (activeSkill === 'Khai Thiên' && effColor === 'red') {
+                        } else if ((activeSkill === 'Khai Thiên' || normSkill === 'khai_thien') && effColor === 'red') {
                             isPlayable = true;
-                        } else if (activeSkill === 'Kỳ Tập' && effColor === 'black') {
+                        } else if ((activeSkill === 'Kỳ Tập' || normSkill === 'ky_tap') && effColor === 'black') {
                             isPlayable = true;
-                        } else if (activeSkill === 'Tiên Duyên' && (effSuit === 'club' || effSuit === '♣' || effSuit === 'clubs' || effSuit === 'chuồn')) {
+                        } else if ((activeSkill === 'Tiên Duyên' || normSkill === 'tien_duyen') && (effSuit === 'club' || effSuit === '♣' || effSuit === 'clubs' || effSuit === 'chuồn' || effSuit === 'nhép')) {
                             isPlayable = true;
-                        } else if (activeSkill === 'Thần Hỏa' && effColor === 'red') {
+                        } else if ((activeSkill === 'Thần Hỏa' || normSkill === 'than_hoa') && effColor === 'red') {
                             isPlayable = true;
-                        } else if (activeSkill === 'Định Quốc' && (card.name === 'Né' || card.name === 'Sấm Sét')) {
+                        } else if ((activeSkill === 'Định Quốc' || normSkill === 'dinh_quoc') && (card.name === 'Né' || card.name === 'Sấm Sét')) {
                             isPlayable = true;
-                        } else if (activeSkill === 'Phá Thành') {
+                        } else if (activeSkill === 'Phá Thành' || normSkill === 'pha_thanh') {
                             // Cần kiểm tra phaThanhColor của me
                             if (me.phaThanhColor && effColor !== me.phaThanhColor) {
                                 isPlayable = true;
                             }
-                        } else if ((activeSkill === 'Hòa Thân' || activeSkill === 'hoa_than_an_tu') && (effSuit === 'diamond' || effSuit === '♦' || effSuit === 'diamonds' || effSuit === 'rô')) {
+                        } else if ((activeSkill === 'Hòa Thân' || activeSkill === 'hoa_than_an_tu' || normSkill === 'hoa_than') && (effSuit === 'diamond' || effSuit === '♦' || effSuit === 'diamonds' || effSuit === 'rô')) {
                             isPlayable = true;
                         } else {
                             isPlayable = card.isPlayable;
@@ -289,8 +293,9 @@ export function PlayerHand(props) {
                             e.stopPropagation();
                             if (needsDiscard) {
                                 handleDiscardToggle(originalIndex);
-                            } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
-                                const isConvertingSkill = activeSkill && CARD_CONVERTING_SKILLS.includes(activeSkill);
+                            } else if (isMyTurn && (gameState.phase || '').toLowerCase() === 'action' && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
+                                const normSkill = normalizeSkillId(activeSkill);
+                                const isConvertingSkill = activeSkill && (CARD_CONVERTING_SKILLS.includes(activeSkill) || CARD_CONVERTING_SKILLS_NORM.includes(normSkill));
                                 if (isPlayable || isConvertingSkill) { // Allow click only if card is playable or activeSkill converts it
                                     handleCardClick(originalIndex);
                                 } else {
@@ -463,24 +468,25 @@ export function PlayerHand(props) {
                                 let isPlayable = false;
                                 if (needsDiscard) {
                                     isPlayable = true;
-                                } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
-                                    if (activeSkill === 'Dời Núi' && (card.name === 'Né' || card.name === 'Chém')) {
+                                } else if (isMyTurn && (gameState.phase || '').toLowerCase() === 'action' && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
+                                    const normSkill = normalizeSkillId(activeSkill);
+                                    if ((activeSkill === 'Dời Núi' || normSkill === 'doi_nui') && (card.name === 'Né' || card.name === 'Chém')) {
                                         isPlayable = true;
-                                    } else if (activeSkill === 'Khai Thiên' && effColor === 'red') {
+                                    } else if ((activeSkill === 'Khai Thiên' || normSkill === 'khai_thien') && effColor === 'red') {
                                         isPlayable = true;
-                                    } else if (activeSkill === 'Kỳ Tập' && effColor === 'black') {
+                                    } else if ((activeSkill === 'Kỳ Tập' || normSkill === 'ky_tap') && effColor === 'black') {
                                         isPlayable = true;
-                                    } else if (activeSkill === 'Tiên Duyên' && (effSuit === 'club' || effSuit === '♣' || effSuit === 'clubs' || effSuit === 'chuồn')) {
+                                    } else if ((activeSkill === 'Tiên Duyên' || normSkill === 'tien_duyen') && (effSuit === 'club' || effSuit === '♣' || effSuit === 'clubs' || effSuit === 'chuồn' || effSuit === 'nhép')) {
                                         isPlayable = true;
-                                    } else if (activeSkill === 'Thần Hỏa' && effColor === 'red') {
+                                    } else if ((activeSkill === 'Thần Hỏa' || normSkill === 'than_hoa') && effColor === 'red') {
                                         isPlayable = true;
-                                    } else if (activeSkill === 'Định Quốc' && (card.name === 'Né' || card.name === 'Sấm Sét')) {
+                                    } else if ((activeSkill === 'Định Quốc' || normSkill === 'dinh_quoc') && (card.name === 'Né' || card.name === 'Sấm Sét')) {
                                         isPlayable = true;
-                                    } else if (activeSkill === 'Phá Thành') {
+                                    } else if (activeSkill === 'Phá Thành' || normSkill === 'pha_thanh') {
                                         if (me.phaThanhColor && effColor !== me.phaThanhColor) {
                                             isPlayable = true;
                                         }
-                                    } else if ((activeSkill === 'Hòa Thân' || activeSkill === 'hoa_than_an_tu') && (effSuit === 'diamond' || effSuit === '♦' || effSuit === 'diamonds' || effSuit === 'rô')) {
+                                    } else if ((activeSkill === 'Hòa Thân' || activeSkill === 'hoa_than_an_tu' || normSkill === 'hoa_than') && (effSuit === 'diamond' || effSuit === '♦' || effSuit === 'diamonds' || effSuit === 'rô')) {
                                         isPlayable = true;
                                     } else {
                                         isPlayable = card.isPlayable;
@@ -496,8 +502,9 @@ export function PlayerHand(props) {
                                         e.stopPropagation();
                                         if (needsDiscard) {
                                             handleDiscardToggle(originalIndex);
-                                        } else if (isMyTurn && gameState.phase === PHASES.ACTION && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
-                                            const isConvertingSkill = activeSkill && CARD_CONVERTING_SKILLS.includes(activeSkill);
+                                        } else if (isMyTurn && (gameState.phase || '').toLowerCase() === 'action' && (!gameState.waitingForResponse || gameState.waitingForResponse.type === 'play_phase')) {
+                                            const normSkill = normalizeSkillId(activeSkill);
+                                            const isConvertingSkill = activeSkill && (CARD_CONVERTING_SKILLS.includes(activeSkill) || CARD_CONVERTING_SKILLS_NORM.includes(normSkill));
                                             if (isPlayable || isConvertingSkill) {
                                                 handleCardClick(originalIndex);
                                                 setIsExpanded(false);

@@ -60,7 +60,8 @@ describe('Cơ Chế Lộ Diện Tướng: Tiên Phong & Âm Dương Giao Hoà (Q
     expect(state.hasPioneerRewardClaimed).toBe(true);
     expect(state.pioneerPlayerId).toBe(0);
 
-    // Người chơi 1 sau đó mới mở tướng chính
+    // Người chơi 1 sau đó đến lượt mới mở tướng chính
+    state.currentTurnPlayerId = 1;
     dispatcher.dispatchAction({
       type: 'ACTION_REVEAL_HERO',
       payload: { playerId: 1, heroIndex: 0 }
@@ -96,6 +97,7 @@ describe('Cơ Chế Lộ Diện Tướng: Tiên Phong & Âm Dương Giao Hoà (Q
   it('3. Tổng máu CHẴN (4 + 4 = 8) khi mở full cả 2 tướng sẽ KHÔNG nhận thưởng bù máu lẻ', () => {
     const state = createTestGame();
     state.hasPioneerRewardClaimed = true; // Giả lập Tiên phong đã được nhận trước đó
+    state.currentTurnPlayerId = 1; // Đến lượt Player 1
     const dispatcher = new DispatcherV4(state);
 
     // Player 1 (4 HP + 4 HP = 8 CHẴN) mở tướng 1
@@ -290,6 +292,35 @@ describe('Cơ Chế Lộ Diện Tướng: Tiên Phong & Âm Dương Giao Hoà (Q
     expect(result.calledAllies).toBeUndefined();
     const log = state.logs.find(l => (typeof l === 'string' ? l : l.message).includes('Không có đồng minh'));
     expect(log).toBeTruthy();
+  });
+
+  it('11. Ràng buộc Quốc Chiến: Chặn mở tướng ngoài lượt khi không có sự kiện kích hoạt; Cho phép mở khi có sự kiện/frame phản hồi', () => {
+    const state = createTestGame();
+    state.currentTurnPlayerId = 0; // Lượt của Player 0
+    const dispatcher = new DispatcherV4(state);
+
+    // Player 1 cố ý mở tướng ngoài lượt khi không có sự kiện gì -> Bị chặn!
+    dispatcher.dispatchAction({
+      type: 'ACTION_REVEAL_HERO',
+      payload: { playerId: 1, heroIndex: 0, isPlayerAction: true }
+    });
+    expect(state.getPlayer(1).revealedHeroes).toEqual([false, false]);
+
+    // Khi có frame/sự kiện yêu cầu Player 1 phản hồi (vd: ASK_DODGE)
+    state.priorityStack.push({
+      type: 'ASK_DODGE',
+      sourceId: 0,
+      targetId: 1,
+      currentActorId: 1,
+      priorityQueue: [1]
+    });
+
+    // Lúc này Player 1 được quyền lật tướng để kích hoạt phòng ngự/kỹ năng phản hồi
+    dispatcher.dispatchAction({
+      type: 'ACTION_REVEAL_HERO',
+      payload: { playerId: 1, heroIndex: 0, isPlayerAction: true }
+    });
+    expect(state.getPlayer(1).revealedHeroes).toEqual([true, false]);
   });
 });
 

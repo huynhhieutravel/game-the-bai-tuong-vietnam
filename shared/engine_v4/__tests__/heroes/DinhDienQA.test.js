@@ -5,6 +5,7 @@ import { TrickRules } from '../../rules/TrickRules.js';
 import { DispatcherV4 } from '../../application/DispatcherV4.js';
 import { globalHeroRegistry } from '../../heroes/HeroRegistry.js';
 import { SON_HEROES } from '../../heroes/son/index.js';
+import { BotBrain } from '../../ai/BotBrain.js';
 
 describe('QA Toàn Diện Tướng Hệ Sơn: Đinh Điền (Dinh Dien QA Suite v4)', () => {
   let state;
@@ -286,5 +287,44 @@ describe('QA Toàn Diện Tướng Hệ Sơn: Đinh Điền (Dinh Dien QA Suite 
       expect(p0.hand.some(c => c.id === 'dodge_p2')).toBe(true);
       expect(state.priorityStack.isEmpty()).toBe(true);
     });
+
+    it('4.6. Chặn Đinh Điền kêu gọi Định Quốc lần thứ 2 trong cùng một lượt (Triệt tiêu loop 5-6s)', () => {
+      const p0 = state.getPlayer(0);
+      p0.skillUsage = { dinh_quoc: { usedThisTurn: true } };
+
+      expect(() => {
+        dispatcher.dispatchAction({
+          type: 'ACTION_USE_SKILL',
+          playerId: 0,
+          skillId: 'dinh_quoc',
+          throwOnError: true
+        });
+      }).toThrow(/Mỗi lượt Đinh Điền chỉ có thể kêu gọi dâng bài 1 lần/);
+
+      // BotBrain không được tự động phát động lại khi đã dùng trong lượt
+      p0.hand = [];
+      const action = BotBrain.decideAction(state, 0);
+      expect(action.skillId).not.toBe('dinh_quoc');
+    });
+
+    it('4.7. Bot không tự Hóa Giải cẩm nang của chính mình khi chưa bị ai vô hiệu hóa', () => {
+      const p0 = state.getPlayer(0);
+      p0.hand = [{ id: 'hoa_giai_1', name: 'Hóa Giải', type: 'trick' }];
+
+      const frame = {
+        type: 'ASK_NEGATE',
+        sourceId: 0, // P0 là người đánh cẩm nang
+        targetId: 1, // P1 là kẻ địch
+        priorityQueue: [0, 1],
+        context: {
+          card: { id: 'chain_1', name: 'Xiềng Xích', type: 'trick' },
+          negateCount: 0 // Chưa ai hóa giải
+        }
+      };
+
+      const reaction = BotBrain.decideReaction(state, 0, frame);
+      expect(reaction.negateCard).toBeNull();
+    });
   });
 });
+

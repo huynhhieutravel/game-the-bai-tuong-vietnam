@@ -1484,5 +1484,41 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
   - **Loại bỏ triệt để hiện tượng đứng hình 5-6 giây:** Sau các cẩm nang diện rộng như [Loạn Tiễn] hoặc [Vạn Tiễn], khi người chơi chính đánh lá [Né] làm PriorityStack rỗng, nếu timer phản ứng cũ của Bot trước đó vẫn đang chờ, state update mới không còn bị vứt bỏ nữa mà được lưu vào `this.pendingState`.
   - **Tự động đánh thức (Auto-Wakeup):** Ngay khi timer phản ứng kết thúc, hàm `this._finishProcessing()` tự động xả `pendingState` và kích hoạt ngay `onStateUpdate`, đưa Bot đang trong lượt tiếp tục xử lý Action Phase mượt mà, loại bỏ mọi hiện tượng đứng hình hay đơ game.
 
+---
+
+## 73. CƠ CHẾ PHẢN HỒI MICRO-DELAY THÔNG MINH & TRIỆT TIÊU ĐỘ TRỄ CHUYỂN PHA (ZERO-STALL BOT REACTION PACING & PRIORITY QUEUE MICRO-DELAY)
+
+- **⚡ Phản Hồi Micro-Delay Thông Minh Cho Hàng Đợi Ưu Tiên (Smart Micro-Delay Priority Queue):**
+  - **Khái niệm:** Chuẩn hóa theo [ADR 0105](file:///Users/huynhtronghieu/Documents/game/game-vietnam-the-bai/docs/adr/0105-zero-stall-bot-reaction-pacing-and-priority-queue-micro-delay.md). Khi một khung ưu tiên xuất hiện (`ASK_NEGATE`, `ASK_PEACH`, `ASK_DODGE`, `ASK_SLASH_RESPONSE`, `ASK_DINH_QUOC`, `ASK_BOC_TRAM_TRUNG_SLASH`...):
+  - **Tự Động Bỏ Qua Nhanh (Fast-Fail 50ms):** Nếu Bot được đánh giá là không có lá bài hợp lệ hoặc sẽ bỏ qua (`isCanceled === true`):
+    - Bot không còn ngồi chờ thời gian trì hoãn 900ms của người thật nữa mà lập tức phản hồi bỏ qua sau **50ms**.
+    - 50ms cho phép React cập nhật 3 frame mượt mà không rách hình.
+    - Cả 3 Bot cùng bỏ qua Hóa Giải hay Cứu Đào chỉ mất $50ms \times 3 = \mathbf{150ms}$ (thay vì 2.7 giây - 5.4 giây như trước).
+  - **Giữ Trì Hoãn Chiến Thuật Khi Ra Bài (Tactical Delay on Real Action):** Nếu Bot thực sự có bài và quyết định tung chiêu (ra Hóa Giải, tung Đào, đánh Né, lật Bát Quái):
+    - Giữ nguyên độ trễ 900ms (`this.getDelay('reaction')`) để tạo cảm giác suy nghĩ tự nhiên và kịp hiển thị hiệu ứng động.
+- **⏩ Rút Ngắn Độ Trễ Chuyển Pha Trống Của Bot (Zero-Wait Phase Transitions):**
+  - **Pha Hành Động (`ACTION`):** Nếu Bot đã hết bài để đánh, tự động chuyển pha sau **500ms** (`idleAction` nhịp thở tự nhiên).
+  - **Pha Bỏ Bài (`DISCARD`):** Nếu số bài trên tay đã hợp lệ ($\le$ HP), tự động chuyển pha sau **250ms** (`idleDiscard`).
+  - **Pha Kết Thúc (`END`):** Tự động dọn dẹp và chuyển lượt sau **200ms** (`idleEnd`).
+- **🔗 Chuẩn Hóa Trạng Thái Xiềng Xích Đa Tầng (`isChained` vs `chained`):**
+  - `BotBrain.js` đồng bộ kiểm tra đồng thời cả `(p.isChained || p.chained)`.
+  - Triệt tiêu hoàn toàn lỗi Bot Tiên Duyên (Chử Đồng Tử) liên tục spam xích lại những mục tiêu đã bị xích trước đó.
+
+---
+
+## 74. RÀNG BUỘC LUẬT MỞ TƯỚNG THEO LƯỢT & CHUẨN HÓA NHỊP ĐỘ VỪA PHẢI (TURN-BOUND HERO REVEAL RULE & MODERATE GAME PACING)
+
+- **🛡️ Ràng Buộc Mở Tướng 3 Tầng Theo Luật Quốc Chiến (3-Tier Turn-Bound Hero Reveal Guard):**
+  - **Luật Quốc Chiến Chuẩn:** Người chơi chỉ được chủ động mở tướng trong các giai đoạn trong lượt của mình (Đầu lượt, Rút bài, Ra bài, Bỏ bài). Tuyệt đối **KHÔNG ĐƯỢC** mở tướng bất kỳ ngoài lượt của mình, trừ phi có sự kiện/frame ưu tiên đang yêu cầu người chơi phản hồi (`ASK_DODGE`, `ASK_PEACH`, `ASK_NEGATE`, `ASK_SLASH_RESPONSE`, v.v.).
+  - **3 Chốt Chặn Bất Biến:**
+    1. **UI Component (`MyHeroBar.jsx`):** Nút "Lật" có điều kiện `canRevealHero = isMyTurn || hasWaitingResponse`. Khi ngoài lượt và không có sự kiện, nút bị `disabled={true}` (hiệu ứng mờ 50% qua `.btn-action:disabled`, con trỏ `not-allowed`), tooltip hiển thị `"Chỉ có thể mở tướng trong lượt của bạn hoặc khi có sự kiện kích hoạt"`, click bị chặn hoàn toàn.
+    2. **Client Callback (`GameView.jsx`):** Trong `handleRevealClick`, nếu người chơi cố ý kích hoạt ngoài lượt, hiển thị ngay Toast Banner `⚠️ Bạn chỉ có thể mở tướng trong lượt của mình hoặc khi có sự kiện kích hoạt!` và dừng lệnh.
+    3. **Application Layer (`DispatcherV4.js` & `GameAPIV4.js`):** `gameAPI.revealHero` gắn nhãn `isPlayerAction: true`. Handler `_handleRevealHero` từ chối thực thi và log cảnh báo nếu hành động người chơi vi phạm quy tắc lượt khi không có frame sự kiện đang đợi.
+- **⏱️ Chuẩn Hóa Nhịp Độ Trận Đấu Vừa Phải (Moderate Pacing Sweet Spot):**
+  - **Chuẩn Normal Mới:** `passReaction: 200ms`, `idleAction: 500ms`, `idleDiscard: 250ms`, `idleEnd: 200ms`.
+  - Khi 3 Bot liên tiếp bỏ qua phản hồi (Pass): Tổng thời gian $3 \times 200ms = \mathbf{600ms}$. Mắt người theo dõi được trọn vẹn vệt sáng lượt chuyển qua các bot, nhịp chơi trôi mượt mà, loại bỏ cả cảm giác đơ giật 5.4 giây lẫn cảm giác ảo ảnh quá nhanh (50ms).
+
+
+
 
 

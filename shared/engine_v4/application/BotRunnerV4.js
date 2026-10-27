@@ -15,23 +15,35 @@ export const BOT_PACE_CONFIG = {
     draw: 600,
     discard: 700,
     end: 500,
-    draft: 800
+    draft: 800,
+    passReaction: 350,
+    idleAction: 700,
+    idleDiscard: 350,
+    idleEnd: 250
   },
-  normal: { // Mặc định mới: nhịp độ thong thả, rõ ràng
+  normal: { // Mặc định: nhịp độ vừa phải, mượt mà, triệt tiêu điểm nghẽn
     action: 1300,
     reaction: 900,
     draw: 450,
     discard: 500,
     end: 400,
-    draft: 500
+    draft: 500,
+    passReaction: 200, // 200ms khi bỏ qua/không có bài (3 bot = 600ms, vừa mắt nhìn, không nghẽn 2.7s)
+    idleAction: 500,   // 500ms khi hết bài trong Action (nửa giây nhịp thở tự nhiên)
+    idleDiscard: 250,  // 250ms khi không cần bỏ bài
+    idleEnd: 200       // 200ms dọn dẹp chuyển lượt
   },
-  fast: { // Tốc độ tiêu chuẩn ban đầu của game
+  fast: { // Tốc độ nhanh
     action: 700,
     reaction: 600,
     draw: 300,
     discard: 400,
     end: 300,
-    draft: 500
+    draft: 500,
+    passReaction: 100,
+    idleAction: 300,
+    idleDiscard: 150,
+    idleEnd: 100
   }
 };
 
@@ -144,6 +156,23 @@ export class BotRunnerV4 {
       if (frame.currentActorId !== undefined && frame.currentActorId !== null) {
         const actor = (gameState.players || []).find(p => p.id === frame.currentActorId);
         if (actor && actor.isBot) {
+          let reactionDelay = this.getDelay('reaction');
+          try {
+            const quickReaction = BotBrain.decideReaction(gameState, actor.id, frame);
+            const chosenCard = quickReaction?.dodgeCard || quickReaction?.peachCard || quickReaction?.slashCard || quickReaction?.negateCard || null;
+            const chosenCardId = quickReaction?.cardId || chosenCard?.id;
+            const isCanceled = quickReaction?.canceled !== undefined 
+              ? quickReaction.canceled 
+              : (!chosenCard && !chosenCardId && !quickReaction?.useBagua && !quickReaction?.doUse && !quickReaction?.orderedCards && !quickReaction?.doProvide && !quickReaction?.doReact && !quickReaction?.doJudge && !quickReaction?.doDiscard && !quickReaction?.option && !quickReaction?.selectedAlly && !quickReaction?.suit && !quickReaction?.virtualCardName && !quickReaction?.costType && !quickReaction?.cardIds && !quickReaction?.targetId && !quickReaction?.targetA && !quickReaction?.targets);
+
+            if (isCanceled) {
+              // Bot không có bài/kỹ năng để phản hồi -> Phản hồi với delay vừa phải (passReaction: 200ms normal, 100ms fast)
+              reactionDelay = this.getDelay('passReaction');
+            } else if (frame.type === 'ASK_JUDGEMENT_RESULT') {
+              reactionDelay = Math.min(250, reactionDelay);
+            }
+          } catch (_) {}
+
           this._clearTimer();
           this.isProcessing = true;
           this.timerId = setTimeout(() => {
@@ -213,7 +242,7 @@ export class BotRunnerV4 {
             } finally {
               this._finishProcessing();
             }
-          }, this.getDelay('reaction'));
+          }, reactionDelay);
           return;
         }
       }
@@ -229,6 +258,15 @@ export class BotRunnerV4 {
       const currentPhase = (gameState.currentPhase || gameState.phase || '').toUpperCase();
 
       if (currentPhase === 'ACTION') {
+        let actionDelay = this.getDelay('action');
+        try {
+          const quickAction = BotBrain.decideAction(gameState, currentTurnId);
+          if (!quickAction || quickAction.type === 'END_PHASE' || !['PLAY_CARD', 'USE_SKILL', 'REVEAL_HERO'].includes(quickAction.type)) {
+            // Bot không còn hành động nào để chơi -> Kết thúc phase vừa phải (idleAction)
+            actionDelay = this.getDelay('idleAction');
+          }
+        } catch (_) {}
+
         this._clearTimer();
         this.isProcessing = true;
         this.timerId = setTimeout(() => {
@@ -283,7 +321,7 @@ export class BotRunnerV4 {
           } finally {
             this._finishProcessing();
           }
-        }, this.getDelay('action'));
+        }, actionDelay);
       } else if (currentPhase === 'DRAW') {
         this._clearTimer();
         this.isProcessing = true;
@@ -304,6 +342,13 @@ export class BotRunnerV4 {
           }
         }, this.getDelay('draw'));
       } else if (currentPhase === 'DISCARD') {
+        let discardDelay = this.getDelay('discard');
+        const excess = (currentTurnPlayer.hand || []).length - Math.max(0, currentTurnPlayer.hp);
+        if (excess <= 0) {
+          // Đã thỏa mãn bài tay, không cần bỏ bài -> Chuyển phase vừa phải (idleDiscard)
+          discardDelay = this.getDelay('idleDiscard');
+        }
+
         this._clearTimer();
         this.isProcessing = true;
         this.timerId = setTimeout(() => {
@@ -348,8 +393,9 @@ export class BotRunnerV4 {
           } finally {
             this._finishProcessing();
           }
-        }, this.getDelay('discard'));
+        }, discardDelay);
       } else if (currentPhase === 'END') {
+        const endDelay = this.getDelay('idleEnd');
         this._clearTimer();
         this.isProcessing = true;
         this.timerId = setTimeout(() => {
@@ -367,7 +413,7 @@ export class BotRunnerV4 {
           } finally {
             this._finishProcessing();
           }
-        }, this.getDelay('end'));
+        }, endDelay);
       }
     }
   }

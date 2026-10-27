@@ -1,6 +1,6 @@
 import { getSuitEmoji } from 'shared/constants/cardTypes';
 import { getCardBg, getBadgeColor } from 'shared/utils/cardStyles';
-import { normalizeSkillType, normalizePhase, getPhaseLabel, getFactionLabel, getFactionColor } from 'shared/utils/translationHelper';
+import { normalizeSkillType, normalizeSkillId, normalizePhase, getPhaseLabel, getFactionLabel, getFactionColor } from 'shared/utils/translationHelper';
 // @ts-check
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from "react-router-dom";
@@ -231,11 +231,36 @@ export default function GameView(props = {}) {
     gameAPI.endPhase(mainPlayerId);
   }, [gameAPI, cancelTargeting, mainPlayerId, dismissBanner]);
 
+  const showPhaseBanner = useCallback((text) => {
+    if (!text) return;
+    setToastQueue(prev => {
+      if (prev.length > 0 && prev[prev.length - 1] === text) return prev;
+      const nextQueue = [...prev, text];
+      return nextQueue.slice(-6); // Giữ tối đa 6 thông báo liên tiếp
+    });
+  }, []);
+
   const handleRevealClick = useCallback((heroIndex) => {
     dismissBanner();
     if (!gameAPI) return;
+
+    const currentTurnId = gameState?.currentTurnPlayerId ?? gameState?.currentPlayerIndex;
+    const isMyTurn = currentTurnId !== undefined && currentTurnId !== null ? currentTurnId === mainPlayerId : true;
+    const hasWaitingResponse = Boolean(
+      gameState?.waitingForResponse && (
+        gameState.waitingForResponse.responderId === mainPlayerId ||
+        gameState.waitingForResponse.targetId === mainPlayerId ||
+        (Array.isArray(gameState.waitingForResponse.askQueue) && gameState.waitingForResponse.askQueue.includes(mainPlayerId))
+      )
+    );
+
+    if (!isMyTurn && !hasWaitingResponse) {
+      showPhaseBanner("⚠️ Bạn chỉ có thể mở tướng trong lượt của mình hoặc khi có sự kiện kích hoạt!");
+      return;
+    }
+
     gameAPI.revealHero(mainPlayerId, heroIndex);
-  }, [gameAPI, mainPlayerId, dismissBanner]);
+  }, [gameAPI, mainPlayerId, dismissBanner, gameState, showPhaseBanner]);
 
   const onCardClick = useCallback((card) => {
     dismissBanner();
@@ -256,9 +281,14 @@ export default function GameView(props = {}) {
   const confirmPlayCard = useCallback(() => {
     dismissBanner();
     if (!targetSession || isActionPending.current || !gameAPI) return;
+    if (!targetSession.card) {
+      console.warn('[GameView] Không thể dùng bài hoặc rèn lại khi chưa chọn lá bài!');
+      return;
+    }
     isActionPending.current = true;
     try {
-      const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
+      const isTienDuyen = activeSkill === 'Tiên Duyên' || normalizeSkillId(activeSkill) === 'tien_duyen';
+      const isXiengXich = targetSession.card?.name === 'Xiềng Xích' || targetSession.virtualCardName === 'Xiềng Xích' || isTienDuyen;
       const isReforge = isXiengXich && (!targetSession.selectedTargets || targetSession.selectedTargets.length === 0);
       gameAPI.playCard(mainPlayerId, targetSession.card.id, targetSession.selectedTargets || [], { 
         virtualCardName: targetSession.virtualCardName || (isXiengXich ? 'Xiềng Xích' : undefined),
@@ -273,15 +303,6 @@ export default function GameView(props = {}) {
     }
     cancelTargeting();
   }, [targetSession, activeSkill, gameAPI, mainPlayerId, cancelTargeting, isActionPending, dismissBanner]);
-
-  const showPhaseBanner = useCallback((text) => {
-    if (!text) return;
-    setToastQueue(prev => {
-      if (prev.length > 0 && prev[prev.length - 1] === text) return prev;
-      const nextQueue = [...prev, text];
-      return nextQueue.slice(-6); // Giữ tối đa 6 thông báo liên tiếp
-    });
-  }, []);
 
   // 1. Lấy toast tiếp theo từ hàng đợi khi chưa có banner hiển thị
   useEffect(() => {
@@ -1031,19 +1052,23 @@ export default function GameView(props = {}) {
               );
             })}
             {targetSession && (() => {
-              const cardName = targetSession.virtualCardName || targetSession.card?.name || activeSkill || '';
-              const isXiengXich = cardName === 'Xiềng Xích' || targetSession.card?.name === 'Xiềng Xích' || activeSkill === 'Tiên Duyên';
+              const hasCard = Boolean(targetSession.card);
+              const isTienDuyen = activeSkill === 'Tiên Duyên' || normalizeSkillId(activeSkill) === 'tien_duyen';
+              const cardName = targetSession.virtualCardName || targetSession.card?.name || (isTienDuyen ? 'Xiềng Xích' : (activeSkill || ''));
+              const isXiengXich = cardName === 'Xiềng Xích' || targetSession.card?.name === 'Xiềng Xích' || isTienDuyen;
               const isMultiple = targetSession.targetingDef?.type === 'multiple';
               const selectedCount = targetSession.selectedTargets?.length || 0;
               const maxTargets = targetSession.targetingDef?.max || (isXiengXich ? 2 : 1);
               const minTargets = targetSession.targetingDef?.min !== undefined ? targetSession.targetingDef.min : 1;
-              const isReforge = isXiengXich && selectedCount === 0;
+              const isReforge = hasCard && isXiengXich && selectedCount === 0;
 
               let message = targetSession.targetingDef?.steps?.[targetSession.step]?.message || targetSession.message;
               if (isMultiple) {
                 if (selectedCount === 0) {
                   message = isXiengXich
-                    ? `[Xiềng Xích]: Đã chọn 0/${maxTargets} mục tiêu (Bấm "Rèn Lại" nếu không khóa ai)`
+                    ? (hasCard 
+                        ? `[Xiềng Xích]: Đã chọn [${targetSession.card.name}] (Bấm "Rèn Lại" nếu không khóa ai)`
+                        : `[Xiềng Xích]: Hãy nhấp chọn 1 lá bài ♣ trên tay`)
                     : `[${cardName}]: Đã chọn 0/${maxTargets} mục tiêu`;
                 } else {
                   message = `[${cardName}]: Đã chọn ${selectedCount}/${maxTargets} mục tiêu${selectedCount >= maxTargets ? ' (Đã đủ)' : ''}`;
@@ -1055,9 +1080,11 @@ export default function GameView(props = {}) {
                 : (selectedCount > 0);
 
               const canConfirm = Boolean(
-                ['none', 'aoe', 'self'].includes(targetSession.targetingDef?.type) ||
-                isReforge ||
-                hasEnoughTargets
+                hasCard && (
+                  ['none', 'aoe', 'self'].includes(targetSession.targetingDef?.type) ||
+                  isReforge ||
+                  hasEnoughTargets
+                )
               );
 
               let confirmLabel = `Dùng ${cardName}`.trim();

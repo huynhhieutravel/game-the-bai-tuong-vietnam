@@ -344,7 +344,7 @@ export class DispatcherV4 {
       TrickRules.playTrick(this.state, sourceId, [sourceId], card);
       return;
     }
-    const isDiamond = card && normalizeSuit(card.suit).code === 'diamond';
+    const isDiamond = card && normalizeSuit(effSuit || card.suit).code === 'diamond';
     const hasHoaThanAnTu = (globalHeroRegistry.hasSkill(player, 'hoa_than_an_tu', true) || globalHeroRegistry.hasSkill(player, 'hoa-than-an-tu', true)) && isDiamond && (virtualCardName === 'Hỗn Loạn' || payload.asChaos || card.asChaos);
     if (cardName === 'Hỗn Loạn' || hasHoaThanAnTu) {
       const targetId = targetIds[0];
@@ -364,7 +364,7 @@ export class DispatcherV4 {
       TrickRules.playStarvation(this.state, sourceId, targetId, card);
       return;
     }
-    const isClub = card && normalizeSuit(card.suit).code === 'club';
+    const isClub = card && normalizeSuit(effSuit || card.suit).code === 'club';
     const hasTienDuyenChain = globalHeroRegistry.hasSkill(player, 'tien_duyen_chu_dong_tu', true) && isClub && (virtualCardName === 'Xiềng Xích' || payload.asChain);
     if (cardName === 'Xiềng Xích' || card.idKey === 'xieng_xich' || hasTienDuyenChain) {
       if (hasTienDuyenChain) {
@@ -1781,6 +1781,9 @@ export class DispatcherV4 {
           if (target && target.isAlive) {
             player.hp -= 1;
             this.state.drawCards(target.id, 2);
+            player.skillUsage = player.skillUsage || {};
+            player.skillUsage.can_gian = player.skillUsage.can_gian || {};
+            player.skillUsage.can_gian.usedThisTurn = true;
             this.state.addLog(`🕊️ [Can Gián] ${player.name} mất 1 HP giúp ${target.name} rút 2 lá bài!`);
           }
         }
@@ -1916,6 +1919,7 @@ export class DispatcherV4 {
 
     if (normSkillId === 'can_gian') {
       if (player.hp <= 1) throw new Error('[Can Gián] Sinh lực phải lớn hơn 1 để Can Gián!');
+      if (player.skillUsage?.can_gian?.usedThisTurn) throw new Error('[Can Gián] Mỗi lượt chỉ được sử dụng 1 lần!');
       const targetId = targets[0] !== undefined ? targets[0] : options.targetId;
       if (targetId === undefined) {
         this.state.priorityStack.push({
@@ -1932,6 +1936,9 @@ export class DispatcherV4 {
       if (!target || !target.isAlive) throw new Error('[Can Gián] Mục tiêu không hợp lệ!');
       player.hp -= 1;
       this.state.drawCards(target.id, 2);
+      player.skillUsage = player.skillUsage || {};
+      player.skillUsage.can_gian = player.skillUsage.can_gian || {};
+      player.skillUsage.can_gian.usedThisTurn = true;
       this.state.addLog(`🕊️ [Can Gián] ${player.name} mất 1 HP giúp ${target.name} rút 2 lá bài!`);
       return;
     }
@@ -1984,7 +1991,8 @@ export class DispatcherV4 {
 
       const card = player.hand.find(c => c.id === usedCardId);
       if (!card) throw new Error('[Hòa Thân] Không tìm thấy lá bài trên tay!');
-      const isDiamond = normalizeSuit(card.suit).code === 'diamond';
+      const effSuit = globalHeroRegistry.getEffectiveSuit(player, card);
+      const isDiamond = normalizeSuit(effSuit || card.suit).code === 'diamond';
       if (!isDiamond) throw new Error('[Hòa Thân] Chỉ có thể dùng lá bài chất Rô ♦ như [Hỗn Loạn]!');
       this.state.addLog(`🌺 [Hòa Thân] ${player.name} sử dụng lá bài Rô [${card.name}] như [Hỗn Loạn]!`);
       TrickRules.playChaos(this.state, playerId, targetId, { ...card, name: 'Hỗn Loạn', idKey: 'hon_loan', virtual: true });
@@ -2071,6 +2079,9 @@ export class DispatcherV4 {
         if (!isSonFaction) {
           throw new Error('[Định Quốc] Chỉ có tướng phe Sơn mới có thể hiến bài cho Đinh Điền!');
         }
+        if (player.skillUsage?.dinh_quoc?.usedThisTurn) {
+          throw new Error('[Định Quốc] Mỗi lượt bạn chỉ có thể dâng bài cho Đinh Điền 1 lần!');
+        }
         const usedCardId = cardIds.length > 0 ? cardIds[0] : options.cardId;
         const card = player.hand.find(c => c.id === usedCardId);
         if (!card) {
@@ -2082,11 +2093,18 @@ export class DispatcherV4 {
         }
         player.hand = player.hand.filter(c => c.id !== card.id);
         dinhDien.hand.push(card);
+        player.skillUsage = player.skillUsage || {};
+        player.skillUsage.dinh_quoc = player.skillUsage.dinh_quoc || {};
+        player.skillUsage.dinh_quoc.usedThisTurn = true;
         this.state.addLog(`👑 [Định Quốc] ${player.name} dâng tặng lá [${card.name}] cho Định Quốc Công ${dinhDien.name}!`);
         return;
       }
 
       // Trường hợp 2: Đinh Điền chủ động phát động Định Quốc kêu gọi đồng minh Sơn dâng bài
+      if (player.skillUsage?.dinh_quoc?.usedThisTurn) {
+        throw new Error('[Định Quốc] Mỗi lượt Đinh Điền chỉ có thể kêu gọi dâng bài 1 lần!');
+      }
+
       const allySonIds = this.state.players
         .filter(p => p.id !== dinhDien.id && p.isAlive && getCanonicalFaction(p.faction) === 'son')
         .map(p => p.id);
@@ -2094,6 +2112,10 @@ export class DispatcherV4 {
       if (allySonIds.length === 0) {
         throw new Error('[Định Quốc] Không có đồng minh phe Sơn nào còn sống trên bàn cờ!');
       }
+
+      player.skillUsage = player.skillUsage || {};
+      player.skillUsage.dinh_quoc = player.skillUsage.dinh_quoc || {};
+      player.skillUsage.dinh_quoc.usedThisTurn = true;
 
       this.state.priorityStack.push({
         type: 'ASK_DINH_QUOC',
@@ -2444,7 +2466,8 @@ export class DispatcherV4 {
       }
       const card = player.hand.find(c => c.id === cardId);
       if (!card) throw new Error('[Tiên Duyên] Không tìm thấy lá bài trên tay!');
-      const isClub = normalizeSuit(card.suit).code === 'club';
+      const effSuit = globalHeroRegistry.getEffectiveSuit(player, card);
+      const isClub = normalizeSuit(effSuit || card.suit).code === 'club';
       if (!isClub) throw new Error('[Tiên Duyên] Kỹ năng Tiên Duyên chỉ dùng được với lá bài ♣ (Chuồn)!');
 
       const isReforge = !targets || targets.length === 0;
@@ -2558,9 +2581,37 @@ export class DispatcherV4 {
     this.stateMachine.handleDiscard(targetId, cardIds);
   }
 
-  _handleRevealHero({ playerId, heroIndex }) {
+  _handleRevealHero({ playerId, heroIndex, force = false, isPlayerAction = false }) {
     const player = this.state.getPlayer(playerId);
-    if (!player) return;
+    if (!player || player.isAlive === false) return;
+
+    // Ràng buộc Luật Quốc Chiến: Người chơi chỉ được chủ động mở tướng trong lượt của mình,
+    // trừ phi có frame/event kích hoạt hoặc có cờ force = true (hệ thống/kỹ năng tự động mở).
+    const currentTurnId = this.state.currentTurnPlayerId;
+    const isMyTurn = currentTurnId === undefined || currentTurnId === null || currentTurnId === playerId;
+
+    const frame = this.state.priorityStack?.peek?.();
+    const hasActiveFrame = Boolean(frame && (
+      frame.currentActorId === playerId ||
+      frame.targetId === playerId ||
+      frame.sourceId === playerId ||
+      (Array.isArray(frame.priorityQueue) && frame.priorityQueue[0] === playerId) ||
+      frame.context?.currentResponderId === playerId
+    ));
+
+    const waiting = this.state.waitingForResponse;
+    const hasActiveWaiting = Boolean(waiting && (
+      waiting.responderId === playerId ||
+      waiting.targetId === playerId ||
+      (Array.isArray(waiting.askQueue) && waiting.askQueue.includes(playerId))
+    ));
+
+    if (isPlayerAction && !force && !isMyTurn && !hasActiveFrame && !hasActiveWaiting) {
+      console.warn(`[DispatcherV4] Người chơi ${playerId} không thể mở tướng ngoài lượt khi không có sự kiện kích hoạt! (Lượt hiện tại: ${currentTurnId})`);
+      this.addLog(`⚠️ Không thể mở tướng khi chưa tới lượt và không có sự kiện kích hoạt!`, 'warning');
+      return;
+    }
+
     if (heroIndex === 'all' || heroIndex === -1 || heroIndex === undefined) {
       this.heroRegistry.revealPlayerHero(this.state, player, 0, null, true);
       this.heroRegistry.revealPlayerHero(this.state, player, 1, null, true);

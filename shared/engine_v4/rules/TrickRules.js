@@ -91,6 +91,13 @@ export class TrickRules {
       return;
     }
 
+    // 3.6. Bỏ qua Hóa Giải nếu có cờ skipNegate
+    if (extraArgs?.skipNegate) {
+      state.addLog(`⚡ Cẩm nang [${card.name}] có hiệu lực!`);
+      this._executeTrickEffect(state, sourceId, targets, card, extraArgs);
+      return;
+    }
+
     // 4. Mở vòng hỏi Hóa Giải (Negate Chain) cho Cẩm nang đơn thể / có mục tiêu
     this._startNegateChain(state, sourceId, targets, card, extraArgs);
   }

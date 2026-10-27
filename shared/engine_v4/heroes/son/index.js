@@ -174,6 +174,7 @@ export const DinhDien = {
       id: 'dinh_quoc',
       name: 'Định Quốc',
       type: 'active',
+      canUse: (state, ctx) => !ctx.owner?.skillUsage?.dinh_quoc?.usedThisTurn,
       description: 'Chủ Công Kỹ: Tướng Sơn có thể đưa lá [Né] hoặc [Sấm Sét] cho Đinh Điền.'
     })
   ]

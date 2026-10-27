@@ -17,24 +17,40 @@ export function JudgementRollModal({ req, gameState, onConfirm }) {
   const titleName = isChaos ? 'HỖN LOẠN' : (isLightning ? 'SẤM SÉT' : 'BINH LƯƠNG');
 
   const [countdown, setCountdown] = useState(isResult ? 4 : 7);
+  const hasConfirmedRef = React.useRef(false);
+
+  const handleConfirm = React.useCallback((payload) => {
+    if (hasConfirmedRef.current) return;
+    hasConfirmedRef.current = true;
+    onConfirm(payload);
+  }, [onConfirm]);
 
   useEffect(() => {
+    hasConfirmedRef.current = false;
+    setCountdown(isResult ? 4 : 7);
+
     const timer = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
           clearInterval(timer);
-          if (isResult) {
-            onConfirm({ confirmResult: true, _isAuto: true });
-          } else {
-            onConfirm({ doRoll: true, _isAuto: true });
-          }
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
+
     return () => clearInterval(timer);
-  }, [isResult, onConfirm]);
+  }, [isResult, req?.id, req?.type]);
+
+  useEffect(() => {
+    if (countdown === 0 && !hasConfirmedRef.current) {
+      if (isResult) {
+        handleConfirm({ confirmResult: true, _isAuto: true });
+      } else {
+        handleConfirm({ doRoll: true, _isAuto: true });
+      }
+    }
+  }, [countdown, isResult, handleConfirm]);
 
   const judgeCard = req.judgeCard;
   const isSuccess = req.isSuccess;
@@ -114,7 +130,7 @@ export function JudgementRollModal({ req, gameState, onConfirm }) {
               width: '100%',
               boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
             }} 
-            onClick={() => onConfirm({ doRoll: true })}
+            onClick={() => handleConfirm({ doRoll: true })}
           >
             🎲 RÚT BÀI PHÁN XÉT ({countdown}s)
           </button>
@@ -181,7 +197,7 @@ export function JudgementRollModal({ req, gameState, onConfirm }) {
               cursor: 'pointer',
               width: '100%'
             }} 
-            onClick={() => onConfirm({ confirmResult: true })}
+            onClick={() => handleConfirm({ confirmResult: true })}
           >
             Tiếp tục ➔ ({countdown}s)
           </button>

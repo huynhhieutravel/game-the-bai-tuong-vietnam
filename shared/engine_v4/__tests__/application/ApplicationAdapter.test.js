@@ -135,27 +135,27 @@ describe('Engine v4 Application Layer Adapter', () => {
     // Bot 1 is next actor
     expect(state.priorityStack.peek().currentActorId).toBe(1);
 
-    // Advance timers for Bot 1
-    await vi.advanceTimersByTimeAsync(700);
+    // Advance timers for Bot 1 (100ms passReaction delay for auto-cancel)
+    await vi.advanceTimersByTimeAsync(100);
 
     // Bot 2 is next actor
     expect(state.priorityStack.peek().currentActorId).toBe(2);
 
-    // Advance timers for Bot 2
-    await vi.advanceTimersByTimeAsync(700);
+    // Advance timers for Bot 2 (100ms passReaction delay)
+    await vi.advanceTimersByTimeAsync(100);
 
     // Bot 3 is next actor
     expect(state.priorityStack.peek().currentActorId).toBe(3);
 
-    // Advance timers for Bot 3
-    await vi.advanceTimersByTimeAsync(700);
+    // Advance timers for Bot 3 (100ms passReaction delay)
+    await vi.advanceTimersByTimeAsync(100);
 
     // Negate chain finishes! Now ASK_SLASH_DUEL for Player 1 (Bot 1)
     expect(state.priorityStack.peek().type).toBe('ASK_SLASH_DUEL');
     expect(state.priorityStack.peek().currentActorId).toBe(1);
 
-    // Advance timers for Bot 1 duel slash
-    await vi.advanceTimersByTimeAsync(700);
+    // Advance timers for Bot 1 duel slash (no slash -> 100ms cancel)
+    await vi.advanceTimersByTimeAsync(100);
 
     // Duel either continues or Bot 1 takes damage / loses
     runner.cleanup();

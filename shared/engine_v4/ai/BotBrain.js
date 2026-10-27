@@ -519,7 +519,7 @@ export class BotBrain {
       if (clubCard) {
         const unchainedEnemies = this._sortTargetsByPriority(
           bot,
-          alivePlayers.filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p) && !p.chained),
+          alivePlayers.filter(p => p.id !== bot.id && !this._isKnownAlly(bot, p) && !p.isChained && !p.chained),
           state
         );
         if (unchainedEnemies.length > 0) {
@@ -558,7 +558,7 @@ export class BotBrain {
     }
 
     // 2. Can Gián (Trần Bình Trọng) - Mất 1 HP cho đồng minh rút 2 bài khi an toàn
-    if (hasSkill(bot, 'can_gian') && bot.hp >= 3) {
+    if (hasSkill(bot, 'can_gian') && !bot.skillUsage?.can_gian?.usedThisTurn && bot.hp >= 3) {
       const cardStarvedAlly = alivePlayers.find(p => p.id !== bot.id && this._isKnownAlly(bot, p) && (p.hand?.length || 0) <= 2);
       if (cardStarvedAlly) {
         return {
@@ -570,7 +570,7 @@ export class BotBrain {
     }
 
     // 3. Định Quốc (Đinh Điền) - Chủ động kêu gọi đồng minh Sơn dâng bài
-    if (hasSkill(bot, 'dinh_quoc') && (bot.hand?.length || 0) <= 2) {
+    if (hasSkill(bot, 'dinh_quoc') && !bot.skillUsage?.dinh_quoc?.usedThisTurn && (bot.hand?.length || 0) <= 2) {
       const hasSonAlly = alivePlayers.some(p => p.id !== bot.id && getCanonicalFaction(p.faction) === 'son');
       if (hasSonAlly) {
         return {
@@ -774,7 +774,7 @@ export class BotBrain {
           if (otherCards.length === 0) continue;
 
           // Ưu tiên mục tiêu bị Xiềng Xích để kích hoạt sát thương lây lan
-          const chainedEnemies = sortedEnemies.filter(p => p.chained);
+          const chainedEnemies = sortedEnemies.filter(p => p.isChained || p.chained);
           const targetEnemy = chainedEnemies.length > 0 ? chainedEnemies[0] : sortedEnemies[0];
           return {
             type: 'PLAY_CARD',
@@ -823,7 +823,7 @@ export class BotBrain {
         );
         const sortedVictims = this._sortTargetsByPriority(bot, potentialVictims, state);
         if (sortedVictims.length > 0) {
-          const chainedVictims = sortedVictims.filter(p => p.chained);
+          const chainedVictims = sortedVictims.filter(p => p.isChained || p.chained);
           const victim = chainedVictims.length > 0 ? chainedVictims[0] : sortedVictims[0];
           return {
             type: 'PLAY_CARD',
@@ -1237,7 +1237,7 @@ export class BotBrain {
     if (target.equipment?.weapon) score += 12;
     if (target.equipment?.horse_attack) score += 8;
     if (target.equipment?.armor) score -= 8;
-    if (target.chained) score += 15; // Mục tiêu bị xiềng xích dễ chịu sát thương lan nguyên tố
+    if (target.isChained || target.chained) score += 15; // Mục tiêu bị xiềng xích dễ chịu sát thương lan nguyên tố
 
     // 6. Khoảng Cách Cự Ly (Proximity Penalty)
     if (state && typeof RangeSystem?.getDistance === 'function') {
@@ -1349,6 +1349,13 @@ export class BotBrain {
       }
 
       case 'ASK_NEGATE': {
+        const isMyCard = frame.sourceId === bot.id;
+        const negateCount = frame.context?.negateCount || 0;
+        // Tuyệt đối không tự Hóa Giải cẩm nang của chính mình khi chưa bị ai vô hiệu hóa
+        if (isMyCard && negateCount % 2 === 0) {
+          return { type: 'ACTION_REACT', negateCard: null };
+        }
+
         const card = frame.context?.card;
         const targetId = frame.targetId;
         const target = targetId !== null && targetId !== undefined ? state.getPlayer(targetId) : null;
@@ -1369,7 +1376,7 @@ export class BotBrain {
         }
 
         // Hóa giải cẩm nang gây hại nếu mục tiêu là bản thân hoặc đồng minh
-        const isHarmful = card && ['Sấm Sét', 'Hỗn Loạn', 'Quyết Đấu', 'Cướp Bài', 'Tước Bài', 'Nam Man Xâm Nhập', 'Loạn Tiễn'].includes(card.name);
+        const isHarmful = card && ['Sấm Sét', 'Hỗn Loạn', 'Quyết Đấu', 'Cướp Bài', 'Tước Bài', 'Nam Man Xâm Nhập', 'Loạn Tiễn', 'Xiềng Xích', 'Hỏa Công'].includes(card.name);
         if (isHarmful) {
           if (target && this._isKnownAlly(bot, target)) {
             return { type: 'ACTION_REACT', negateCard };
@@ -1377,9 +1384,18 @@ export class BotBrain {
           return { type: 'ACTION_REACT', negateCard: null };
         }
 
-        // Hóa giải cẩm nang có lợi nếu mục tiêu là kẻ địch
-        if (target && this._isKnownEnemy(bot, target)) {
+        // Hóa giải cẩm nang có lợi nếu mục tiêu là kẻ địch (Vô Trung Sinh Hữu, Hồi Xuân...)
+        const isBeneficial = card && ['Vô Trung Sinh Hữu', 'Hồi Xuân'].includes(card.name);
+        if (isBeneficial && target && this._isKnownEnemy(bot, target)) {
           return { type: 'ACTION_REACT', negateCard };
+        }
+
+        // Nếu lá bài của đồng minh hoặc bản thân đang bị đối phương Hóa Giải (negateCount lẻ) -> Hóa Giải phản kháng
+        if (negateCount % 2 === 1) {
+          const source = frame.sourceId !== null && frame.sourceId !== undefined ? state.getPlayer(frame.sourceId) : null;
+          if (source && (source.id === bot.id || this._isKnownAlly(bot, source))) {
+            return { type: 'ACTION_REACT', negateCard };
+          }
         }
 
         return { type: 'ACTION_REACT', negateCard: null };

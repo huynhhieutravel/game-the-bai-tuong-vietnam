@@ -128,10 +128,10 @@ export class GameAPIV4 {
     });
   }
 
-  revealHero(playerId, heroIndex) {
+  revealHero(playerId, heroIndex, options = {}) {
     this.dispatcher.dispatchAction({
       type: 'ACTION_REVEAL_HERO',
-      payload: { playerId, heroIndex }
+      payload: { playerId, heroIndex, isPlayerAction: true, ...options }
     });
   }
 

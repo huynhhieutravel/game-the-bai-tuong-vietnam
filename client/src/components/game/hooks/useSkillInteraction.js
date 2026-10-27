@@ -61,10 +61,10 @@ export function useSkillInteraction({
         }
     
         if (normSkillId === 'tien_duyen') {
-           if (activeSkill === skillId || activeSkill === normSkillId) {
+           if (activeSkill === skillId || activeSkill === normSkillId || normalizeSkillId(activeSkill) === 'tien_duyen') {
                cancelTargeting();
            } else {
-               setActiveSkill(skillId);
+               setActiveSkill('Tiên Duyên');
                setTargetSession({
                    card: null,
                    virtualCardName: null,

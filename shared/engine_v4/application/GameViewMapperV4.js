@@ -90,6 +90,7 @@ export function toViewModel(state, mainPlayerId = 0) {
     deck: state.drawPile || state.deck || [],
     discardPile: state.discardPile || [],
     currentPlayerIndex: state.currentTurnPlayerId ?? state.currentPlayerIndex ?? 0,
+    currentTurnPlayerId: state.currentTurnPlayerId ?? state.currentPlayerIndex ?? 0,
     turn: state.turn || 1,
     chainedDamageQueue: state.chainedDamageQueue || []
   };

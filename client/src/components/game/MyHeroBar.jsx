@@ -33,6 +33,17 @@ export default function MyHeroBar(props) {
     const isSelected = targetSession?.selectedTargets.includes(me.id);
     const isDead = me?.isAlive === false;
     const isDying = me?.isAlive !== false && typeof me?.hp === 'number' && me.hp <= 0;
+
+    const currentTurnId = gameState?.currentTurnPlayerId ?? gameState?.currentPlayerIndex;
+    const isMyTurn = currentTurnId !== undefined && currentTurnId !== null ? currentTurnId === me?.id : true;
+    const hasWaitingResponse = Boolean(
+      gameState?.waitingForResponse && (
+        gameState.waitingForResponse.responderId === me?.id ||
+        gameState.waitingForResponse.targetId === me?.id ||
+        (Array.isArray(gameState.waitingForResponse.askQueue) && gameState.waitingForResponse.askQueue.includes(me?.id))
+      )
+    );
+    const canRevealHero = isMyTurn || hasWaitingResponse;
     
     const onAvatarClick = (e) => {
         if (e) e.stopPropagation();
@@ -305,7 +316,20 @@ export default function MyHeroBar(props) {
                                {me.revealedHeroes && !me.revealedHeroes[0] && (
                                  <div className="my-hero-reveal-overlay" onClick={(e) => { e.stopPropagation(); setHeroPopup(me); }}>
                                    <span className="my-hero-reveal-label">{(!me.revealedHeroes[0] && !me.revealedHeroes[1]) ? "TƯỚNG 1" : "CHÍNH ẨN"}</span>
-                                   <button className="btn-action warning my-hero-reveal-btn" title="Lật mở tướng này làm Tướng Chính" onClick={(e) => { e.stopPropagation(); handleRevealClick(0); }}>Lật</button>
+                                   <button 
+                                     className="btn-action warning my-hero-reveal-btn" 
+                                     disabled={!canRevealHero}
+                                     title={!canRevealHero 
+                                       ? "Chỉ có thể mở tướng trong lượt của bạn hoặc khi có sự kiện kích hoạt" 
+                                       : "Lật mở tướng này làm Tướng Chính"} 
+                                     onClick={(e) => { 
+                                       e.stopPropagation(); 
+                                       if (!canRevealHero) return;
+                                       handleRevealClick(0); 
+                                     }}
+                                   >
+                                     Lật
+                                   </button>
                                    <button className="btn-action secondary my-hero-view-btn" onClick={(e) => { e.stopPropagation(); setHeroPopup(me); }}>Xem</button>
                                  </div>
                                )}
@@ -319,8 +343,15 @@ export default function MyHeroBar(props) {
                                    <span className="my-hero-reveal-label">{(!me.revealedHeroes[0] && !me.revealedHeroes[1]) ? "TƯỚNG 2" : "PHÓ ẨN"}</span>
                                    <button 
                                      className="btn-action warning my-hero-reveal-btn" 
-                                     title={!me.revealedHeroes[0] ? "Lật mở tướng này làm Tướng Chính" : "Lật mở Phó Tướng"}
-                                     onClick={(e) => { e.stopPropagation(); handleRevealClick(1); }}
+                                     disabled={!canRevealHero}
+                                     title={!canRevealHero 
+                                       ? "Chỉ có thể mở tướng trong lượt của bạn hoặc khi có sự kiện kích hoạt" 
+                                       : (!me.revealedHeroes[0] ? "Lật mở tướng này làm Tướng Chính" : "Lật mở Phó Tướng")}
+                                     onClick={(e) => { 
+                                       e.stopPropagation(); 
+                                       if (!canRevealHero) return;
+                                       handleRevealClick(1); 
+                                     }}
                                    >
                                      Lật
                                    </button>
