@@ -98,7 +98,7 @@ export function VipHeroSelectorModal({ draftSelection = [], me, onSelect, onClos
         border: '2px solid #fbbf24',
         boxShadow: '0 0 35px rgba(245, 158, 11, 0.3), 0 25px 50px -12px rgba(0, 0, 0, 0.95)',
         width: '98%',
-        maxWidth: '1000px',
+        maxWidth: '1080px',
         height: '94vh',
         maxHeight: '430px',
         display: 'flex',
@@ -241,15 +241,15 @@ export function VipHeroSelectorModal({ draftSelection = [], me, onSelect, onClos
           </div>
         </div>
 
-        {/* DANH SÁCH 3 CỘT — CỐ ĐỊNH MIN-HEIGHT ĐẢM BẢO KHÔNG SỤP LAYOUT */}
+        {/* DANH SÁCH 4 CỘT — 4 TƯỚNG 1 HÀNG THEO YÊU CẦU TEST MODE */}
         <div style={{
           flex: '1 1 auto',
           minHeight: 0,
           overflowY: 'auto',
           overflowX: 'hidden',
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '10px',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '8px',
           padding: '4px 2px'
         }}>
           {availableHeroes.length > 0 ? (

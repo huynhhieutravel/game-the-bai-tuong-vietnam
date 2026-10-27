@@ -163,6 +163,9 @@ export function ModalContainer({ mainPlayerId = 0 }) {
           backdropFilter: 'blur(12px)',
           boxShadow: '0 0 40px rgba(0,0,0,0.6)',
           minWidth: '280px',
+          maxWidth: '96vw',
+          maxHeight: '94vh',
+          boxSizing: 'border-box',
         };
         // Ask Khai Quốc
         if (req.type === 'ask_khai_quoc' && req.responderId === me.id) {
@@ -260,7 +263,18 @@ export function ModalContainer({ mainPlayerId = 0 }) {
 
         if (req.type === 'ask_banh_chung' && req.responderId === me.id) {
           return (
-            <div style={modalStyle}>
+            <div style={{
+              ...modalStyle,
+              width: '96%',
+              maxWidth: '650px',
+              maxHeight: 'min(94vh, 385px)',
+              padding: '10px 14px',
+              display: 'flex',
+              flexDirection: 'column',
+              boxSizing: 'border-box',
+              border: '2px solid #10b981',
+              boxShadow: '0 0 35px rgba(16, 185, 129, 0.35), 0 20px 45px rgba(0,0,0,0.85)'
+            }}>
               <BanhChungModal req={req} onConfirm={handleResponseAction} />
             </div>
           );

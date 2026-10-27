@@ -4,8 +4,8 @@ import { render, fireEvent, screen } from '@testing-library/react';
 import React from 'react';
 import { VipHeroSelectorModal } from '../modals/VipHeroSelectorModal';
 
-describe('UI QA: VipHeroSelectorModal - 3 Cột, Chọn Nhanh & Xem Chi Tiết Kỹ Năng', () => {
-  it('1. Hiển thị đúng 3 cột và có đầy đủ 4 tab Phe chuẩn (Lạc, Việt, Hà, Sơn)', () => {
+describe('UI QA: VipHeroSelectorModal - 4 Cột (4 Tướng 1 Hàng), Chọn Nhanh & Xem Chi Tiết Kỹ Năng', () => {
+  it('1. Hiển thị đúng 4 cột (4 tướng 1 hàng) và có đầy đủ 4 tab Phe chuẩn (Lạc, Việt, Hà, Sơn)', () => {
     const { container } = render(
       <VipHeroSelectorModal
         draftSelection={[]}
@@ -22,8 +22,8 @@ describe('UI QA: VipHeroSelectorModal - 3 Cột, Chọn Nhanh & Xem Chi Tiết K
     expect(screen.getByText(/🔵 Hà/i)).toBeTruthy();
     expect(screen.getByText(/🟤 Sơn/i)).toBeTruthy();
 
-    // Kiểm tra Grid 3 cột theo đúng yêu cầu
-    const gridEl = container.querySelector('div[style*="grid-template-columns: repeat(3, 1fr)"], div[style*="gridTemplateColumns: repeat(3, 1fr)"], div[style*="repeat(3, 1fr)"]');
+    // Kiểm tra Grid 4 cột theo đúng yêu cầu
+    const gridEl = container.querySelector('div[style*="grid-template-columns: repeat(4, 1fr)"], div[style*="gridTemplateColumns: repeat(4, 1fr)"], div[style*="repeat(4, 1fr)"]');
     expect(gridEl).toBeTruthy();
   });
 
