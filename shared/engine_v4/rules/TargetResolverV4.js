@@ -5,7 +5,7 @@
  * Tương thích với GameViewModel & UI, tích hợp RangeSystem & HeroRegistry v4.
  */
 
-import { RangeSystem } from './RangeSystem.js';
+import { RangeSystem, getEquipmentSlot } from './RangeSystem.js';
 import { globalHeroRegistry } from '../heroes/HeroRegistry.js';
 import { 
   normalizeSuit, 
@@ -260,17 +260,7 @@ export function getTargetingDefinition(state, playerId, cardNameOrId, physicalCa
               return alive.filter(x => {
                 if (x.id === p.id) return false;
                 // Kiểm tra vũ khí trên người đối thủ (tương thích cả cấu trúc object x.equipment.weapon lẫn mảng x.equipment)
-                const hasWeapon = Boolean(x.equipment?.weapon) || (Array.isArray(x.equipment) && x.equipment.some(e => 
-                  e && (
-                    e.type === 'weapon' || 
-                    e.subtype === 'weapon' || 
-                    e.subType === 'weapon' || 
-                    e.subtype === 'equip_weapon' || 
-                    e.subType === 'equip_weapon' ||
-                    e.slot === 'weapon' ||
-                    Boolean(RangeSystem.getWeaponRange(e.name || e.idKey || ''))
-                  )
-                ));
+                const hasWeapon = Boolean(getEquipmentSlot(x, 'weapon'));
                 if (!hasWeapon) return false;
                 // Người bị mượn đao phải có ít nhất 1 mục tiêu khác để Chém tới
                 const validVictims = RangeSystem.getValidSlashTargets(x, alive).filter(v => v.id !== x.id);

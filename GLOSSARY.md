@@ -1476,4 +1476,13 @@ Tài liệu này định nghĩa hệ thống ngôn ngữ và khái niệm thốn
   - **Khái niệm:** Chiến thuật khuếch đại sát thương diện rộng của [Hỏa Công] khi kết hợp với trạng thái [Xiềng Xích].
   - Khi lựa chọn mục tiêu Hỏa Công, Bot ưu tiên hàng đầu các kẻ địch đang bị Xiềng Xích (`chained: true`) để kích hoạt chuỗi sát thương nguyên tố lửa lan truyền toàn bộ các mục tiêu bị xích trên bàn cờ.
 
+- **🗡️ Mượn Đao Diệt Địch (Borrow Sword) & Thanh Long Đao:**
+  - **Nhận diện Trang Bị Đa Cấu Trúc (Array & Object Compatibility):** Hàm `getEquipmentSlot(player, slot)` và `RangeSystem.getAttackRange` hỗ trợ đọc chính xác vũ khí khi `player.equipment` ở dạng mảng (ViewModel React). Nhờ đó, người chơi mang Thanh Long Đao (tầm = 3) luôn được nhận diện đúng tầm đánh và đủ điều kiện xuất hiện trong danh sách mục tiêu hợp lệ (`validTargets`) ở bước 1 của Mượn Đao.
+  - **Tương Tác Chọn Mục Tiêu Trên Bàn Đấu (Targeting Priority on Player Board):** Trong `PlayerBoard.jsx`, khi đối thủ đang trong trạng thái `isTargetable` (đang có hiệu lực chọn mục tiêu cho Mượn Đao, Chém, Cướp Bài...), thao tác nhấp vào hàng trang bị / ô vũ khí của đối thủ được tự động chuyển hướng thành hành động chọn mục tiêu (`handleTargetClick(player.id)`) thay vì mở popup xem chi tiết trang bị, loại bỏ hoàn toàn sự ức chế không click chọn được người có vũ khí.
+
+- **⚡ Cơ Chế Hàng Đợi Trạng Thái BotRunner (Pending State Queue - Zero Freeze Invariant):**
+  - **Loại bỏ triệt để hiện tượng đứng hình 5-6 giây:** Sau các cẩm nang diện rộng như [Loạn Tiễn] hoặc [Vạn Tiễn], khi người chơi chính đánh lá [Né] làm PriorityStack rỗng, nếu timer phản ứng cũ của Bot trước đó vẫn đang chờ, state update mới không còn bị vứt bỏ nữa mà được lưu vào `this.pendingState`.
+  - **Tự động đánh thức (Auto-Wakeup):** Ngay khi timer phản ứng kết thúc, hàm `this._finishProcessing()` tự động xả `pendingState` và kích hoạt ngay `onStateUpdate`, đưa Bot đang trong lượt tiếp tục xử lý Action Phase mượt mà, loại bỏ mọi hiện tượng đứng hình hay đơ game.
+
+
 

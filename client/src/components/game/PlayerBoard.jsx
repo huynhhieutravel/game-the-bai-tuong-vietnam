@@ -393,12 +393,16 @@ export function PlayerBoard({
               className="equipment-area opponent-equipment-row" 
               style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: '2px', marginTop: '2px', cursor: 'pointer' }}
               onClick={(e) => {
+                if (isTargetable) {
+                  handleTargetClick(player.id);
+                  return;
+                }
                 e.stopPropagation();
                 if (setHeroPopup) {
                   setHeroPopup({ ...player, initialTab: 'equipment' });
                 }
               }}
-              title="Nhấn để xem chi tiết trang bị & phán xét"
+              title={isTargetable ? `Nhấn để chọn ${player.name || 'người chơi này'}` : "Nhấn để xem chi tiết trang bị & phán xét"}
             >
               {[
                 { type: CARD_SUBTYPES.EQUIP_WEAPON, icon: <WeaponIcon size={11} />, title: 'Vũ khí' },

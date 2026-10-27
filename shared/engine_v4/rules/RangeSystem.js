@@ -24,7 +24,62 @@ export const WEAPON_RANGE_MAP = {
   'ky_lan_cung': 5, 'ky-lan-cung': 5, 'kỳ-lân-cung': 5, 'Kỳ Lân Cung': 5, 'ky_lan': 5, 'kirin_bow': 5
 };
 
+export function getEquipmentSlot(player, slot) {
+  if (!player || !player.equipment) return null;
+  if (!Array.isArray(player.equipment)) {
+    return player.equipment[slot] || null;
+  }
+  if (player.equipment[slot]) return player.equipment[slot];
+  if (slot === 'weapon') {
+    return player.equipment.find(e => e && (
+      e.type === 'weapon' || e.subtype === 'weapon' || e.subtype === 'equip_weapon' ||
+      e.subType === 'weapon' || e.subType === 'equip_weapon' || e.slot === 'weapon' ||
+      Boolean(RangeSystem.getWeaponRange(e))
+    )) || null;
+  }
+  if (slot === 'armor') {
+    return player.equipment.find(e => e && (
+      e.type === 'armor' || e.subtype === 'armor' || e.subtype === 'equip_armor' ||
+      e.subType === 'armor' || e.subType === 'equip_armor' || e.slot === 'armor'
+    )) || null;
+  }
+  if (slot === 'horse_attack') {
+    return player.equipment.find(e => e && (
+      e.subtype === 'horse_attack' || e.subtype === 'equip_horse_attack' ||
+      e.subtype === 'mount_attack' || e.slot === 'horse_attack' || e.slot === 'mount_attack'
+    )) || null;
+  }
+  if (slot === 'horse_defense') {
+    return player.equipment.find(e => e && (
+      e.subtype === 'horse_defense' || e.subtype === 'equip_horse_defense' ||
+      e.subtype === 'mount_defense' || e.slot === 'horse_defense' || e.slot === 'mount_defense'
+    )) || null;
+  }
+  return null;
+}
+
 export class RangeSystem {
+  /**
+   * Lấy tầm đánh của một loại vũ khí cụ thể theo thẻ bài hoặc tên
+   */
+  static getWeaponRange(cardOrName) {
+    if (!cardOrName) return 0;
+    if (typeof cardOrName === 'object') {
+      if (typeof cardOrName.range === 'number') return cardOrName.range;
+      cardOrName = cardOrName.name || cardOrName.idKey || cardOrName.id || '';
+    }
+    const raw = String(cardOrName).trim();
+    if (WEAPON_RANGE_MAP[raw]) return WEAPON_RANGE_MAP[raw];
+    const canonicalKey = normalizeEquipKey(raw);
+    if (WEAPON_RANGE_MAP[canonicalKey]) return WEAPON_RANGE_MAP[canonicalKey];
+    for (const [key, r] of Object.entries(WEAPON_RANGE_MAP)) {
+      if (raw.toLowerCase().includes(key.toLowerCase())) {
+        return r;
+      }
+    }
+    return 0;
+  }
+
   /**
    * Tính khoảng cách từ người chơi Source đến người chơi Target
    * @param {Object} source Người chơi thực hiện hành động
@@ -49,17 +104,17 @@ export class RangeSystem {
     const diff = Math.abs(sourceIdx - targetIdx);
     const rawCircleDist = Math.min(diff, total - diff);
 
-    // 1. Điều chỉnh từ Ngựa / Trang bị
+    // 1. Điều chỉnh từ Ngựa / Trang bị (hỗ trợ cả cấu trúc Object và Mảng)
     let attackModifier = 0; // Trừ khoảng cách khi tấn công người khác (-1)
     let defenseModifier = 0; // Tăng khoảng cách khi người khác tấn công mình (+1)
 
     // Ngựa tấn công (-1) của Source
-    if (source.equipment?.horse_attack) {
+    if (getEquipmentSlot(source, 'horse_attack')) {
       attackModifier += 1;
     }
 
     // Ngựa phòng thủ (+1) của Target
-    if (target.equipment?.horse_defense) {
+    if (getEquipmentSlot(target, 'horse_defense')) {
       defenseModifier += 1;
     }
 
@@ -118,28 +173,12 @@ export class RangeSystem {
       }
     }
 
-    // Vũ khí trang bị
-    const weapon = player.equipment?.weapon;
+    // Vũ khí trang bị (hỗ trợ cả Object và Array)
+    const weapon = getEquipmentSlot(player, 'weapon');
     if (weapon) {
-      if (typeof weapon.range === 'number') {
-        return weapon.range;
-      }
-      const canonicalKey = normalizeEquipKey(weapon);
-      if (WEAPON_RANGE_MAP[canonicalKey]) {
-        return WEAPON_RANGE_MAP[canonicalKey];
-      }
-      const rawName = weapon.idKey || weapon.name || weapon.key || weapon.id || '';
-      if (WEAPON_RANGE_MAP[rawName]) {
-        return WEAPON_RANGE_MAP[rawName];
-      }
-      const cleanSlug = String(rawName).toLowerCase().replace(/[-_][0-9]+.*$/, '');
-      if (WEAPON_RANGE_MAP[cleanSlug]) {
-        return WEAPON_RANGE_MAP[cleanSlug];
-      }
-      for (const [key, r] of Object.entries(WEAPON_RANGE_MAP)) {
-        if (typeof rawName === 'string' && rawName.toLowerCase().includes(key.toLowerCase())) {
-          return r;
-        }
+      const weaponRange = RangeSystem.getWeaponRange(weapon);
+      if (weaponRange > 0) {
+        return weaponRange;
       }
     }
 
